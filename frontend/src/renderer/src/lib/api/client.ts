@@ -1,5 +1,6 @@
 import { readAPIResponse } from '@/lib/api/response'
 import { DEFAULT_API_BASE_URL, clientRuntime } from '@/lib/clientRuntime'
+import { isPreviewProxyTargetHostname } from '@shared/preview'
 
 export { ApiError } from '@/lib/api/response'
 
@@ -25,6 +26,15 @@ export function normalizeBaseUrl(url: string): string {
     return new URL(trimmed).origin
   } catch {
     return trimmed
+  }
+}
+
+export function isLocalBackendUrl(url: string): boolean {
+  try {
+    const { hostname, port } = new URL(normalizeBaseUrl(url))
+    return isPreviewProxyTargetHostname(hostname) && port === DEFAULT_LOCAL_PORT
+  } catch {
+    return false
   }
 }
 

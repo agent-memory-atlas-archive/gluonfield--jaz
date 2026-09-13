@@ -5,6 +5,7 @@ import { X509Certificate } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { installBrowserControl } from '@main/browserControl'
+import { attachExternalOpenHandler } from '@main/browserNavigation'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
 import { installBrowserPasswords } from '@main/browserPasswords'
 import { BrowserPasswordStore } from '@main/browserPasswordStore'
@@ -15,6 +16,10 @@ import { accessibilityFixture, accessibilityFrame } from './accessibility'
 app.setName('Jaz')
 app.setPath('userData', join(process.env.JAZ_BROWSER_SMOKE_DIR!, `profile-${process.pid}`))
 const timeout = Number(process.env.JAZ_BROWSER_SMOKE_TIMEOUT_MS || 30000)
+const openedURLs: string[] = []
+app.on('web-contents-created', (_event, contents) => attachExternalOpenHandler(contents, async (url) => {
+  openedURLs.push(url)
+}))
 installBrowserControl()
 installBrowserPasswords()
 process.on('unhandledRejection', (error) => {
@@ -22,6 +27,7 @@ process.on('unhandledRejection', (error) => {
   app.exit(1)
 })
 ipcMain.handle('smoke:backend', () => process.env.JAZ_BROWSER_SMOKE_BACKEND)
+ipcMain.handle('smoke:opened-urls', () => openedURLs)
 ipcMain.handle('smoke:browser-exists', (_event, id: number) => Boolean(webContents.fromId(id)))
 
 let pendingProxy: { response: ServerResponse; url: string } | undefined
@@ -79,7 +85,11 @@ const server = createServer(async (request, response) => {
       proxyWaiter = undefined
       return
     }
-    response.end(JSON.stringify({ url }))
+    const source = new URL(url)
+    if (source.searchParams.get('preview') === 'direct') {
+      source.hostname = 'jaz-preview-fixture.localhost'
+    }
+    response.end(JSON.stringify({ url: source.href }))
     return
   }
   const pathname = new URL(request.url!, 'http://localhost').pathname

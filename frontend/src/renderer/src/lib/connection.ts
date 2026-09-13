@@ -5,7 +5,7 @@ import {
   CLIENT_PLATFORM,
   CLIENT_PLATFORM_HEADER,
   consumeStartupConnectUrl,
-  DEFAULT_LOCAL_PORT,
+  isLocalBackendUrl,
   localBaseUrl,
   normalizeBaseUrl,
   parseBackendConnectUrl,
@@ -16,6 +16,8 @@ import { rememberBackend, removeKnownBackend } from './backends'
 import { clientRuntime } from './clientRuntime'
 import { getDeviceProfile } from './deviceIdentity'
 import { queryClient } from './query/queryClient'
+
+export { isLocalBackendUrl } from '@/lib/api/client'
 
 // Gate for the whole app: 'checking' on first probe of the remembered URL,
 // 'connected' while periodic /health polls pass. On loss the app stays
@@ -581,22 +583,6 @@ async function restoreConnection(snapshot: ConnectionSnapshot): Promise<void> {
   // like any other loss of that backend.
   if (snapshot.preference) savePreference(snapshot.preference)
   await reconnectKnown(snapshot.url)
-}
-
-// "This machine" is the local backend, which always runs on the default Jaz port.
-// A loopback host on any other port (e.g. an SSH tunnel to a remote backend) is a
-// remote server, not this Mac.
-export function isLocalBackendUrl(url: string): boolean {
-  try {
-    const { hostname, port } = new URL(normalizeBaseUrl(url))
-    return isLoopbackHost(hostname) && port === DEFAULT_LOCAL_PORT
-  } catch {
-    return false
-  }
-}
-
-function isLoopbackHost(host: string): boolean {
-  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0'
 }
 
 // Probe whatever URL the user typed; persist it only once it answers.

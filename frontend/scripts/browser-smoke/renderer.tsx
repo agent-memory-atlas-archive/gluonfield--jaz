@@ -5,6 +5,7 @@ import { SideBrowser } from '@/lib/sideBrowser'
 import { BrowserProfileImport } from '@/components/browser/BrowserProfileImport'
 import { exerciseProfileImport } from './profiles-ui'
 import { exerciseBrowserIdentity } from './identity'
+import { exercisePreviewLinks } from './links'
 import '@/styles/globals.css'
 import { exerciseBrowserLifecycle } from './lifecycle'
 import { exercisePasswords } from './passwords'
@@ -12,7 +13,7 @@ import { exerciseBrowserLayout } from './layout'
 
 declare global {
   interface Window {
-    smoke: { backend(): Promise<string>; browserExists(id: number): Promise<boolean>; passwordStore(): Promise<{ count: number; plaintext: boolean }>; pointer(type: string, x: number, y: number): Promise<void>; capture(name?: string): Promise<void>; resize(width: number, height: number): Promise<void>; result(result: unknown): void }
+    smoke: { backend(): Promise<string>; openedURLs(): Promise<string[]>; browserExists(id: number): Promise<boolean>; passwordStore(): Promise<{ count: number; plaintext: boolean }>; pointer(type: string, x: number, y: number): Promise<void>; capture(name?: string): Promise<void>; resize(width: number, height: number): Promise<void>; result(result: unknown): void }
   }
 }
 
@@ -49,6 +50,8 @@ function Fixture() {
       }
       stage = 'browser identity'
       await exerciseBrowserIdentity(evaluate)
+      stage = 'local preview URLs and external links'
+      await exercisePreviewLinks(browser, evaluate)
       stage = 'profile import'
       await exerciseProfileImport(evaluate)
       stage = 'password saving, filling and origin isolation'

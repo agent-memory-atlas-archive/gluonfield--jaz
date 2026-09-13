@@ -127,6 +127,8 @@ export function PreviewPanel({
   }, [target.sourceUrl])
 
   const bindWebview = useCallback((element: Element | null) => {
+    // React omits this Electron boolean JSX attribute; set it before the guest loads.
+    element?.setAttribute('allowpopups', '')
     const next = element as PreviewWebviewElement | null
     webviewRef.current = next
     setWebview(next)
@@ -351,7 +353,6 @@ export function PreviewPanel({
           <webview
             ref={bindWebview}
             partition={PREVIEW_PARTITION}
-            allowpopups
             className="h-full w-full bg-bg"
           />
         ) : resolvedSourceUrl ? (

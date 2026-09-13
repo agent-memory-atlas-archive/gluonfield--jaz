@@ -1,11 +1,11 @@
-import { post } from './client'
-import { shouldProxyPreview } from '../../../../shared/preview'
-import { preparePreviewProxySource, type PreviewProxyResponse } from './previewSource'
+import { apiBaseUrl, isLocalBackendUrl, post } from '@/lib/api/client'
+import { shouldProxyPreview } from '@shared/preview'
+import { preparePreviewProxySource, type PreviewProxyResponse } from '@/lib/api/previewSource'
 
 const previewHosts = new Map<string, string>()
 
 export async function resolvePreviewSource(value: string): Promise<string> {
-  if (!shouldProxyPreview(value)) return value
+  if (!shouldProxyPreview(value) || isLocalBackendUrl(apiBaseUrl())) return value
   const response = await post<PreviewProxyResponse>('/v1/preview/proxies', { url: value })
   const source = await preparePreviewProxySource(response)
   rememberProxy(value, source)

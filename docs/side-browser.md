@@ -10,6 +10,13 @@ The shared Jaz MCP tools expose this browser to any ACP provider that supports
 those tools. Cancellation, disconnection, changing backend, or closing the app
 stops browser work. Other conversations' tabs cannot be claimed.
 
+With **This machine** selected (a loopback backend on port 5299), localhost
+previews load directly and keep their original URLs, including paths, queries
+and fragments. **Open in Browser** opens that same URL. Remote backends, including
+loopback tunnels on other ports, use the server preview proxy.
+New-tab links and JavaScript popups open in the default external browser while
+preserving the current side-browser page.
+
 Hidden browser sessions are eligible for unloading after five minutes without
 browser commands, including JavaScript sessions that have not opened a page.
 Cleanup checks the conversation's current status and keeps sessions for
@@ -244,7 +251,7 @@ unfinished actions, and cancellation releases the interpreter even when a host
 operation does not respond. High-level calls return through the authenticated
 conversation action endpoint, sharing input validation with the MCP tools. Raw
 CDP calls go directly to the owned webview's IPC method. Localhost navigation uses the
-existing server preview proxy, allowing the server and desktop to be separate.
+server preview proxy when connected to a remote backend.
 
 The Codex 26.903.61454 extraction informed the design: short spring movements,
 long curved movements, rotation/stretch, an idle wiggle and arrival before input.
@@ -296,6 +303,11 @@ including session-header binding, observed success after output truncation, and
 an image result. Each Electron process uses a fresh browser profile. The fixture
 reports pending commands on timeout and writes a screenshot into the printed
 temporary artifact directory.
+
+URL checks verify direct local previews without proxy requests, remote/tunnel
+proxying, unchanged public URLs, and actual clicks on **Open in Browser**,
+new-tab links and JavaScript popups through the production external-open handler.
+The fixture records external destinations without launching the user's browser.
 
 The command builds the desktop bundle and tests the actual sandboxed preload.
 A temporary HTTPS login site checks save/update consent, encrypted store reload,

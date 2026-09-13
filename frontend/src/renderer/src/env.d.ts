@@ -16,7 +16,6 @@ declare namespace JSX {
   interface IntrinsicElements {
     webview: React.DetailedHTMLProps<
       React.HTMLAttributes<HTMLElement> & {
-        allowpopups?: boolean
         partition?: string
         src?: string
       },

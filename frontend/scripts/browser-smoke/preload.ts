@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('jaz', {
 })
 contextBridge.exposeInMainWorld('smoke', {
   backend: () => ipcRenderer.invoke('smoke:backend'),
+  openedURLs: () => ipcRenderer.invoke('smoke:opened-urls'),
   browserExists: (id: number) => ipcRenderer.invoke('smoke:browser-exists', id),
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
   pointer: (type: string, x: number, y: number) => ipcRenderer.invoke('smoke:pointer', type, x, y),
