@@ -36,7 +36,7 @@ import {
 
 const COLLAPSED_PROJECTS_KEY = 'jaz.sidebar.collapsedProjects'
 const MORE_ACTION_CLASS =
-  'flex h-[30px] items-center rounded-full pl-9 pr-2.5 text-[13px] text-ink-3 opacity-80 transition-[background-color,color,opacity] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 max-sm:h-11 max-sm:pl-10 max-sm:pr-3 max-sm:text-[15px]'
+  'flex h-[30px] items-center rounded-full pr-2.5 text-[13px] text-ink-3 opacity-80 transition-[background-color,color,opacity] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 max-sm:h-11 max-sm:pr-3 max-sm:text-[15px]'
 const SECTION_HEADING_CLASS = 'text-[13px] font-semibold text-ink max-sm:text-[15px]'
 const ROW_SPRING: Transition = { type: 'spring', stiffness: 420, damping: 34 }
 
@@ -79,10 +79,12 @@ function SessionRows({
   items,
   shortcutByID,
   shortcutMode,
+  reserveIconSpace = true,
 }: {
   items: SessionListItem[]
   shortcutByID: Map<string, number>
   shortcutMode: boolean
+  reserveIconSpace?: boolean
 }) {
   const showRuntimeBadge = useShowModelIcons()
   return (
@@ -100,6 +102,7 @@ function SessionRows({
               shortcutIndex={shortcutByID.get(item.session.id)}
               shortcutMode={shortcutMode}
               showRuntimeBadge={showRuntimeBadge}
+              reserveIconSpace={reserveIconSpace}
             />
           </AnimatedListItem>
         ))}
@@ -191,7 +194,7 @@ function ProjectGroup({
       <Collapse open={!collapsed}>
         <SessionRows items={items} shortcutByID={shortcutByID} shortcutMode={shortcutMode} />
         {items.length < group.items.length ? (
-          <button type="button" onClick={onShowMore} className={MORE_ACTION_CLASS}>
+          <button type="button" onClick={onShowMore} className={`${MORE_ACTION_CLASS} pl-9 max-sm:pl-10`}>
             Show More
           </button>
         ) : null}
@@ -229,7 +232,7 @@ function UngroupedSessions({
       </p>
       <SessionRows items={block.items} shortcutByID={shortcutByID} shortcutMode={shortcutMode} />
       {block.items.length < block.total ? (
-        <button type="button" onClick={onShowMore} className={MORE_ACTION_CLASS}>
+        <button type="button" onClick={onShowMore} className={`${MORE_ACTION_CLASS} pl-9 max-sm:pl-10`}>
           Show More
         </button>
       ) : null}
@@ -306,9 +309,14 @@ function RecentSessionList({
   if (!items.length) return null
   return (
     <div>
-      <SessionRows items={items} shortcutByID={shortcutByID} shortcutMode={shortcutMode} />
+      <SessionRows
+        items={items}
+        shortcutByID={shortcutByID}
+        shortcutMode={shortcutMode}
+        reserveIconSpace={false}
+      />
       {items.length < total ? (
-        <button type="button" onClick={onShowMore} className={MORE_ACTION_CLASS}>
+        <button type="button" onClick={onShowMore} className={`${MORE_ACTION_CLASS} pl-2.5 max-sm:pl-3`}>
           Show more
         </button>
       ) : null}

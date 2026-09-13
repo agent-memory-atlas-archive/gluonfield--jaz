@@ -38,12 +38,14 @@ export function SessionRow({
   shortcutIndex,
   shortcutMode = false,
   showRuntimeBadge = true,
+  reserveIconSpace,
 }: {
   session: Session
   child?: boolean
   shortcutIndex?: number
   shortcutMode?: boolean
   showRuntimeBadge?: boolean
+  reserveIconSpace: boolean
 }) {
   const shortcut = shortcutMode && shortcutIndex ? shortcutIndex : undefined
   const timeLabel = recentTime(session.last_attention_at || session.updated_at)
@@ -55,6 +57,11 @@ export function SessionRow({
   const menuTriggers = useContextMenuTrigger(setMenu)
   const startRename = () => setRename(isCoarsePointer() ? 'modal' : 'inline')
   const inlineEditing = rename === 'inline'
+  const icon = child ? (
+    <CornerDownRight size={12} className="text-ink-3" />
+  ) : showRuntimeBadge && session.runtime === 'acp' ? (
+    <RuntimeBadge session={session} compact />
+  ) : null
 
   return (
     <>
@@ -65,13 +72,9 @@ export function SessionRow({
         activeProps={{ className: 'bg-list-active!' }}
         {...menuTriggers}
       >
-        {!session.pinned && (
+        {!session.pinned && (reserveIconSpace || icon) && (
           <span className="grid size-[18px] shrink-0 place-items-center">
-            {child ? (
-              <CornerDownRight size={12} className="text-ink-3" />
-            ) : showRuntimeBadge && session.runtime === 'acp' ? (
-              <RuntimeBadge session={session} compact />
-            ) : null}
+            {icon}
           </span>
         )}
         {inlineEditing ? (
