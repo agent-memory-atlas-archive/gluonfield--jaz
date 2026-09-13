@@ -1,9 +1,11 @@
+import type { UsageWindow } from '@/lib/usageWindow'
+
 export const keys = {
   health: ['health'] as const,
   sidebarSessions: ['sessions', 'sidebar'] as const,
   session: (id: string) => ['sessions', id] as const,
   usage: ['usage'] as const,
-  usageDaily: (days: number, timezone: string) => ['usage', 'daily', days, timezone] as const,
+  usageDaily: (window: UsageWindow, timezone: string) => ['usage', 'daily', window, timezone] as const,
   archivedSessions: ['sessions', 'archived'] as const,
   feed: ['feed'] as const,
   threadSearch: (query: string, includeArchived = false) =>

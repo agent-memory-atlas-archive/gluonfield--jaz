@@ -32,13 +32,13 @@ export function UsageShareCharts({ rows }: { rows: PricedModel[] }) {
   return (
     <div className="mt-5">
       <div className="min-w-0">
-        <p className="text-[12px] font-medium text-ink">Last 30 days token share</p>
+        <p className="text-[12px] font-medium text-ink">Token share</p>
         <p className="mt-0.5 truncate text-[11px] text-ink-3">Hover chart segments or legend items for details.</p>
       </div>
 
       {!hasShare ? (
         <p className="mt-2 rounded-control bg-bg/45 px-3 py-2 text-[12px] text-ink-3">
-          No ACP token usage recorded yet.
+          No ACP token usage in this period.
         </p>
       ) : (
         <div className="mt-2 grid gap-3 md:grid-cols-2">
@@ -103,13 +103,13 @@ export function ModelBreakdown({
   return (
     <div className="mt-5">
       <div className="min-w-0">
-        <p className="text-[12px] font-medium text-ink">Last 30 days by model</p>
+        <p className="text-[12px] font-medium text-ink">By model</p>
         <p className="mt-0.5 truncate text-[11px] text-ink-3">ACP agent usage, ranked by total tokens.</p>
       </div>
 
       {visible.length === 0 ? (
         <p className="mt-2 rounded-control bg-bg/45 px-3 py-2 text-[12px] text-ink-3">
-          No ACP model usage recorded yet.
+          No ACP model usage in this period.
         </p>
       ) : (
         <>
@@ -161,8 +161,7 @@ export function ModelBreakdown({
           ) : null}
 
           <p className="mt-2 text-[11px] text-ink-3">
-            Total = Input + Cache read + Output. Input is every token sent that cache did not
-            replay, so Cache write is counted inside it.
+            Total = Input + Output. Cache write is included in Input.
           </p>
           <p className="mt-1 text-[11px] text-ink-3">
             Cost is an OpenRouter list-price equivalent for subscription-backed coding-agent usage,

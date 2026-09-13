@@ -26,7 +26,7 @@ import (
 
 type fakeUsageStore struct{}
 
-func (fakeUsageStore) UsageEventsSince(time.Time) ([]storage.UsageEvent, error) {
+func (fakeUsageStore) UsageEvents(time.Time, time.Time) ([]storage.UsageEvent, error) {
 	return nil, nil
 }
 

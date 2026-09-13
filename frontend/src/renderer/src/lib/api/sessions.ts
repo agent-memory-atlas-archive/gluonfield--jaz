@@ -1,3 +1,4 @@
+import type { UsageWindow } from '@/lib/usageWindow'
 import { readAPIResponse } from '@/lib/api/response'
 import { queryOptions } from '@tanstack/react-query'
 import type { MessageContextInput } from '@/lib/messageContext'
@@ -106,12 +107,12 @@ export const acpAgentsQuery = queryOptions({
   },
 })
 
-export const dailyUsageQuery = (days = 30) => {
+export const dailyUsageQuery = (window: UsageWindow = { days: 30 }) => {
   const timezone = usageTimezone()
   return queryOptions({
-    queryKey: keys.usageDaily(days, timezone),
+    queryKey: keys.usageDaily(window, timezone),
     queryFn: async (): Promise<DailyUsage[]> => {
-      const params = usageParams(days, timezone)
+      const params = usageParams(window, timezone)
       const data = await get<{ days: DailyUsage[] | null }>(`/v1/usage/daily?${params}`)
       return data.days ?? []
     },
@@ -121,8 +122,8 @@ export const dailyUsageQuery = (days = 30) => {
   })
 }
 
-function usageParams(days: number, timezone: string): URLSearchParams {
-  const params = new URLSearchParams({ days: String(days) })
+function usageParams(window: UsageWindow, timezone: string): URLSearchParams {
+  const params = new URLSearchParams('days' in window ? { days: String(window.days) } : window)
   if (timezone) params.set('timezone', timezone)
   else params.set('tz_offset_minutes', String(new Date().getTimezoneOffset()))
   return params

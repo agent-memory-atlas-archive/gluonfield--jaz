@@ -36,7 +36,7 @@ export function CategoryBreakdown({ categories }: { categories: UsageCategoryTot
 
   return (
     <div className="mt-5 rounded-control bg-bg/45 px-3 py-3">
-      <p className="text-[12px] font-medium text-ink">Last 30 days by activity</p>
+      <p className="text-[12px] font-medium text-ink">By activity</p>
       <p className="mt-0.5 text-[11px] text-ink-3">
         Input and output tokens across chat, loops, and memory, excluding cache reads.
       </p>

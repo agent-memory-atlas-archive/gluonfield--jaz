@@ -1,4 +1,4 @@
-import type { DailyUsage, UsageTotals } from './api/types'
+import type { DailyUsage, UsageTotals } from '@/lib/api/types'
 
 export type UsageCategoryTotals = {
   category: string
@@ -24,22 +24,16 @@ export type UsageModelTotals = {
   usage: UsageTotals
 }
 
-export const USAGE_CHART_DAYS = 182
-
-export function visibleUsageDays(days: DailyUsage[], limit = USAGE_CHART_DAYS): DailyUsage[] {
-  return days.slice(-limit)
-}
-
 export function usageCells(days: DailyUsage[]): UsageCell[] {
   if (days.length === 0) return []
   const byDate = new Map(days.map((day) => [day.date, day]))
-  const first = parseLocalDate(days[0].date)
-  const last = parseLocalDate(days[days.length - 1].date)
-  const start = addDays(first, -first.getDay())
-  const end = addDays(last, 6 - last.getDay())
+  const first = parseUsageDate(days[0].date)
+  const last = parseUsageDate(days[days.length - 1].date)
+  const start = addDays(first, -first.getUTCDay())
+  const end = addDays(last, 6 - last.getUTCDay())
   const cells: UsageCell[] = []
   for (let date = start, index = 0; date <= end; date = addDays(date, 1), index++) {
-    const key = dateKey(date)
+    const key = date.toISOString().slice(0, 10)
     cells.push({
       date: key,
       day: byDate.get(key) ?? null,
@@ -58,10 +52,10 @@ export function usageMonthLabels(cells: UsageCell[]): UsageMonthLabel[] {
   const labels: UsageMonthLabel[] = []
   let lastWeek = -4
   for (const cell of cells) {
-    const date = parseLocalDate(cell.date)
-    if (date.getDate() <= 7 && cell.week - lastWeek >= 4) {
+    const date = parseUsageDate(cell.date)
+    if (date.getUTCDate() <= 7 && cell.week - lastWeek >= 4) {
       labels.push({
-        label: date.toLocaleDateString(undefined, { month: 'short' }),
+        label: date.toLocaleDateString(undefined, { month: 'short', timeZone: 'UTC' }),
         week: cell.week,
       })
       lastWeek = cell.week
@@ -165,10 +159,11 @@ export function usageLevel(total: number, maxTotal: number): number {
 }
 
 export function formatUsageDate(date: string): string {
-  return parseLocalDate(date).toLocaleDateString(undefined, {
+  return parseUsageDate(date).toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: 'UTC',
   })
 }
 
@@ -186,18 +181,18 @@ function modelUsageKey(model: UsageModelTotals): string {
   return [model.agent ?? '', model.model_provider ?? '', model.model ?? ''].join('\u0000')
 }
 
-function parseLocalDate(date: string): Date {
-  return new Date(`${date}T00:00:00`)
+function parseUsageDate(date: string): Date {
+  return new Date(`${date}T00:00:00Z`)
 }
 
 function addDays(date: Date, days: number): Date {
   const next = new Date(date)
-  next.setDate(next.getDate() + days)
+  next.setUTCDate(next.getUTCDate() + days)
   return next
 }
 
-function dateKey(date: Date): string {
-  const year = date.getFullYear()
+export function usageDateKey(date: Date): string {
+  const year = String(date.getFullYear()).padStart(4, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`

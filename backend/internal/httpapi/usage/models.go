@@ -38,7 +38,7 @@ func (h modelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, usagecore.ErrUnsupported):
 		httpapi.WriteError(w, http.StatusNotImplemented, err)
-	case errors.Is(err, usagecore.ErrInvalidDays):
+	case errors.Is(err, usagecore.ErrInvalidDays), errors.Is(err, usagecore.ErrInvalidRange):
 		httpapi.WriteError(w, http.StatusBadRequest, err)
 	case err != nil:
 		httpapi.WriteError(w, http.StatusInternalServerError, err)

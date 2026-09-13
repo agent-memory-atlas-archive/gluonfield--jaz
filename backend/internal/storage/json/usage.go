@@ -10,15 +10,15 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
-func (s *Store) UsageEventsSince(since time.Time) ([]storage.UsageEvent, error) {
+func (s *Store) UsageEvents(since, until time.Time) ([]storage.UsageEvent, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	events, hasEvents, err := s.loadUsageEventsSince(since)
+	events, hasEvents, err := s.loadUsageEvents(since, until)
 	if err != nil {
 		return nil, err
 	}
 	if !hasEvents {
-		return s.usageEventsFromSessions(since)
+		return s.usageEventsFromSessions(since, until)
 	}
 	return events, nil
 }
@@ -51,7 +51,7 @@ func (s *Store) appendUsageEvent(session storage.Session, usage storage.Usage, t
 	return json.NewEncoder(file).Encode(event)
 }
 
-func (s *Store) loadUsageEventsSince(since time.Time) ([]storage.UsageEvent, bool, error) {
+func (s *Store) loadUsageEvents(since, until time.Time) ([]storage.UsageEvent, bool, error) {
 	file, err := os.Open(s.usageEventsPath())
 	if os.IsNotExist(err) {
 		return nil, false, nil
@@ -71,20 +71,20 @@ func (s *Store) loadUsageEventsSince(since time.Time) ([]storage.UsageEvent, boo
 			return nil, false, err
 		}
 		hasEvents = true
-		if !event.CreatedAt.Before(since) {
+		if !event.CreatedAt.Before(since) && (until.IsZero() || event.CreatedAt.Before(until)) {
 			events = append(events, event)
 		}
 	}
 }
 
-func (s *Store) usageEventsFromSessions(since time.Time) ([]storage.UsageEvent, error) {
+func (s *Store) usageEventsFromSessions(since, until time.Time) ([]storage.UsageEvent, error) {
 	sessions, err := s.listSessionsLocked(storage.SessionFilter{IncludeChildren: true})
 	if err != nil {
 		return nil, err
 	}
 	events := make([]storage.UsageEvent, 0, len(sessions))
 	for _, session := range sessions {
-		if session.UpdatedAt.Before(since) || !session.Usage.Countable() {
+		if session.UpdatedAt.Before(since) || (!until.IsZero() && !session.UpdatedAt.Before(until)) || !session.Usage.Countable() {
 			continue
 		}
 		events = append(events, storage.UsageEvent{
