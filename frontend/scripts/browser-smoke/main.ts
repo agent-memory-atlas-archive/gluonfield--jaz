@@ -5,6 +5,7 @@ import { X509Certificate } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { installBrowserControl } from '@main/browserControl'
+import { attachExternalOpenHandler } from '@main/browserNavigation'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
 import { installBrowserPasswords } from '@main/browserPasswords'
 import { BrowserPasswordStore } from '@main/browserPasswordStore'
@@ -15,6 +16,10 @@ import { accessibilityFixture, accessibilityFrame } from './accessibility'
 app.setName('Jaz')
 app.setPath('userData', join(process.env.JAZ_BROWSER_SMOKE_DIR!, `profile-${process.pid}`))
 const timeout = Number(process.env.JAZ_BROWSER_SMOKE_TIMEOUT_MS || 30000)
+const openedURLs: string[] = []
+app.on('web-contents-created', (_event, contents) => attachExternalOpenHandler(contents, async (url) => {
+  openedURLs.push(url)
+}))
 installBrowserControl()
 installBrowserPasswords()
 process.on('unhandledRejection', (error) => {
@@ -23,6 +28,7 @@ process.on('unhandledRejection', (error) => {
 })
 ipcMain.handle('smoke:backend', () => process.env.JAZ_BROWSER_SMOKE_BACKEND)
 ipcMain.handle('smoke:browser-exists', (_event, id: number) => Boolean(webContents.fromId(id)))
+ipcMain.handle('smoke:opened-urls', () => openedURLs)
 
 let pendingProxy: { response: ServerResponse; url: string } | undefined
 let proxyWaiter: ServerResponse | undefined
@@ -94,7 +100,6 @@ server.listen(0, '127.0.0.1', async () => {
   }
   await app.whenReady()
   configurePreviewSession()
-  await prepareProfileFixture(process.env.JAZ_BROWSER_SMOKE_DIR!)
   process.env.ELECTRON_RENDERER_URL = `http://127.0.0.1:${address.port}`
   const cert = await readFile(join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'cert.pem'))
   const fingerprint = new X509Certificate(cert).fingerprint256
@@ -119,11 +124,13 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     throw new Error('Missing HTTPS fixture address')
   }
   passwordOrigin = `https://localhost:${secureAddress.port}`
+  await prepareProfileFixture(process.env.JAZ_BROWSER_SMOKE_DIR!, passwordOrigin)
   const window = new BrowserWindow({
     width: 1050,
     height: 850,
     webPreferences: {
       webviewTag: true,
+      backgroundThrottling: false,
       contextIsolation: true,
       sandbox: true,
       preload: join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'preload.js'),
@@ -156,6 +163,11 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
       console.error(message)
     }
   })
+  ipcMain.handle('smoke:key', async (_event, keyCode: string, modifiers: string[] = []) => {
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
   await assertUntrustedProfileCaller(process.env.JAZ_BROWSER_SMOKE_DIR!)
   ipcMain.handle('smoke:capture', async (_event, name = 'browser') => {
     if (!/^[a-z-]+$/.test(name)) {
@@ -174,5 +186,7 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     app.exit(result.ok ? 0 : 1)
   })
   await window.loadURL(`http://127.0.0.1:${address.port}?timeout=${timeout}`)
+  window.webContents.debugger.attach('1.3')
+  await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
 })
 setTimeout(() => app.exit(2), timeout + 10000)

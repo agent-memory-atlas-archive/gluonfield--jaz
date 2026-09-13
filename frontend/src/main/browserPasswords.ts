@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
-import { app, ipcMain, session, webContents, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { ipcMain, session, webContents, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import {
   PASSWORD_CHANNEL, PASSWORD_CAPTURE_CHANNEL, PASSWORD_FILL_CHANNEL, PASSWORD_RESULT_CHANNEL, PASSWORD_CHANGED_CHANNEL,
   type BrowserPasswordAction, type BrowserPasswordState,
@@ -12,7 +11,7 @@ import { isTrustedRendererURL } from '@main/permissions'
 type PendingPassword = BrowserPassword & { id: string }
 
 export function installBrowserPasswords(): void {
-  const store = new BrowserPasswordStore(join(app.getPath('userData'), 'browser-passwords.enc'))
+  const store = new BrowserPasswordStore()
   const pending = new WeakMap<WebContents, PendingPassword>()
   const errors = new WeakMap<WebContents, string>()
   const watching = new Set<WebContents>()

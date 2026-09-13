@@ -97,7 +97,7 @@ export function SidePanelResizeHandle({
       title="Drag left or right to resize · Arrow keys adjust width"
       onPointerDown={startResize}
       onKeyDown={resizeByKeyboard}
-      className="group absolute inset-y-0 left-0 z-shell hidden w-4 cursor-col-resize touch-none items-center justify-center outline-none sm:flex"
+      className="group absolute inset-y-0 left-0 z-shell hidden w-4 cursor-col-resize touch-none items-center justify-center outline-none! sm:flex"
     >
       <span className="absolute inset-y-3 left-1.5 w-px bg-border transition-colors duration-150 group-hover:bg-primary/50 group-focus-visible:bg-primary" />
       <span className="relative h-12 w-1 rounded-full bg-ink-3/60 ring-4 ring-bg transition-colors duration-150 group-hover:bg-primary group-focus-visible:bg-primary" />

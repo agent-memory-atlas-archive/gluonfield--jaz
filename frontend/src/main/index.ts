@@ -15,7 +15,7 @@ import {
 import appIcon from '../assets/jaz-icon-1024.png?asset'
 import { isPreviewURL } from '../shared/preview'
 import { startLocalBackend, stopLocalBackend } from './backend'
-import { attachBrowserNavigationCommands, attachBrowserNavigationShortcuts } from './browserNavigation'
+import { attachBrowserNavigationCommands, attachBrowserNavigationShortcuts, attachExternalOpenHandler } from './browserNavigation'
 import { attachWindowLifecycle, installMainDiagnostics } from './diagnostics'
 import { getDeviceIdentity, getDeviceMetadata } from './deviceIdentity'
 import { registerDictation } from './dictation'
@@ -104,16 +104,6 @@ function installApplicationMenu(): void {
     },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
-}
-
-function attachExternalOpenHandler(contents: WebContents): void {
-  contents.setWindowOpenHandler(({ url }) => {
-    if (contents.getType() === 'webview' && !isPreviewURL(url)) {
-      return { action: 'deny' }
-    }
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
 }
 
 function openExternalURL(url: string): void {

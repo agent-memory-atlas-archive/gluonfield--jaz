@@ -1,18 +1,20 @@
-import { KeyRound, Trash2 } from 'lucide-react'
+import { Cookie, KeyRound, MoreVertical, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { IconButton } from '@/components/ui/IconButton'
 import { Popover } from '@/components/ui/Popover'
+import { BrowserProfileImportDialog } from './BrowserProfileImportDialog'
 import type { BrowserPasswordAction, BrowserPasswordState } from '@shared/browserPasswords'
 
-export function BrowserPasswords({ webContentsId, visible }: { webContentsId: number | null; visible: boolean }) {
+export function BrowserMenu({ webContentsId, visible }: { webContentsId: number | null; visible: boolean }) {
   const api = window.jaz?.browserPasswords
   const [state, setState] = useState<BrowserPasswordState>({ origin: '', usernames: [] })
-  const [open, setOpen] = useState(false)
+  const [view, setView] = useState<'menu' | 'passwords' | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const revision = useRef(0)
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => setView(null), [])
 
   useEffect(() => {
     if (!api || webContentsId === null) {
@@ -41,7 +43,7 @@ export function BrowserPasswords({ webContentsId, visible }: { webContentsId: nu
   }, [api, webContentsId])
 
   useEffect(() => {
-    setOpen(Boolean(state.pending?.id || (state.origin && state.error)))
+    setView(state.pending?.id || (state.origin && state.error) ? 'passwords' : null)
   }, [state.pending?.id, state.origin, state.error])
 
   if (!api) {
@@ -72,21 +74,32 @@ export function BrowserPasswords({ webContentsId, visible }: { webContentsId: nu
   }
 
   const pending = state.pending
-  return <Popover
-    open={open && visible && webContentsId !== null}
+  return <>
+  <Popover
+    open={view !== null && visible}
     onClose={close}
     placement="below"
     align="end"
     trigger={<IconButton
-      size="sm"
-      aria-label="Passwords"
-      title="Saved passwords"
-      aria-expanded={open && visible}
-      disabled={webContentsId === null}
-      onClick={() => setOpen((value) => !value)}
-      className={pending ? 'text-primary' : ''}
-    ><KeyRound size={15} /></IconButton>}
+      aria-label="Browser menu"
+      title="Browser menu"
+      aria-haspopup="menu"
+      aria-expanded={view !== null && visible}
+      onClick={() => setView((current) => current ? null : 'menu')}
+      className={`size-10! ${pending ? 'text-primary' : ''}`}
+    ><MoreVertical size={19} /></IconButton>}
   >
+    {view === 'menu' ? <div role="menu" aria-label="Browser options" className="w-64 max-w-[calc(100vw-32px)]">
+      <button type="button" role="menuitem" aria-label="Passwords" disabled={webContentsId === null} onClick={() => setView('passwords')} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] text-ink hover:bg-surface-2 disabled:opacity-50">
+        <KeyRound size={17} />Passwords
+      </button>
+      <button type="button" role="menuitem" disabled={!window.jaz?.browserProfiles} onClick={() => {
+        close()
+        setImportOpen(true)
+      }} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] text-ink hover:bg-surface-2 disabled:opacity-50">
+        <Cookie size={17} />Import cookies and passwords
+      </button>
+    </div> : (
     <section aria-label="Browser passwords" className="w-72 max-w-[calc(100vw-32px)] p-2.5">
       <h2 className="text-[14px] font-medium text-ink">{pending ? pending.update ? 'Update password?' : 'Save password?' : 'Saved passwords'}</h2>
       {state.origin ? <p className="mt-1 break-all text-[12px] text-ink-2">{state.origin}</p> : null}
@@ -111,5 +124,8 @@ export function BrowserPasswords({ webContentsId, visible }: { webContentsId: nu
         {state.origin ? <Button size="sm" variant="ghost" className="mt-3 min-h-10 w-full" disabled={busy} onClick={() => void act({ kind: 'capture' })}>Save login on this page</Button> : null}
       </>}
     </section>
+    )}
   </Popover>
+  {importOpen && visible && window.jaz?.browserProfiles ? <BrowserProfileImportDialog api={window.jaz.browserProfiles} onClose={() => setImportOpen(false)} /> : null}
+  </>
 }
