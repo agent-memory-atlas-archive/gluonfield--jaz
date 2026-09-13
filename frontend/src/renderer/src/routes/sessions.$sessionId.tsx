@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BottomDock } from '@/components/session/BottomDock'
 import { UserBubble } from '@/components/session/Bubble'
 import { Composer, PlanDecisionCard } from '@/components/session/Composer'
+import { NativeModelOptions } from '@/components/session/NativeModelOptions'
 import { SelectionContextToolbar } from '@/components/session/SelectionContextToolbar'
 import { useComposerContexts } from '@/components/session/useComposerContexts'
 import { FileReaderLinkProvider, MessageMarkdown, PreviewLinkProvider } from '@/components/session/MessageMarkdown'
@@ -631,6 +632,8 @@ function SessionPage({
                   {goalStatusVisible ? <GoalStatusBar goal={goal} /> : null}
                   <Composer
                     streaming={sessionRunning}
+                    commands={derived.agentSession?.commands ?? undefined}
+                    optionsSlot={<NativeModelOptions sessionId={session.id} options={derived.agentSession?.config_options} disabled={sessionRunning} />}
                     planAvailable={planAvailable}
                     planModeActive={Boolean(live?.planRequested) || planActive}
                     goalControlVisible
@@ -645,6 +648,7 @@ function SessionPage({
                     onRemoveContext={composerContexts.removeContext}
                     onReplaceContexts={composerContexts.replaceContexts}
                     onSend={handleSend}
+                    onQueuePrompt={queue.onQueuePrompt}
                     onStop={stopSession}
                     onClearGoal={stopSession}
                     onVoice={voice.phase === 'off' ? voice.start : undefined}

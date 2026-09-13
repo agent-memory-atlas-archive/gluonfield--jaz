@@ -20,7 +20,7 @@ native paths.
 | Adapter | Refresh mechanism |
 | --- | --- |
 | Claude | Native SDK `reconnectMcpServer("jaz_mcp")` |
-| Kimi | Native session `reconnectMcpServer("jaz_mcp")` |
+| Kimi | Native v2 session `connectionManager.reconnect("jaz_mcp")` |
 | OpenCode | Standard `notifications/tools/list_changed` |
 | Grok | Native `_x.ai/session/update_mcp_servers`; a revision header changes only the Jaz proxy connection |
 | Codex | Native `config/mcpServer/reload`, with the companion native reconnect fix described below |
@@ -47,11 +47,13 @@ to the requested server name.
 
 ## Integration status
 
-Implementation is local and unreleased. Adapter changes live in sibling
-worktrees `mcp-refresh-codex-20260913`, `mcp-refresh-claude-20260913`, and
-`mcp-refresh-kimi-20260913`; the native fix is in
-`mcp-refresh-native-codex-20260913`. Release pins remain unchanged until the
-coordinated adapter/runtime artifacts exist and pass native parity verification.
+Jaz includes the live proxy and refresh negotiation. Grok 1.0.30 and OpenCode
+1.18.30 refresh through their native mechanisms. Claude 0.76.0 / SDK 0.3.270 and
+Kimi 0.42.0 companion adapters implement the extension, but remain outside the
+release pins until their authenticated live-turn checks pass. Codex 1.11.0 bundles
+stock native 0.154.0, so its refresh extension remains disabled. The native reconnect
+fix is prepared separately in `mcp-refresh-native-codex-20260913`; packaging and
+verification are still required before enabling it.
 
 Tests cover an initially empty catalog, additions, schema changes, removal,
 unchanged connections, active calls, failed configuration reads, policy filtering,

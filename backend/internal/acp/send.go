@@ -185,7 +185,7 @@ func (m *Manager) sendOnce(ctx context.Context, req SendRequest, opts sendOption
 func (m *Manager) Steer(ctx context.Context, req SteerRequest) (Job, error) {
 	job, err := m.job(req.Session)
 	if err != nil {
-		return Job{}, err
+		return Job{}, fmt.Errorf("%w: %v", ErrSteeringUnsupported, err)
 	}
 	if !storage.HasMessageContent(req.Message, req.Contexts, req.Attachments) {
 		return Job{}, fmt.Errorf("message is required")

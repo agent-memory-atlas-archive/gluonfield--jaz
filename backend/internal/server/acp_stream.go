@@ -64,8 +64,18 @@ func (s *Server) streamACPSession(w http.ResponseWriter, flusher http.Flusher, c
 	session, err = s.beginACPTurn(clientCtx, session, turnTitle)
 	if err != nil {
 		if !turn.compact() && errors.Is(err, errACPTurnRunning) {
-			err = s.queueACPStreamTurn(session.ID, turn)
+			err = acp.ErrSteeringUnsupported
+			if !turn.PlanRequested || session.Turn != nil && session.Turn.PlanRequested {
+				_, err = s.ACP.Steer(clientCtx, acp.SteerRequest{
+					Session: session.ID, Message: turn.Message, Contexts: turn.Contexts,
+					Attachments: turn.Attachments, GoalRequested: turn.GoalRequested,
+				})
+			}
+			if errors.Is(err, acp.ErrSteeringUnsupported) {
+				err = s.queueACPStreamTurn(session.ID, turn)
+			}
 			if err == nil {
+				s.publishMessagesChanged(session.ID)
 				writeSSE(w, flusher, agent.StreamEvent{Type: agent.StreamAccepted})
 				writeSSE(w, flusher, agent.StreamEvent{Type: agent.StreamDone})
 				return

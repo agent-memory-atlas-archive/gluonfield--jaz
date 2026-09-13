@@ -6,7 +6,7 @@ import type { Session, SessionMessages } from '@/lib/api/types'
 import { useQueueAppender } from '@/lib/hooks/useQueueAppender'
 import { keys } from '@/lib/query/keys'
 import { normalizeQueuedMessagesForDisplay } from '@/lib/sessionQueue'
-import type { SendMessageHandler, SendMessageOptions } from '@/lib/sendMessage'
+import type { SendMessageHandler } from '@/lib/sendMessage'
 
 export function useSessionQueue({
   sessionId,
@@ -55,13 +55,6 @@ export function useSessionQueue({
 
   const { queuePrompt, queueAction } = useQueueAppender(sessionId, mutateQueue)
 
-  const send = useCallback((text: string, options: SendMessageOptions = {}) => {
-    if (running) {
-      return queuePrompt(text, options)
-    }
-    return onSend(text, options)
-  }, [onSend, queuePrompt, running])
-
   const deletePrompt = useCallback((id: string) => {
     void mutateQueue({ op: 'delete', id }).catch(showQueueError)
   }, [mutateQueue, showQueueError])
@@ -92,7 +85,7 @@ export function useSessionQueue({
     queuedPrompts,
     sessionRunning: running,
     steerDisabled: false,
-    onSend: send,
+    onSend,
     onQueuePrompt: queuePrompt,
     onQueueAction: queueAction,
     onSteerQueuedPrompt: steerPrompt,
