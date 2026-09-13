@@ -10,10 +10,21 @@ import '@/styles/globals.css'
 import { exerciseBrowserLifecycle } from './lifecycle'
 import { exercisePasswords } from './passwords'
 import { exerciseBrowserLayout } from './layout'
+import { exerciseAnnotations } from './annotations'
 
 declare global {
   interface Window {
-    smoke: { backend(): Promise<string>; openedURLs(): Promise<string[]>; browserExists(id: number): Promise<boolean>; passwordStore(): Promise<{ count: number; plaintext: boolean }>; pointer(type: string, x: number, y: number): Promise<void>; capture(name?: string): Promise<void>; resize(width: number, height: number): Promise<void>; result(result: unknown): void }
+    smoke: {
+      openedURLs(): Promise<string[]>
+      backend(): Promise<string>
+      browserExists(id: number): Promise<boolean>
+      passwordStore(): Promise<{ count: number; plaintext: boolean }>
+      pointer(type: string, x: number, y: number): Promise<void>
+      key(key: string, modifiers?: string[]): Promise<void>
+      capture(name?: string): Promise<void>
+      resize(width: number, height: number): Promise<void>
+      result(result: unknown): void
+    }
   }
 }
 
@@ -42,6 +53,8 @@ function Fixture() {
       await exerciseBrowserLifecycle(await window.smoke.backend(), (next) => {
         stage = next
       })
+      stage = 'annotation after renderer updates and composer delivery'
+      await exerciseAnnotations()
       stage = 'opening, profile import and cursor checks'
       await browser.call({ method: 'Jaz.open', params: { url: `${location.origin}/target` } })
       const evaluate = async (expression: string) => {
@@ -53,7 +66,7 @@ function Fixture() {
       stage = 'local preview URLs and external links'
       await exercisePreviewLinks(browser, evaluate)
       stage = 'profile import'
-      await exerciseProfileImport(evaluate)
+      await exerciseProfileImport(browser)
       stage = 'password saving, filling and origin isolation'
       await exercisePasswords(browser)
       stage = 'cursor ordering and cancellation'
@@ -202,7 +215,7 @@ await tab.scroll('down', 0, targetRef)` } })
       await window.smoke.capture()
       socket.close()
       browser.dispose()
-      window.smoke.result({ ok: true, checks: ['browser opening collapses navigation, wider defaults, pointer and keyboard resizing', 'HTTPS password save/update/fill/delete, encrypted reload, consent and origin isolation', 'Chromium AX hierarchy, diffs, hidden-frame exclusion and root-index scrolling', 'trusted AX clicks on wrapped text, closed shadows and nested frames', 'hit-tested coordinates and obscured-target rejection', 'nested debugger sessions survive document replacement', 'native Chromium identity across first navigation, fetch, page, worker and client hints', 'cursor arrival precedes input', 'trusted click and hover', 'persistent direct CDP without overlay movement', 'zero scroll animates and hovers without scrolling', 'animated and raw-command cancellation', 'cancellation during preview URL resolution', 'webview ownership', 'MCP script through Go and Electron with verified page result', 'profile import rejects untrusted callers', 'selected encrypted cookies authenticate the side browser', 'import dismissal, profile selection, failure retry, themes and narrow layout'] })
+      window.smoke.result({ ok: true, checks: ['new-tab Sign In reaches external browser handler without replacing preview', 'annotation survives renderer updates and reaches the composer; cancellation cleans up', 'browser opening collapses navigation, wider defaults, pointer and keyboard resizing', 'HTTPS password save/update/fill/delete, encrypted reload, consent and origin isolation', 'Chromium AX hierarchy, diffs, hidden-frame exclusion and root-index scrolling', 'trusted AX clicks on wrapped text, closed shadows and nested frames', 'hit-tested coordinates and obscured-target rejection', 'nested debugger sessions survive document replacement', 'native Chromium identity across first navigation, fetch, page, worker and client hints', 'cursor arrival precedes input', 'trusted click and hover', 'persistent direct CDP without overlay movement', 'zero scroll animates and hovers without scrolling', 'animated and raw-command cancellation', 'cancellation during preview URL resolution', 'webview ownership', 'MCP script through Go and Electron with verified page result', 'profile import rejects untrusted callers', 'encrypted cookies and passwords import with type selection and existing-login preservation', 'browser menu, profile selection, partial import retry, themes and narrow layout'] })
     }
     void run().catch((error) => window.smoke.result({ ok: false, error: error.message, stack: error.stack, stage, pending: [...pending.values()] })).finally(() => clearTimeout(timeout))
   }, [browser])

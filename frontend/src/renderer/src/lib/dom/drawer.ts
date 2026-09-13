@@ -13,7 +13,7 @@ export function drawerSlide(opts: {
   isMobile: boolean
   open: boolean
   side: 'left' | 'right'
-  width: number
+  width: number | string
 }): TargetAndTransition {
   const { isMobile, open, side, width } = opts
   if (!isMobile) return { width: open ? width : 0 }

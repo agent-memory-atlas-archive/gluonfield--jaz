@@ -2,7 +2,7 @@ import { usePrefetchQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { createFileRoute, useLocation, useNavigate } from '@tanstack/react-router'
 import { ArrowDown, Play } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BottomDock } from '@/components/session/BottomDock'
 import { UserBubble } from '@/components/session/Bubble'
 import { Composer, PlanDecisionCard } from '@/components/session/Composer'
@@ -15,7 +15,7 @@ import { GoalStatusBar } from '@/components/session/GoalStatusBar'
 import { PendingSteerBubble } from '@/components/session/PendingSteerBubble'
 import { PendingSessionHistory } from '@/components/session/PendingSessionHistory'
 import { SidePanel, type SidePanelView } from '@/components/session/SidePanel'
-import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
+import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
 import { SidePanelControl, useSidePanelState } from '@/components/session/SidePanelState'
 import { RuntimeBadge } from '@/components/sidebar/RuntimeBadge'
 import { ThinkingBlock } from '@/components/session/ThinkingBlock'
@@ -43,7 +43,6 @@ import {
   uploadSessionAttachment,
 } from '@/lib/api/sessions'
 import type { Session, SessionEvent, SessionOverview } from '@/lib/api/types'
-import { drawerSlide } from '@/lib/dom/drawer'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -662,25 +661,7 @@ function SessionPage({
 
           {/* Docked, never overlapping: the chat pane flexes and stays centered
               between the sidebar and this panel. */}
-          <motion.div
-            style={{ '--side-panel-width': `${sidePanel.width}px` } as CSSProperties}
-            className="relative h-full shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-shell max-sm:w-full!"
-            initial={false}
-            // The fixed backdrop above owns tap-to-dismiss.
-            animate={drawerSlide({ isMobile, open: sidePanel.open, side: 'right', width: sidePanel.width })}
-            transition={sidePanel.resizing ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 36 }}
-          >
-            {sidePanel.resizable ? (
-              <SidePanelResizeHandle
-                width={sidePanel.width}
-                minWidth={sidePanel.minWidth}
-                maxWidth={sidePanel.maxWidth}
-                disabled={isMobile || !sidePanel.open}
-                onResizeStart={() => sidePanel.setResizing(true)}
-                onResize={sidePanel.resize}
-                onResizeEnd={() => sidePanel.setResizing(false)}
-              />
-            ) : null}
+          <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
             <SidePanel
               session={session}
               progress={panelProgress}
@@ -703,7 +684,7 @@ function SessionPage({
               onSendSideChat={handleSideChatSend}
               onClose={sidePanel.toggle}
             />
-          </motion.div>
+          </SidePanelDrawer>
         </FileDropScope>
       </PreviewLinkProvider>
     </FileReaderLinkProvider>

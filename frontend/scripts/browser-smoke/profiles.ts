@@ -5,11 +5,12 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { BrowserWindow, session } from 'electron'
 import { discoverBrowserProfiles } from '@main/browserProfiles'
-import { importProfileCookies, listCookieSites } from '@main/browserCookies'
+import { importProfileCookies } from '@main/browserCookies'
 import { BrowserProfileImporter, installBrowserProfileImport } from '@main/browserProfileImport'
 import { PREVIEW_PARTITION } from '@shared/preview'
+import { preparePasswordDatabases, exercisePasswordImport } from './profile-passwords'
 
-export async function prepareProfileFixture(root: string): Promise<void> {
+export async function prepareProfileFixture(root: string, passwordOrigin: string): Promise<void> {
   const home = join(root, 'source-profiles')
   const chromeRoot = join(home, 'Library/Application Support/Google/Chrome')
   const profileRoot = join(chromeRoot, 'Default')
@@ -40,23 +41,20 @@ samesite INTEGER, expires_utc INTEGER, has_expires INTEGER, encrypted_value BLOB
   insert.run('host-only.test', '__Host-exact', 'host-value', '/', 1, 1, 1, expires, 1, Buffer.alloc(0), '')
   db.close()
   const original = await readFile(database)
+  preparePasswordDatabases(profileRoot, key, passwordOrigin)
   const profiles = await discoverBrowserProfiles(home, 'darwin')
   assert.equal(profiles.length, 1)
   assert.equal(profiles[0].name, 'Personal')
   assert.equal(profiles[0].browser, 'Chrome')
   const chrome = profiles[0]
-  const sites = listCookieSites(chrome)
-  assert.equal(sites.find((site) => site.domain === 'host-only.test')?.cookies, 2)
-  assert(!sites.some((site) => site.domain === 'expired.test' || site.domain === 'partitioned.test'))
-  assert(!JSON.stringify(sites).includes('signed-in-fixture'))
+  await exercisePasswordImport(chrome, join(root, 'password-import.enc'), password, passwordOrigin)
   const jar = session.fromPartition('profile-contract-' + process.pid).cookies
-  await assert.rejects(importProfileCookies(chrome, [], (cookie) => jar.set(cookie)), /Choose the sites/)
-  await assert.rejects(importProfileCookies(chrome, ['127.0.0.1'], (cookie) => jar.set(cookie), async () => {
+  await assert.rejects(importProfileCookies(chrome, (cookie) => jar.set(cookie), async () => {
     throw new Error('Keychain denied')
   }), /Keychain denied/)
   assert.equal((await jar.get({})).length, 0)
-  const result = await importProfileCookies(chrome, ['127.0.0.1', 'bad-hash.test', 'host-only.test'], (cookie) => jar.set(cookie), async () => password)
-  assert.deepEqual(result, { imported: 3, failed: 1 })
+  const result = await importProfileCookies(chrome, (cookie) => jar.set(cookie), async () => password)
+  assert.deepEqual(result, { imported: 4, failed: 1 })
   const cookies = await jar.get({})
   assert.equal(cookies.find((cookie) => cookie.name === 'jaz_import_fixture')?.value, 'signed-in-fixture')
   assert(cookies.find((cookie) => cookie.name === 'jaz_import_fixture')?.httpOnly)
@@ -64,7 +62,7 @@ samesite INTEGER, expires_utc INTEGER, has_expires INTEGER, encrypted_value BLOB
   assert.equal(cookies.find((cookie) => cookie.name === 'domain')?.hostOnly, false)
   assert.equal(cookies.find((cookie) => cookie.name === 'domain')?.path, '/limited')
   assert.equal(cookies.find((cookie) => cookie.name === 'domain')?.sameSite, 'strict')
-  assert(!cookies.some((cookie) => cookie.name === 'private_fixture' || cookie.name === 'bad_hash'))
+  assert(!cookies.some((cookie) => ['expired', 'partitioned', 'bad_hash'].includes(cookie.name)))
   assert.deepEqual(await readFile(database), original)
 
   const firefoxRoot = join(home, 'Library/Application Support/Firefox')
@@ -80,15 +78,15 @@ samesite INTEGER, expires_utc INTEGER, has_expires INTEGER, encrypted_value BLOB
   const found = await discoverBrowserProfiles(home, 'darwin')
   assert.equal(found.length, 2)
   const firefoxProfile = found.find((profile) => profile.family === 'firefox')!
-  assert.deepEqual(listCookieSites(firefoxProfile), [{ domain: 'firefox.test', cookies: 1 }])
-  const firefoxResult = await importProfileCookies(firefoxProfile, ['firefox.test'], (cookie) => jar.set(cookie), async () => {
+  const firefoxResult = await importProfileCookies(firefoxProfile, (cookie) => jar.set(cookie), async () => {
     throw new Error('Firefox must not access Keychain')
   })
   assert.equal(firefoxResult.imported, 1)
   const importer = new BrowserProfileImporter(async () => found, async () => password)
-  assert.equal(await importer.dismissed(), false)
-  await assert.rejects(importer.import('../../arbitrary-path', ['127.0.0.1']), /no longer available/)
+  await assert.rejects(importer.import('../../arbitrary-path', { cookies: true, passwords: true }), /no longer available/)
   assert.equal((await session.fromPartition(PREVIEW_PARTITION).cookies.get({})).length, 0)
+  await assert.rejects(importer.import(chrome.id, { cookies: false, passwords: false }), /Choose cookies/)
+  assert(!JSON.stringify(await importer.list()).includes('fixture-import'))
   installBrowserProfileImport(importer)
 }
 

@@ -1,10 +1,11 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { safeStorage } from 'electron'
+import { app, safeStorage } from 'electron'
+import { join } from 'node:path'
 
 export type BrowserPassword = { origin: string; username: string; password: string }
 
 export class BrowserPasswordStore {
-  constructor(private readonly file: string) {}
+  constructor(private readonly file = join(app.getPath('userData'), 'browser-passwords.enc')) {}
 
   read(): BrowserPassword[] {
     let encrypted: Buffer
@@ -33,6 +34,23 @@ export class BrowserPasswordStore {
   save(password: BrowserPassword): void {
     const records = this.read().filter((entry) => entry.origin !== password.origin || entry.username !== password.username)
     this.write([...records, password])
+  }
+
+  import(passwords: BrowserPassword[]): number {
+    const records = this.read()
+    const identities = new Set(records.map((entry) => JSON.stringify([entry.origin, entry.username])))
+    const initial = records.length
+    for (const password of passwords) {
+      const identity = JSON.stringify([password.origin, password.username])
+      if (!identities.has(identity)) {
+        records.push(password)
+        identities.add(identity)
+      }
+    }
+    if (records.length > initial) {
+      this.write(records)
+    }
+    return records.length - initial
   }
 
   remove(origin: string, username: string): void {

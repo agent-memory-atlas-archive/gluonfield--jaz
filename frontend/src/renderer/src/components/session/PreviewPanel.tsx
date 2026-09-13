@@ -4,7 +4,7 @@ import {
   ExternalLink,
   Globe,
   LoaderCircle,
-  MessageSquare,
+  MessageCirclePlus,
   RotateCw,
   SquareStop,
   X,
@@ -31,8 +31,7 @@ import {
 } from './previewWebview'
 import type { PreviewTarget } from '@/lib/browserSessions'
 import type { SideBrowser } from '@/lib/sideBrowser'
-import { BrowserProfileImport } from '@/components/browser/BrowserProfileImport'
-import { BrowserPasswords } from '@/components/browser/BrowserPasswords'
+import { BrowserMenu } from '@/components/browser/BrowserMenu'
 import { PREVIEW_PARTITION } from '@shared/preview'
 import { usePreviewFindControls } from './usePreviewFindControls'
 
@@ -57,13 +56,14 @@ export function PreviewPanel({
 }) {
   const webviewRef = useRef<PreviewWebviewElement | null>(null)
   const cursorLayer = useRef<HTMLDivElement | null>(null)
-  const readyRef = useRef(false)
+  const readyRef = useRef<PreviewWebviewElement | null>(null)
   const targetRef = useRef(target)
   const canUseWebview = clientRuntime.capabilities.previewWebview
   const [webview, setWebview] = useState<PreviewWebviewElement | null>(null)
   const [draft, setDraft] = useState(target.displayUrl)
   const [resolvedSourceUrl, setResolvedSourceUrl] = useState(target.sourceUrl)
-  const [webviewReady, setWebviewReady] = useState(false)
+  const [readyWebview, setReadyWebview] = useState<PreviewWebviewElement | null>(null)
+  const webviewReady = webview !== null && readyWebview === webview
   const [iframeKey, setIframeKey] = useState(0)
   const [loading, setLoading] = useState(false)
   const [canGoBack, setCanGoBack] = useState(false)
@@ -96,7 +96,6 @@ export function PreviewPanel({
     setError('')
     if (!canUseWebview) {
       setLoading(Boolean(target.sourceUrl))
-      setWebviewReady(Boolean(target.sourceUrl))
       setCanGoBack(false)
       setCanGoForward(false)
     }
@@ -104,7 +103,7 @@ export function PreviewPanel({
 
   useEffect(() => {
     let cancelled = false
-    if (readyRef.current && webviewRef.current?.getURL() === target.sourceUrl) {
+    if (readyRef.current === webviewRef.current && webviewRef.current?.getURL() === target.sourceUrl) {
       setResolvedSourceUrl(target.sourceUrl)
       return
     }
@@ -117,7 +116,7 @@ export function PreviewPanel({
       .catch((err: Error) => {
         if (!cancelled) {
           setLoading(false)
-          setWebviewReady(false)
+          setReadyWebview(null)
           setError(err.message || 'Preview failed to load.')
         }
       })
@@ -136,20 +135,16 @@ export function PreviewPanel({
 
   useEffect(() => {
     if (!webview) return
-    readyRef.current = false
-    setWebviewReady(false)
-    setCanGoBack(false)
-    setCanGoForward(false)
     const sync = (event?: PreviewNavigationEvent) => {
       let next = event?.url || event?.validatedURL || webview.src
-      if (readyRef.current) {
+      if (readyRef.current === webview) {
         try {
           next = event?.url || event?.validatedURL || webview.getURL() || webview.src
           setCanGoBack(webview.canGoBack())
           setCanGoForward(webview.canGoForward())
         } catch (err) {
-          readyRef.current = false
-          setWebviewReady(false)
+          readyRef.current = null
+          setReadyWebview(null)
           setCanGoBack(false)
           setCanGoForward(false)
           if (!isPreviewWebviewPending(err)) setError(previewWebviewErrorMessage(err))
@@ -165,8 +160,8 @@ export function PreviewPanel({
       }
     }
     const ready = () => {
-      readyRef.current = true
-      setWebviewReady(true)
+      readyRef.current = webview
+      setReadyWebview(webview)
       sync()
     }
     const start = () => {
@@ -189,6 +184,9 @@ export function PreviewPanel({
     webview.addEventListener('did-navigate-in-page', sync as EventListener)
     webview.addEventListener('did-fail-load', fail as EventListener)
     webview.addEventListener('dom-ready', ready)
+    if (readyRef.current === webview) {
+      sync()
+    }
     return () => {
       webview.removeEventListener('did-start-loading', start)
       webview.removeEventListener('did-stop-loading', stop)
@@ -203,7 +201,7 @@ export function PreviewPanel({
     if (!webview || !resolvedSourceUrl) {
       return
     }
-    const current = readyRef.current ? webview.getURL() : webview.src
+    const current = readyRef.current === webview ? webview.getURL() : webview.src
     if (current !== resolvedSourceUrl) {
       webview.src = resolvedSourceUrl
     }
@@ -226,8 +224,8 @@ export function PreviewPanel({
     try {
       action(webview)
     } catch (err) {
-      readyRef.current = false
-      setWebviewReady(false)
+      readyRef.current = null
+      setReadyWebview(null)
       setCanGoBack(false)
       setCanGoForward(false)
       if (!isPreviewWebviewPending(err)) setError(previewWebviewErrorMessage(err))
@@ -274,10 +272,10 @@ export function PreviewPanel({
           event.preventDefault()
           openDraft()
         }}
-        className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border px-2.5"
+        className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-2"
       >
         <IconButton
-          size="sm"
+          className="size-10!"
           aria-label="Back"
           title="Back"
           disabled={!webviewReady || !canGoBack}
@@ -286,7 +284,7 @@ export function PreviewPanel({
           <ArrowLeft size={14} />
         </IconButton>
         <IconButton
-          size="sm"
+          className="size-10!"
           aria-label="Forward"
           title="Forward"
           disabled={!webviewReady || !canGoForward}
@@ -295,7 +293,7 @@ export function PreviewPanel({
           <ArrowRight size={14} />
         </IconButton>
         <IconButton
-          size="sm"
+          className="size-10!"
           aria-label="Reload preview"
           title="Reload"
           disabled={!resolvedSourceUrl || (canUseWebview && !webviewReady)}
@@ -314,30 +312,29 @@ export function PreviewPanel({
           />
         </div>
         <IconButton
-          size="sm"
+          aria-label={annotating ? 'Stop annotation' : 'Annotate preview'}
+          title={annotating ? 'Stop annotation' : 'Annotate'}
+          disabled={!resolvedSourceUrl || !webviewReady || !canAnnotate}
+          onClick={() => (annotating ? void stopAnnotation() : void annotate())}
+          className={`size-10! ${annotating ? 'bg-primary/15 text-primary! hover:bg-primary/20' : 'text-ink-2'}`}
+        >
+          {annotating ? <SquareStop size={18} /> : <MessageCirclePlus size={19} />}
+        </IconButton>
+        <IconButton
+          className="size-10!"
           aria-label="Open in Browser"
           title="Open in Browser"
           disabled={!resolvedSourceUrl}
           onClick={() => window.open(resolvedSourceUrl, '_blank', 'noopener')}
         >
-          <ExternalLink size={14} />
+          <ExternalLink size={17} />
         </IconButton>
-        <BrowserPasswords webContentsId={webviewReady && webview ? webview.getWebContentsId() : null} visible={visible} />
-        <IconButton
-          size="sm"
-          aria-label={annotating ? 'Stop annotation' : 'Annotate preview'}
-          title={annotating ? 'Stop annotation' : 'Annotate'}
-          disabled={!resolvedSourceUrl || !webviewReady || !canAnnotate}
-          onClick={() => (annotating ? void stopAnnotation() : void annotate())}
-          className={annotating ? 'text-danger hover:bg-danger-soft hover:text-danger' : ''}
-        >
-          {annotating ? <SquareStop size={14} /> : <MessageSquare size={14} />}
-        </IconButton>
+        <BrowserMenu webContentsId={webviewReady && webview ? webview.getWebContentsId() : null} visible={visible} />
         <button
           type="button"
           aria-label="Hide side panel"
           onClick={onClose}
-          className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-[8px] text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
+          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
         >
           <X size={15} />
         </button>
@@ -345,7 +342,6 @@ export function PreviewPanel({
       {error ? (
         <p className="shrink-0 border-b border-border px-3 py-2 text-[12px] text-danger">{error}</p>
       ) : null}
-      <BrowserProfileImport offer active={visible} />
       <div className="relative min-h-0 flex-1 bg-bg">
         <div ref={cursorLayer} aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 overflow-hidden" />
         <PreviewFindBar find={find} />
@@ -364,7 +360,6 @@ export function PreviewPanel({
             referrerPolicy="no-referrer"
             onLoad={() => {
               setLoading(false)
-              setWebviewReady(true)
             }}
             className="h-full w-full border-0 bg-bg"
           />

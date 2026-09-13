@@ -51,6 +51,10 @@ const BROWSER_ANNOTATION_CAPTURE_SCRIPT = String.raw`
   const cssEscape = (value) => window.CSS?.escape ? window.CSS.escape(value) : String(value).replace(/[^a-zA-Z0-9_-]/g, '\\$&');
   let target = null;
 
+  const host = doc.createElement('div');
+  host.setAttribute('data-jaz-annotation-ui', 'true');
+  Object.assign(host.style, { all: 'initial', display: 'contents' });
+  const shadow = host.attachShadow({ mode: 'open' });
   const highlight = doc.createElement('div');
   const marker = doc.createElement('div');
   const editor = doc.createElement('form');
@@ -58,9 +62,6 @@ const BROWSER_ANNOTATION_CAPTURE_SCRIPT = String.raw`
   const submit = doc.createElement('button');
   const cancel = doc.createElement('button');
 
-  highlight.setAttribute('data-jaz-annotation-ui', 'true');
-  marker.setAttribute('data-jaz-annotation-ui', 'true');
-  editor.setAttribute('data-jaz-annotation-ui', 'true');
   Object.assign(highlight.style, {
     position: 'fixed',
     zIndex: '2147483646',
@@ -90,7 +91,8 @@ const BROWSER_ANNOTATION_CAPTURE_SCRIPT = String.raw`
     position: 'fixed',
     zIndex: '2147483647',
     display: 'none',
-    width: '320px',
+    boxSizing: 'border-box',
+    width: 'min(340px, calc(100vw - 24px))',
     padding: '10px',
     borderRadius: '10px',
     background: 'rgba(32,32,32,0.96)',
@@ -132,13 +134,12 @@ const BROWSER_ANNOTATION_CAPTURE_SCRIPT = String.raw`
   Object.assign(row.style, { display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' });
   row.append(cancel, submit);
   editor.append(textarea, row);
-  doc.body.append(highlight, marker, editor);
+  shadow.append(highlight, marker, editor);
+  doc.body.append(host);
 
   let settled = false;
   const cleanup = () => {
-    highlight.remove();
-    marker.remove();
-    editor.remove();
+    host.remove();
     doc.removeEventListener('pointermove', onMove, true);
     doc.removeEventListener('click', onClick, true);
     doc.removeEventListener('keydown', onKey, true);
@@ -194,9 +195,10 @@ const BROWSER_ANNOTATION_CAPTURE_SCRIPT = String.raw`
     marker.style.display = 'grid';
     marker.style.left = event.clientX + 'px';
     marker.style.top = event.clientY + 'px';
-    const left = Math.min(Math.max(12, event.clientX - 24), window.innerWidth - 332);
-    const top = Math.min(Math.max(12, event.clientY + 18), window.innerHeight - 150);
     editor.style.display = 'block';
+    const bounds = editor.getBoundingClientRect();
+    const left = Math.max(12, Math.min(event.clientX - 24, window.innerWidth - bounds.width - 12));
+    const top = Math.max(12, Math.min(event.clientY + 18, window.innerHeight - bounds.height - 12));
     editor.style.left = left + 'px';
     editor.style.top = top + 'px';
     textarea.focus();

@@ -6,11 +6,8 @@ import { BROWSER_PROFILE_CHANNELS, type BrowserProfileAPI } from '@shared/browse
 contextBridge.exposeInMainWorld('jaz', {
   browserPasswords,
   browserProfiles: {
-    dismissed: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.dismissed),
-    dismiss: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.dismiss),
     list: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.list),
-    sites: (id) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.sites, id),
-    import: (id, domains) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, id, domains),
+    import: (id, selection) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, id, selection),
   } satisfies BrowserProfileAPI,
   windowKind: 'main',
   get apiBaseUrl() {
@@ -20,10 +17,11 @@ contextBridge.exposeInMainWorld('jaz', {
 })
 contextBridge.exposeInMainWorld('smoke', {
   backend: () => ipcRenderer.invoke('smoke:backend'),
-  openedURLs: () => ipcRenderer.invoke('smoke:opened-urls'),
   browserExists: (id: number) => ipcRenderer.invoke('smoke:browser-exists', id),
+  openedURLs: () => ipcRenderer.invoke('smoke:opened-urls'),
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
   pointer: (type: string, x: number, y: number) => ipcRenderer.invoke('smoke:pointer', type, x, y),
+  key: (key: string, modifiers?: string[]) => ipcRenderer.invoke('smoke:key', key, modifiers),
   capture: (name?: string) => ipcRenderer.invoke('smoke:capture', name),
   resize: (width: number, height: number) => ipcRenderer.invoke('smoke:resize', width, height),
   result: (result: unknown) => ipcRenderer.send('smoke:result', result),

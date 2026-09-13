@@ -43,6 +43,11 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   const defaultWidth = activeView === 'preview' ? Math.max(layout.width, Math.round(containerWidth * 0.6)) : layout.width
   const maxWidth = Math.max(minWidth, activeView === 'preview' ? availableWidth : Math.min(PANEL_MAX_WIDTH, availableWidth))
   const width = layout.resizable ? clampSidePanelWidth(widthOverrides[activeView] ?? defaultWidth, minWidth, maxWidth) : defaultWidth
+  const availableCSS = `calc(100% - ${PANEL_MIN_THREAD_WIDTH}px)`
+  const preferredCSS = widthOverrides[activeView] === undefined ? `max(${layout.width}px, 60%)` : `${widthOverrides[activeView]}px`
+  const widthStyle = activeView === 'preview'
+    ? `clamp(min(400px, max(240px, ${availableCSS})), ${preferredCSS}, max(240px, ${availableCSS}))`
+    : `${width}px`
 
   useEffect(() => {
     localStorage.setItem(PANEL_OPEN_KEY, open ? 'open' : 'closed')
@@ -116,6 +121,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     toggle,
     view: activeView,
     width,
+    widthStyle,
     minWidth,
     maxWidth,
     resizable: layout.resizable,

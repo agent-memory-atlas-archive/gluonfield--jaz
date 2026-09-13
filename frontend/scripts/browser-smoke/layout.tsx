@@ -1,9 +1,13 @@
-import { useState, type CSSProperties } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { motion } from 'motion/react'
+import { useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { SidePanelControl, useSidePanelState } from '@/components/session/SidePanelState'
-import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
-import { PreviewPanel } from '@/components/session/PreviewPanel'
-import { BrowserSessions, BrowserSessionsContext } from '@/lib/browserSessions'
+import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
+import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
+import { useBrowserSessions } from '@/lib/browserSessions'
+import { drawerSlide } from '@/lib/dom/drawer'
+import { keys } from '@/lib/query/keys'
 import { SidebarVisibility } from '@/lib/sidebar'
 import { setThemePref } from '@/lib/theme'
 
@@ -12,10 +16,15 @@ export async function exerciseBrowserLayout(): Promise<void> {
   element.style.cssText = 'position:fixed;inset:0;z-index:100;background:var(--color-bg)'
   document.body.append(element)
   const root = createRoot(element)
-  const sessions = new BrowserSessions()
-  sessions.update('layout', { target: { sourceUrl: location.origin + '/target', displayUrl: location.origin + '/target' } })
+  const queryClient = new QueryClient()
+  queryClient.setQueryData(keys.browserSettings, { enabled: false, mode: 'desktop' })
+  let setNavigationWidth: (width: number) => void
   function Chat() {
+    const sessions = useBrowserSessions()
     const panel = useSidePanelState('layout')
+    useLayoutEffect(() => {
+      sessions.update('layout', { target: { sourceUrl: location.origin + '/target', displayUrl: location.origin + '/target' } })
+    }, [sessions])
     return <div ref={panel.containerRef} className="flex min-w-0 flex-1 flex-col">
       <header className="flex h-[52px] shrink-0 items-center justify-end px-4">
         <SidePanelControl open={panel.open} view={panel.view} sideChatAvailable={false} fileAvailable={false} onToggle={panel.toggle} onSelectView={panel.selectView} />
@@ -24,28 +33,33 @@ export async function exerciseBrowserLayout(): Promise<void> {
         <div className="min-w-0 flex-1 p-6 text-ink" data-layout-chat>
           <p className="text-[15px]">Open the browser to review the page alongside this conversation.</p>
         </div>
-        {panel.open && panel.view === 'preview' ? <div className="relative shrink-0" data-layout-browser style={{ width: panel.width, '--side-panel-width': `${panel.width}px` } as CSSProperties}>
-          <SidePanelResizeHandle width={panel.width} minWidth={panel.minWidth} maxWidth={panel.maxWidth} disabled={false} onResize={panel.resize} onResizeStart={() => panel.setResizing(true)} onResizeEnd={() => panel.setResizing(false)} />
-          <PreviewPanel target={panel.previewTarget} onTargetChange={panel.setPreviewTarget} onClose={panel.toggle} />
-        </div> : null}
+        {panel.view === 'preview' ? <SidePanelDrawer panel={panel} isMobile={false}>
+          <BrowserPanelSlot sessionId="layout" visible={panel.open} onClose={panel.toggle} />
+        </SidePanelDrawer> : null}
       </div>
     </div>
   }
   function Fixture() {
     const [sidebar, setSidebar] = useState(true)
-    return <BrowserSessionsContext.Provider value={sessions}><SidebarVisibility.Provider value={setSidebar}>
+    const [sidebarWidth, setSidebarWidth] = useState(264)
+    useLayoutEffect(() => {
+      setNavigationWidth = setSidebarWidth
+    }, [])
+    return <QueryClientProvider client={queryClient}><BrowserWorkspace><SidebarVisibility.Provider value={setSidebar}>
       <div className="flex h-full">
-        {sidebar ? <nav className="w-[264px] shrink-0 bg-surface p-6 text-ink" aria-label="Main navigation">Jaz</nav> : null}
+        <motion.div className="shrink-0 overflow-hidden" initial={false} animate={drawerSlide({ isMobile: false, open: sidebar, side: 'left', width: sidebarWidth })} transition={{ type: 'spring', stiffness: 400, damping: 36 }}>
+          <nav style={{ width: sidebarWidth }} className="h-full bg-surface p-6 text-ink" aria-hidden={!sidebar} aria-label="Main navigation">Jaz</nav>
+        </motion.div>
         <button className="absolute left-3 top-3 text-ink" aria-label="Toggle navigation" onClick={() => setSidebar((value) => !value)}>☰</button>
         <Chat />
       </div>
-    </SidebarVisibility.Provider></BrowserSessionsContext.Provider>
+    </SidebarVisibility.Provider></BrowserWorkspace></QueryClientProvider>
   }
   const until = async (check: () => boolean | Promise<boolean>) => {
     const end = Date.now() + 5000
     while (!await check()) {
       if (Date.now() > end) {
-        throw new Error('Browser layout check timed out')
+        throw new Error('Browser layout check timed out: ' + check.toString())
       }
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
@@ -55,6 +69,9 @@ export async function exerciseBrowserLayout(): Promise<void> {
     if (!target) {
       throw new Error('Missing browser layout control: ' + selector)
     }
+    const initial = target.getBoundingClientRect()
+    await window.smoke.pointer('mouseMove', Math.round(initial.x + initial.width / 2), Math.round(initial.y + initial.height / 2))
+    await new Promise((resolve) => setTimeout(resolve, 250))
     const bounds = target.getBoundingClientRect()
     const x = Math.round(bounds.x + bounds.width / 2)
     const y = Math.round(bounds.y + bounds.height / 2)
@@ -62,7 +79,8 @@ export async function exerciseBrowserLayout(): Promise<void> {
     await window.smoke.pointer('mouseDown', x, y)
     await window.smoke.pointer('mouseUp', x, y)
   }
-  const browserWidth = () => element.querySelector('[data-layout-browser]')?.getBoundingClientRect().width ?? 0
+  const browserWidth = () => element.querySelector('[role="separator"]')?.parentElement?.getBoundingClientRect().width ?? 0
+  const navigation = () => element.querySelector<HTMLElement>('nav:not([aria-hidden="true"])')
   const chatWidth = () => element.querySelector('[data-layout-chat]')!.getBoundingClientRect().width
   try {
     await window.smoke.resize(1440, 900)
@@ -70,11 +88,11 @@ export async function exerciseBrowserLayout(): Promise<void> {
     root.render(<Fixture />)
     await until(() => Boolean(element.querySelector('[title="Open Preview (⌘P)"]')))
     await click('[title="Open Preview (⌘P)"]')
-    await until(() => !element.querySelector('nav') && browserWidth() === 864)
+    await until(() => !navigation() && browserWidth() === 864)
     await click('[aria-label="Toggle navigation"]')
-    await until(() => Boolean(element.querySelector('nav')) && chatWidth() >= 360)
+    await until(() => Boolean(navigation()) && browserWidth() === 800 && chatWidth() >= 360)
     await click('[aria-label="Toggle navigation"]')
-    await until(() => !element.querySelector('nav') && browserWidth() === 864)
+    await until(() => !navigation() && browserWidth() === 864)
     const divider = element.querySelector<HTMLElement>('[role="separator"]')!
     const grip = divider.getBoundingClientRect()
     if (getComputedStyle(divider.lastElementChild!).backgroundColor === 'rgba(0, 0, 0, 0)') {
@@ -94,7 +112,25 @@ export async function exerciseBrowserLayout(): Promise<void> {
     if (document.activeElement !== divider) {
       throw new Error('Clicking the divider did not focus it for keyboard resizing')
     }
-    divider.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    await window.smoke.key('Right')
+    await until(() => browserWidth() === 940)
+    await window.smoke.key('Tab')
+    await until(() => document.activeElement !== divider)
+    await window.smoke.key('Tab', ['shift'])
+    await window.smoke.capture('browser-divider-keyboard')
+    await until(() => document.activeElement === divider && divider.matches(':focus-visible'))
+    const focusedGrip = divider.getBoundingClientRect()
+    const focusedX = Math.round(focusedGrip.x + focusedGrip.width / 2)
+    await window.smoke.pointer('mouseMove', focusedX, y)
+    await window.smoke.pointer('mouseDown', focusedX, y)
+    await window.smoke.pointer('mouseMove', focusedX - 24, y)
+    await until(() => browserWidth() === 964)
+    await window.smoke.capture('browser-divider-drag')
+    if (getComputedStyle(divider).outlineStyle !== 'none') {
+      throw new Error(`The resize handle draws a second line: ${getComputedStyle(divider).outline}`)
+    }
+    await window.smoke.pointer('mouseUp', focusedX - 24, y)
+    await window.smoke.key('Right')
     await until(() => browserWidth() === 940)
     await click('[aria-label="Toggle navigation"]')
     await until(() => browserWidth() === 816 && chatWidth() >= 360)
@@ -111,23 +147,63 @@ export async function exerciseBrowserLayout(): Promise<void> {
     await click('[title="Hide Preview panel (⌘P)"]')
     await until(() => browserWidth() === 0)
     await click('[aria-label="Toggle navigation"]')
-    await until(() => Boolean(element.querySelector('nav')))
+    await until(() => Boolean(navigation()))
     await click('[title="Open Preview (⌘P)"]')
-    await until(() => !element.querySelector('nav') && browserWidth() === 940)
+    await until(() => !navigation() && browserWidth() === 940 && element.querySelector('nav')!.parentElement!.getBoundingClientRect().width === 0)
     await window.smoke.resize(1050, 850)
     await until(() => browserWidth() === 690)
     if (chatWidth() < 360) {
       throw new Error('The browser squeezed the conversation below its minimum width')
     }
-    await click('[aria-label="Toggle navigation"]')
-    await until(() => browserWidth() === 426 && chatWidth() >= 360)
-    element.querySelector('nav')!.style.width = '320px'
+    const sidebarColumn = element.querySelector('nav')!.parentElement!
+    const drawer = element.querySelector('[role="separator"]')!.parentElement!
+    const browserHost = element.querySelector<HTMLElement>('[data-browser-session="layout"]')!
+    const frames: { sidebar: number; drawer: number; expected: number; browserRight: number; browserLeft: number; drawerLeft: number }[] = []
+    const record = () => {
+      const column = drawer.getBoundingClientRect()
+      const browser = browserHost.getBoundingClientRect()
+      frames.push({
+        sidebar: sidebarColumn.getBoundingClientRect().width,
+        drawer: column.width,
+        expected: Math.round(drawer.parentElement!.getBoundingClientRect().width) - 360,
+        browserRight: browser.right,
+        browserLeft: browser.left,
+        drawerLeft: column.left,
+      })
+    }
+    const observer = new ResizeObserver(record)
+    observer.observe(sidebarColumn)
+    observer.observe(drawer)
+    try {
+      await click('[aria-label="Toggle navigation"]')
+      await until(() => browserWidth() === 426 && sidebarColumn.getBoundingClientRect().width === 264)
+      const toggle = element.querySelector<HTMLButtonElement>('[aria-label="Toggle navigation"]')!
+      toggle.click()
+      await new Promise((resolve) => setTimeout(resolve, 80))
+      toggle.click()
+      await until(() => browserWidth() === 426 && sidebarColumn.getBoundingClientRect().width === 264)
+      toggle.click()
+      await until(() => browserWidth() === 690 && sidebarColumn.getBoundingClientRect().width === 0)
+      toggle.click()
+      await until(() => browserWidth() === 426 && sidebarColumn.getBoundingClientRect().width === 264)
+    } finally {
+      observer.disconnect()
+    }
+    const movingFrames = frames.filter((frame) => frame.sidebar > 1 && frame.sidebar < 263)
+    const lag = Math.max(...frames.map((frame) => Math.abs(frame.drawer - frame.expected)))
+    const edgeGap = Math.max(...frames.flatMap((frame) => [Math.abs(frame.browserRight - window.innerWidth), Math.abs(frame.browserLeft - frame.drawerLeft)]))
+    if (movingFrames.length < 8 || lag > 1 || edgeGap > 1) {
+      throw new Error(`Browser resize was not synchronized: ${movingFrames.length} moving frames, ${lag}px width lag, ${edgeGap}px edge gap`)
+    }
+    console.warn(JSON.stringify({ layoutSynchronization: { movingFrames: movingFrames.length, maxWidthLag: lag, maxEdgeGap: edgeGap } }))
+    setNavigationWidth(320)
     await until(() => browserWidth() === 370 && chatWidth() >= 360)
   } catch (error) {
     await window.smoke.capture('browser-layout-failure')
-    throw new Error(`${(error as Error).message}; viewport=${window.innerWidth}, browser=${browserWidth()}, sidebar=${Boolean(element.querySelector('nav'))}`, { cause: error })
+    throw new Error(`${(error as Error).message}; viewport=${window.innerWidth}, browser=${browserWidth()}, sidebar=${Boolean(navigation())}`, { cause: error })
   } finally {
     root.unmount()
+    queryClient.clear()
     element.remove()
     await window.smoke.resize(1050, 850)
   }

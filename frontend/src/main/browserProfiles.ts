@@ -4,8 +4,9 @@ import { homedir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import type { BrowserProfile } from '@shared/browserProfile'
 
-export type LocalBrowserProfile = BrowserProfile & {
-  database: string
+export type LocalBrowserProfile = Omit<BrowserProfile, 'cookies' | 'passwords'> & {
+  database?: string
+  passwordDatabases: string[]
   family: 'chromium' | 'firefox'
   keychainService?: string
 }
@@ -36,16 +37,19 @@ export async function discoverBrowserProfiles(
         if (basename(folder) !== folder || folder === '.' || folder === '..') {
           continue
         }
-        for (const cookieFile of ['Network/Cookies', 'Cookies']) {
-          const database = join(root, folder, cookieFile)
-          if (await exists(database)) {
-            profiles.push({
-              id: profileID(database), browser,
-              name: typeof metadata?.name === 'string' ? metadata.name : folder,
-              database, family: 'chromium', keychainService,
-            })
-            break
-          }
+        const directory = join(root, folder)
+        const databases = await Promise.all(['Network/Cookies', 'Cookies', 'Login Data', 'Login Data For Account'].map(async (name) => {
+          const file = join(directory, name)
+          return await exists(file) ? file : undefined
+        }))
+        const database = databases[0] ?? databases[1]
+        const passwordDatabases = databases.slice(2).filter((file): file is string => Boolean(file))
+        if (database || passwordDatabases.length) {
+          profiles.push({
+            id: profileID(directory), browser,
+            name: typeof metadata?.name === 'string' ? metadata.name : folder,
+            database, passwordDatabases, family: 'chromium', keychainService,
+          })
         }
       }
     }
@@ -75,7 +79,7 @@ export async function discoverBrowserProfiles(
       const directory = fields.get('IsRelative') === '0' ? resolve(folder) : resolve(root, folder.split('/').join(sep))
       const database = join(directory, 'cookies.sqlite')
       if (await exists(database)) {
-        profiles.push({ id: profileID(database), browser: 'Firefox', name: fields.get('Name') || basename(directory), database, family: 'firefox' })
+        profiles.push({ id: profileID(database), browser: 'Firefox', name: fields.get('Name') || basename(directory), database, passwordDatabases: [], family: 'firefox' })
       }
     }
   }
