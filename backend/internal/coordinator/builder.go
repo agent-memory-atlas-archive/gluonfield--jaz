@@ -5,11 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/connections"
-	"github.com/wins/jaz/backend/internal/promptmodule"
 	"github.com/wins/jaz/backend/internal/skills"
-	"github.com/wins/jaz/backend/internal/templates/jazplatform"
 	"github.com/wins/jaz/backend/internal/visualize"
 )
 
@@ -108,32 +105,6 @@ func (b *Builder) ACPPromptForContext(ctx context.Context, cwd, surface string) 
 	}
 	agents := b.agentNames()
 	return platformPrompt(ctx, b.root, cwd, b.runtimeWorkspace(), memoryRoot, catalog.Prompt(), connections, agents, b.browserToolsEnabled(), visualize.NormalizeSurface(surface), now)
-}
-
-func (b *Builder) PromptModulesForContext(ctx context.Context, opts acp.PromptModuleOptions) (promptmodule.Modules, error) {
-	now := time.Now()
-	memoryRoot := b.memoryRootForPrompt()
-	memory, err := memoryData(memoryRoot, now)
-	if err != nil {
-		return nil, err
-	}
-	out := promptmodule.Modules{}
-	if opts.Connections {
-		connections, err := b.agentConnections(ctx, memoryRoot)
-		if err != nil {
-			return nil, err
-		}
-		prompt, err := jazplatform.RenderConnections(connections)
-		if err != nil {
-			return nil, err
-		}
-		out = out.Append(prompt)
-	}
-	prompt, err := jazplatform.RenderMemory(memory)
-	if err != nil {
-		return nil, err
-	}
-	return out.Append(prompt), nil
 }
 
 func (b *Builder) build(ctx context.Context, workspace string, surface visualize.Surface) (system, skillsPrompt string, err error) {

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-const memorySourceInterval = 2 * time.Minute
+const memorySourceInterval = 30 * time.Minute
 
 func NewMemorySourceRunner(store *sqlitestore.Store, manager *acp.Manager, memory *jazmem.Memory, queue MemorySourceQueue, logger *log.Logger) *memorysource.Runner {
 	return memorysource.New(memory.Root(), store, queue.Queue, manager, logger)

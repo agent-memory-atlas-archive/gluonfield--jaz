@@ -131,7 +131,6 @@ func serveOptions(args []string) []fx.Option {
 			app.CloseMemory,
 			app.StartStorageMaintenance,
 			app.ConfigureMemoryDreamRunner,
-			app.ConfigureMemorySearchRunner,
 			app.ConfigureBrowserTools,
 			app.CloseBrowserBackend,
 			app.StartMemoryScheduler,

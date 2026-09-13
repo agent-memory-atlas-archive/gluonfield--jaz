@@ -53,14 +53,6 @@ type SystemPromptSource interface {
 	ACPPromptForContext(ctx context.Context, cwd, surface string) (string, error)
 }
 
-type PromptModuleOptions struct {
-	Connections bool
-}
-
-type SystemPromptModules interface {
-	PromptModulesForContext(context.Context, PromptModuleOptions) (promptmodule.Modules, error)
-}
-
 type SessionPromptExtensionResolver func(storage.Session) (promptmodule.Modules, error)
 
 type ProviderModelCatalog interface {

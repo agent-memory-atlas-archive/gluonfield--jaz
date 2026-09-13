@@ -21,7 +21,6 @@ import (
 	"github.com/wins/jaz/backend/internal/managedtool"
 	mcpruntime "github.com/wins/jaz/backend/internal/mcp"
 	mcpconfig "github.com/wins/jaz/backend/internal/mcpconfig"
-	"github.com/wins/jaz/backend/internal/memorysearch"
 	"github.com/wins/jaz/backend/internal/memoryservice"
 	"github.com/wins/jaz/backend/internal/modelcatalog"
 	"github.com/wins/jaz/backend/internal/promptmodule"
@@ -349,8 +348,6 @@ func NewACPConfig(cfg Config, store *sqlitestore.Store, workspace Workspace, pro
 	}
 	cfg.ACP.ResumePrompt = func(session storage.Session) (promptmodule.Modules, error) {
 		switch session.SourceType {
-		case storage.SourceMemorySearch:
-			return promptmodule.New(memorysearch.WorkerSystemPrompt()), nil
 		case storage.SourceMemorySource:
 			return promptmodule.New(memorysourceprompt.System()), nil
 		case storage.SourceLoopRun:

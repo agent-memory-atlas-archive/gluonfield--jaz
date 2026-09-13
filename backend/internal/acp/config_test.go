@@ -12,7 +12,6 @@ import (
 
 	"github.com/wins/jaz/backend/internal/managedtool"
 	"github.com/wins/jaz/backend/internal/modelcatalog"
-	"github.com/wins/jaz/backend/internal/promptmodule"
 	modelprovider "github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/runtimeenv"
 	"github.com/wins/jaz/backend/internal/sessioncontext"
@@ -35,24 +34,6 @@ type platformPrompt struct{}
 
 func (platformPrompt) ACPPromptForContext(ctx context.Context, _, _ string) (string, error) {
 	return "platform=" + sessioncontext.ClientPlatform(ctx), nil
-}
-
-type modulePrompt struct{}
-
-const workerConnectionsPrompt = "## connections\n\nConnected accounts and agent-relevant memory paths:\n- Telegram: personal (42)\n  - `sources/chat/telegram/42/contacts.md` (memory_page): Clean contact index.\n  - `sources/chat/telegram/42/conversations/` (memory_prefix): Materialized chat days."
-
-const workerMemoryPrompt = "## memory\n\nJaz has persistent markdown memory (jazmem) at /tmp/jaz/memory.\n\nCore memory paths:\n- `LONG_TERM.md`: stable identity, goals, preferences, and key relationships.\n- `SHORT_TERM.md`: current focus, active projects, and open loops.\n- `sources/`: cleaned source pages from providers or agents.\n\n## memory/LONG_TERM.md\n\n- long\n\n## memory/SHORT_TERM.md\n\n- short\n\n## memory/daily/2026-06-30.md\n\n- today"
-
-func (modulePrompt) ACPPromptForContext(context.Context, string, string) (string, error) {
-	return "full platform prompt", nil
-}
-
-func (modulePrompt) PromptModulesForContext(_ context.Context, opts PromptModuleOptions) (promptmodule.Modules, error) {
-	out := promptmodule.Modules{}
-	if opts.Connections {
-		out = out.Append(workerConnectionsPrompt)
-	}
-	return out.Append(workerMemoryPrompt), nil
 }
 
 func TestProcessEnvIsMinimalAndCanonical(t *testing.T) {
@@ -253,45 +234,15 @@ func TestSessionPromptMetaSendsGrokExtensionsAsRules(t *testing.T) {
 
 func TestSessionPromptMetaSkipsBasePromptForRestrictedWorker(t *testing.T) {
 	manager := &Manager{cfg: Config{SystemPrompt: testPrompt("jaz platform prompt")}}
-	got, err := manager.systemPrompt(context.Background(), "", "", MCPServerPolicyMemorySearchWorker, []string{"memory worker prompt"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got != "memory worker prompt" {
-		t.Fatalf("system prompt = %#v", got)
-	}
-}
-
-func TestSessionPromptMetaAddsRestrictedWorkerModules(t *testing.T) {
-	manager := &Manager{cfg: Config{SystemPrompt: modulePrompt{}}}
-	for _, tc := range []struct {
-		policy string
-		worker string
-		want   string
-	}{
-		{MCPServerPolicyMemorySearchWorker, "memory-search worker prompt", workerConnectionsPrompt + "\n\n" + workerMemoryPrompt + "\n\nmemory-search worker prompt"},
-		{MCPServerPolicyMemorySourceWorker, "memory-source worker prompt", workerConnectionsPrompt + "\n\n" + workerMemoryPrompt + "\n\nmemory-source worker prompt"},
-	} {
-		prompt, err := manager.systemPrompt(context.Background(), "", "", tc.policy, []string{tc.worker})
+	for _, policy := range []string{MCPServerPolicyMemorySearchWorker, MCPServerPolicyMemorySourceWorker} {
+		got, err := manager.systemPrompt(context.Background(), "", "", policy, []string{"memory worker prompt"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if prompt != tc.want {
-			t.Fatalf("system prompt = %q", prompt)
-		}
-		for _, want := range []string{"## connections", "sources/chat/telegram/42/contacts.md", "sources/chat/telegram/42/conversations/", "## memory", "Core memory paths:", "## memory/LONG_TERM.md", "## memory/SHORT_TERM.md", "## memory/daily/2026-06-30.md"} {
-			if !strings.Contains(prompt, want) {
-				t.Fatalf("%s worker prompt missing %q:\n%s", tc.policy, want, prompt)
-			}
-		}
-		if strings.Contains(prompt, "/tmp/jaz/ingest") {
-			t.Fatalf("restricted worker prompt must not include ingest paths:\n%s", prompt)
-		}
-		if strings.Contains(prompt, "full platform") {
-			t.Fatalf("restricted worker received full platform prompt: %q", prompt)
+		if got != "memory worker prompt" {
+			t.Fatalf("%s system prompt = %#v", policy, got)
 		}
 	}
-
 }
 
 func TestMergeAgentsPreservesCapabilitiesOnPartialOverride(t *testing.T) {

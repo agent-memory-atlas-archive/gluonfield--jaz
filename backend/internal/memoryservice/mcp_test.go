@@ -35,6 +35,36 @@ func TestGatedJazmemGetPageAcceptsAbsoluteMemoryPage(t *testing.T) {
 	}
 }
 
+func TestMemorySearchReturnsRankedResultsDirectly(t *testing.T) {
+	root := t.TempDir()
+	mem, err := jazmem.Open(jazmem.Config{Root: root, DBPath: filepath.Join(t.TempDir(), "index.sqlite")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = mem.Close() })
+	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "projects", "jaz.md"), []byte("# Jaz\n\nMemory search should preserve the active chat context."), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mem.Reindex(context.Background(), jazmem.ReindexOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, response, err := (memoryTools{service: New(mem, memorySettingsStore{}, nil, "")}).Search(
+		context.Background(),
+		nil,
+		SearchInput{Query: "active chat context", Limit: 5},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Results) != 1 || response.Results[0].Slug != "projects/jaz" {
+		t.Fatalf("results = %#v", response.Results)
+	}
+}
+
 func TestGatedJazmemGetPageRejectsAbsolutePathOutsideMemoryRoot(t *testing.T) {
 	root := t.TempDir()
 	mem, err := jazmem.Open(jazmem.Config{Root: root, DBPath: filepath.Join(t.TempDir(), "index.sqlite")})

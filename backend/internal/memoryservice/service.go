@@ -35,8 +35,6 @@ type Service struct {
 
 	apiOnce sync.Once
 	api     http.Handler
-
-	searcher AgenticSearcher
 }
 
 func New(memory *jazmem.Memory, store storage.SettingsStorage, scheduler SchedulerControl, mcpURL string) *Service {

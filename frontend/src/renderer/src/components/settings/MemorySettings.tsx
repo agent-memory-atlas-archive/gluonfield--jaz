@@ -257,7 +257,7 @@ export function MemorySettings() {
         <MemorySettingsRow
           title="Memory agent"
           description={selectedMemoryAgent ? `${agentLabel(selectedMemoryAgent)} handles upkeep.` : 'Choose an agent.'}
-          explanation="This agent answers memory-search requests and does background memory review. It should be an enabled ACP agent you trust with your saved context."
+          explanation="This agent captures durable facts from sources and reviews memory in the background. It should be an enabled ACP agent you trust with your saved context."
           disabled={!enabled}
         >
           <div className="grid gap-1">
