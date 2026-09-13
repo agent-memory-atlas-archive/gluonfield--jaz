@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { ChartNoAxesColumn } from 'lucide-react'
 import { type MouseEvent, useMemo, useState } from 'react'
+import { UsageWindowFilter } from '@/components/settings/UsageWindowFilter'
+import type { UsageWindow } from '@/lib/usageWindow'
 import { CategoryBreakdown } from '@/components/settings/UsageCategoryBreakdown'
 import { ModelBreakdown, UsageShareCharts } from '@/components/settings/UsageModelBreakdown'
 import { SettingsCard } from '@/components/settings/SettingsCard'
@@ -18,14 +20,12 @@ import {
   sumModelUsage,
   sumUsage,
   totalUsageTokens,
-  USAGE_CHART_DAYS,
   sumCategoryUsage,
   type UsageCell,
   usageCells,
   usageLevel,
   usageMonthLabels,
   usageWeekCount,
-  visibleUsageDays,
 } from '@/lib/usageDaily'
 
 type TooltipState = {
@@ -38,7 +38,8 @@ const usageSquarePx = 12
 const usageGapPx = 3
 
 export function UsageSettings() {
-  const usage = useQuery(dailyUsageQuery(365))
+  const [window, setWindow] = useState<UsageWindow>({ days: 30 })
+  const usage = useQuery(dailyUsageQuery(window))
   const agentSettings = useQuery(agentSettingsQuery)
   const openRouter = useQuery(openRouterModelsQuery)
   const pricing = useMemo(() => buildPricingIndex(openRouter.data ?? []), [openRouter.data])
@@ -52,12 +53,15 @@ export function UsageSettings() {
         </div>
       </div>
 
+      <UsageWindowFilter window={window} onChange={setWindow} />
+
       {usage.isPending ? (
         <UsageSkeleton />
       ) : usage.isError ? (
         <p className="mt-4 py-2 text-[13px] text-danger">{usage.error.message}</p>
       ) : (
         <UsagePanel
+          key={JSON.stringify(window)}
           days={usage.data}
           pricing={pricing}
           agentSettings={agentSettings.data}
@@ -91,51 +95,52 @@ function UsagePanel({
   agentSettings?: AgentSettings
 }) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
-  const chartDays = useMemo(() => visibleUsageDays(days), [days])
-  const cells = useMemo(() => usageCells(chartDays), [chartDays])
+  const cells = useMemo(() => usageCells(days), [days])
   const monthLabels = useMemo(() => usageMonthLabels(cells), [cells])
   const weekCount = useMemo(() => usageWeekCount(cells), [cells])
-  const last30Days = useMemo(() => days.slice(-30), [days])
-  const last7 = sumUsage(days.slice(-7))
-  const last30 = sumUsage(last30Days)
-  const models = useMemo(() => sumModelUsage(last30Days), [last30Days])
-  const categories = useMemo(() => sumCategoryUsage(last30Days), [last30Days])
-  const peak = peakDay(chartDays)
-  const activeDays = chartDays.filter((day) => totalUsageTokens(day.usage) > 0).length
-  const maxTotal = Math.max(1, ...chartDays.map((day) => totalUsageTokens(day.usage)))
-  const hasUsage = chartDays.some((day) => totalUsageTokens(day.usage) > 0)
-  const inputAndCacheTokens = last30.input_tokens ?? 0
-  const cacheRead = last30.cached_input_tokens ?? 0
-  const cacheWrite = last30.cached_write_tokens ?? 0
-  const reasoning = last30.reasoning_output_tokens ?? 0
+  const total = sumUsage(days)
+  const models = useMemo(() => sumModelUsage(days), [days])
+  const categories = useMemo(() => sumCategoryUsage(days), [days])
+  const peak = peakDay(days)
+  const activeDays = days.filter((day) => totalUsageTokens(day.usage) > 0).length
+  const maxTotal = Math.max(1, ...days.map((day) => totalUsageTokens(day.usage)))
+  const hasUsage = days.some((day) => totalUsageTokens(day.usage) > 0)
+  const inputAndCacheTokens = total.input_tokens ?? 0
+  const cacheRead = total.cached_input_tokens ?? 0
+  const cacheWrite = total.cached_write_tokens ?? 0
+  const reasoning = total.reasoning_output_tokens ?? 0
   const cacheHitLabel = inputAndCacheTokens > 0 ? `${Math.round((cacheRead / inputAndCacheTokens) * 100)}%` : '—'
   const { rows: pricedModels, summary: costSummary } = useMemo(
     () => priceModels(models, pricing, agentSettings),
     [agentSettings, models, pricing],
   )
+  const periodLabel = days.length === 0 ? '' : days.length === 1
+    ? formatUsageDate(days[0].date)
+    : `${formatUsageDate(days[0].date)} – ${formatUsageDate(days[days.length - 1].date)}`
   const costLabel = costSummary.priced > 0 ? formatUsd(costSummary.total) : '—'
   const dailyCostLabels = useMemo(() => {
     const labels = new Map<string, string>()
-    for (const day of chartDays) {
+    for (const day of days) {
       labels.set(day.date, dailyCostLabel(day, pricing, agentSettings))
     }
     return labels
-  }, [agentSettings, chartDays, pricing])
+  }, [agentSettings, days, pricing])
 
   return (
     <SettingsCard className="mt-4 p-3.5">
+      <p className="mb-3 text-[12px] text-ink-2">{periodLabel}</p>
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-control bg-border/70 md:grid-cols-4">
-        <UsageStat label="Last 7 days" value={formatTokens(totalUsageTokens(last7))} detail="total tokens" />
-        <UsageStat label="Last 30 days" value={formatTokens(totalUsageTokens(last30))} detail="total tokens" />
-        <UsageStat label="Est. cost" value={costLabel} detail="30d · list prices" />
+        <UsageStat label="Total tokens" value={formatTokens(totalUsageTokens(total))} detail="input + output" />
+        <UsageStat label="Daily average" value={formatTokens(Math.round(totalUsageTokens(total) / Math.max(1, days.length)))} detail="tokens per day" />
+        <UsageStat label="Est. cost" value={costLabel} detail="list prices" />
         <UsageStat label="Cache hit rate" value={cacheHitLabel} detail="of input + cache" />
       </div>
 
       <div className="mt-4 min-w-0 rounded-control bg-bg/45 px-3 py-2.5">
-        <div className="mb-2 flex items-center justify-between gap-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-[12px] font-medium text-ink">
             <ChartNoAxesColumn size={14} className="text-ink-3" />
-            <span>Last 6 months</span>
+            <span>Daily usage</span>
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-ink-3">
             <span>Less</span>
@@ -150,7 +155,7 @@ function UsagePanel({
           </div>
         </div>
 
-        <div className="pb-1">
+        <div className="overflow-x-auto pb-1">
           <div
             className="grid w-full grid-cols-[24px_auto] gap-x-2 gap-y-1"
             style={{ gridTemplateRows: `16px repeat(7, ${usageSquarePx}px)` }}
@@ -217,8 +222,8 @@ function UsagePanel({
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-3">
-          {!hasUsage ? <span>No token usage recorded yet.</span> : null}
-          <span>{activeDays} active day{activeDays === 1 ? '' : 's'} in {USAGE_CHART_DAYS} days</span>
+          {!hasUsage ? <span>No token usage in this period.</span> : null}
+          <span>{activeDays} active day{activeDays === 1 ? '' : 's'} in {days.length} day{days.length === 1 ? '' : 's'}</span>
           {peak ? <span>Peak {formatUsageDate(peak.date)}: {formatTokens(totalUsageTokens(peak.usage))}</span> : null}
           {cacheRead > 0 ? <span>Cache read {formatTokens(cacheRead)}</span> : null}
           {cacheWrite > 0 ? <span>Cache write {formatTokens(cacheWrite)}</span> : null}

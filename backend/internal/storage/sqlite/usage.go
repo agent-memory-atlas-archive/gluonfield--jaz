@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"math"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/storage"
@@ -10,8 +11,15 @@ import (
 	usagequeries "github.com/wins/jaz/backend/internal/storage/sqlite/generated/usage"
 )
 
-func (s *Store) UsageEventsSince(since time.Time) ([]storage.UsageEvent, error) {
-	rows, err := usagequeries.New(s.db).ListUsageEventsSince(context.Background(), timeToMs(since.In(time.UTC)))
+func (s *Store) UsageEvents(since, until time.Time) ([]storage.UsageEvent, error) {
+	end := int64(math.MaxInt64)
+	if !until.IsZero() {
+		end = ceilUnixMilli(until)
+	}
+	rows, err := usagequeries.New(s.db).ListUsageEvents(context.Background(), usagequeries.ListUsageEventsParams{
+		Since: ceilUnixMilli(since),
+		Until: end,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +45,14 @@ func (s *Store) UsageEventsSince(since time.Time) ([]storage.UsageEvent, error) 
 		})
 	}
 	return events, nil
+}
+
+func ceilUnixMilli(t time.Time) int64 {
+	ms := t.UnixMilli()
+	if t.Nanosecond()%1_000_000 != 0 {
+		ms++
+	}
+	return ms
 }
 
 func insertUsageEvent(ctx context.Context, q usagequeries.Querier, thread threaddb.Thread, usage storage.Usage, total, liveContext, createdAtMs int64) error {

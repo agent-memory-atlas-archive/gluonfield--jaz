@@ -327,7 +327,7 @@ func TestACPUsageSumsCodexLastTokenUsageUpdates(t *testing.T) {
 	if loaded.Usage.ContextTokens != 2020 || loaded.Usage.ContextWindowTokens != 258400 {
 		t.Fatalf("context = %d / %d, want 2020 / 258400", loaded.Usage.ContextTokens, loaded.Usage.ContextWindowTokens)
 	}
-	events, err := store.UsageEventsSince(time.Unix(0, 0))
+	events, err := store.UsageEvents(time.Unix(0, 0), time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +415,7 @@ func TestACPUsageSkipsRepeatedCodexLastTokenUsageUpdate(t *testing.T) {
 	if loaded.Usage.ContextTokens != 1020 || loaded.Usage.ContextWindowTokens != 258400 {
 		t.Fatalf("context = %d / %d, want 1020 / 258400", loaded.Usage.ContextTokens, loaded.Usage.ContextWindowTokens)
 	}
-	events, err := store.UsageEventsSince(time.Unix(0, 0))
+	events, err := store.UsageEvents(time.Unix(0, 0), time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

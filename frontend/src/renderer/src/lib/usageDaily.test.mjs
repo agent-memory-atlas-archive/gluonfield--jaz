@@ -55,3 +55,28 @@ test('cost splits input into the full-rate slice and the cache write it paid for
     expect(fullRateInputTokens(usage) + usage.cached_write_tokens).toBe(inputTokens(usage))
   }
 })
+
+
+test('heatmap keeps every calendar date and weekday across historical timezone changes', () => {
+  const result = globalThis.Bun.spawnSync({
+    cmd: [globalThis.process.execPath, '-e', `
+      import { usageCells, formatUsageDate } from ${JSON.stringify(new globalThis.URL('./usageDaily.ts', import.meta.url).pathname)}
+      const days = ['2011-12-29', '2011-12-30', '2011-12-31'].map((date) => ({ date, usage: {} }))
+      const cells = usageCells(days)
+      process.stdout.write(JSON.stringify({
+        dates: cells.filter((cell) => cell.inRange).map((cell) => cell.date),
+        first: cells[0].date,
+        last: cells.at(-1).date,
+        label: formatUsageDate('2011-12-30')
+      }))
+    `],
+    env: { ...globalThis.process.env, TZ: 'Pacific/Apia' },
+    timeout: 5000,
+  })
+  expect(result.exitCode).toBe(0)
+  const actual = JSON.parse(new globalThis.TextDecoder().decode(result.stdout))
+  expect(actual.dates).toEqual(['2011-12-29', '2011-12-30', '2011-12-31'])
+  expect(actual.first).toBe('2011-12-25')
+  expect(actual.last).toBe('2011-12-31')
+  expect(actual.label).toContain('30')
+})

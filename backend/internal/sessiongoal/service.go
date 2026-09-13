@@ -264,7 +264,7 @@ func (s *Service) publish(sessionID string, state *goal.State, now time.Time) (*
 }
 
 func (s *Service) tokensBetween(sessionID string, start, end time.Time) int64 {
-	events, err := s.Store.UsageEventsSince(start)
+	events, err := s.Store.UsageEvents(start, time.Time{})
 	if err != nil {
 		return 0
 	}

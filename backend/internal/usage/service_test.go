@@ -11,11 +11,13 @@ import (
 type fakeUsageEventStore struct {
 	events []storage.UsageEvent
 	since  time.Time
+	until  time.Time
 	err    error
 }
 
-func (s *fakeUsageEventStore) UsageEventsSince(since time.Time) ([]storage.UsageEvent, error) {
+func (s *fakeUsageEventStore) UsageEvents(since, until time.Time) ([]storage.UsageEvent, error) {
 	s.since = since
+	s.until = until
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -292,5 +294,136 @@ func TestDailyValidationAndUnsupportedStore(t *testing.T) {
 	_, err = NewService(nil).Daily(DailyQuery{Days: 1, Location: time.UTC})
 	if !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("nil store error = %v, want ErrUnsupported", err)
+	}
+}
+
+func TestCustomWindowIncludesWholeLocalDays(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, start := range []time.Time{
+		time.Date(2024, 2, 28, 0, 0, 0, 0, loc),
+		time.Date(2024, 3, 9, 0, 0, 0, 0, loc),
+		time.Date(2024, 11, 2, 0, 0, 0, 0, loc),
+	} {
+		t.Run(start.Format(DateLayout), func(t *testing.T) {
+			end := start.AddDate(0, 0, 3)
+			store := &fakeUsageEventStore{}
+			for i, date := range []time.Time{start.Add(-time.Nanosecond), start, end.Add(-time.Nanosecond), end} {
+				store.events = append(store.events, storage.UsageEvent{
+					SessionID:  "session",
+					Runtime:    storage.RuntimeACP,
+					Agent:      "codex",
+					Source:     storage.UsageEventSourceTurn,
+					SourceType: "loop_run",
+					CreatedAt:  date.UTC(),
+					Usage:      storage.Usage{InputTokens: int64(1 << i)},
+				})
+			}
+			service := Service{store: store, now: func() time.Time {
+				return time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+			}}
+			query := DailyQuery{Range: &DateRange{Start: start, End: end.AddDate(0, 0, -1)}, Location: loc}
+			daily, err := service.Daily(query)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !store.since.Equal(start) || !store.until.Equal(end) || len(daily) != 3 {
+				t.Fatalf("since = %s, days = %d", store.since, len(daily))
+			}
+			for i, want := range []int64{2, 0, 4} {
+				day := daily[i]
+				if day.Date != start.AddDate(0, 0, i).Format(DateLayout) || day.Usage.InputTokens != want {
+					t.Fatalf("day %d = %#v, want %d tokens", i, day, want)
+				}
+				if want > 0 && (len(day.Models) != 1 || day.Models[0].Usage.InputTokens != want ||
+					len(day.Categories) != 1 || day.Categories[0].Usage.InputTokens != want) {
+					t.Fatalf("breakdowns do not match day: %#v", day)
+				}
+			}
+			models, err := service.Models(query)
+			if err != nil || len(models) != 1 || models[0].Usage.InputTokens != 6 || models[0].SessionCount != 1 {
+				t.Fatalf("models = %#v, err = %v", models, err)
+			}
+		})
+	}
+}
+
+func TestCustomWindowLength(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := time.Date(2024, 1, 1, 0, 0, 0, 0, loc)
+	service := NewService(&fakeUsageEventStore{})
+	for _, days := range []int{1, 365, 366, 0} {
+		buckets, err := service.Daily(DailyQuery{Range: &DateRange{Start: start, End: start.AddDate(0, 0, days-1)}, Location: loc})
+		if days < 1 || days > 365 {
+			if !errors.Is(err, ErrInvalidRange) {
+				t.Fatalf("%d days: error = %v", days, err)
+			}
+		} else if err != nil || len(buckets) != days {
+			t.Fatalf("%d days: buckets = %d, error = %v", days, len(buckets), err)
+		}
+	}
+}
+
+func TestHistoricalCalendarTransitions(t *testing.T) {
+	for _, test := range []struct {
+		zone, first, last, start, end string
+		days                          int
+	}{
+		{"America/Sao_Paulo", "2018-11-04", "2018-11-04", "2018-11-04T03:00:00Z", "2018-11-05T02:00:00Z", 1},
+		{"America/Havana", "2024-11-03", "2024-11-03", "2024-11-03T04:00:00Z", "2024-11-04T05:00:00Z", 1},
+		{"Pacific/Apia", "2011-12-29", "2011-12-31", "2011-12-29T10:00:00Z", "2011-12-31T10:00:00Z", 3},
+		{"Pacific/Apia", "2011-12-30", "2011-12-30", "2011-12-30T10:00:00Z", "2011-12-30T10:00:00Z", 1},
+	} {
+		t.Run(test.zone+"/"+test.first, func(t *testing.T) {
+			loc, err := time.LoadLocation(test.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			first, _ := time.Parse(DateLayout, test.first)
+			last, _ := time.Parse(DateLayout, test.last)
+			start, _ := time.Parse(time.RFC3339, test.start)
+			end, _ := time.Parse(time.RFC3339, test.end)
+			store := &fakeUsageEventStore{}
+			for _, instant := range []time.Time{start.Add(-time.Nanosecond), start, end.Add(-time.Nanosecond), end} {
+				store.events = append(store.events, storage.UsageEvent{
+					Runtime:   storage.RuntimeACP,
+					Source:    storage.UsageEventSourceTurn,
+					CreatedAt: instant,
+					Usage:     storage.Usage{InputTokens: 1},
+				})
+			}
+			service := NewService(store)
+			query := DailyQuery{Range: &DateRange{Start: first, End: last}, Location: loc}
+			days, err := service.Daily(query)
+			if err != nil || len(days) != test.days || days[0].Date != test.first || days[len(days)-1].Date != test.last {
+				t.Fatalf("days = %#v, error = %v", days, err)
+			}
+			if !store.since.Equal(start) || !store.until.Equal(end) {
+				t.Fatalf("bounds = [%s, %s), want [%s, %s)", store.since, store.until, start, end)
+			}
+			var tokens int64
+			for _, day := range days {
+				tokens += day.Usage.InputTokens
+				if day.Date == "2011-12-30" && day.Usage.InputTokens != 0 {
+					t.Fatalf("usage on skipped date: %#v", day)
+				}
+			}
+			want := int64(2)
+			if start.Equal(end) {
+				want = 0
+			}
+			if tokens != want {
+				t.Fatalf("daily tokens = %d, want %d", tokens, want)
+			}
+			models, err := service.Models(query)
+			if err != nil || (want == 0 && len(models) != 0) || (want > 0 && (len(models) != 1 || models[0].Usage.InputTokens != want)) {
+				t.Fatalf("models = %#v, error = %v", models, err)
+			}
+		})
 	}
 }

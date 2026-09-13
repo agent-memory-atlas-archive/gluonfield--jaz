@@ -8,25 +8,11 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
-const (
-	DateLayout       = "2006-01-02"
-	DefaultDailyDays = 30
-	MaxDailyDays     = 365
-)
-
-var (
-	ErrInvalidDays = errors.New("days must be a positive integer")
-	ErrUnsupported = errors.New("usage statistics are not supported")
-)
+var ErrUnsupported = errors.New("usage statistics are not supported")
 
 type Service struct {
 	store storage.UsageEventStore
 	now   func() time.Time
-}
-
-type DailyQuery struct {
-	Days     int
-	Location *time.Location
 }
 
 type DailyBucket struct {
@@ -82,23 +68,26 @@ func NewService(store storage.UsageEventStore) Service {
 }
 
 func (s Service) Daily(query DailyQuery) ([]DailyBucket, error) {
-	days, err := ValidateDays(query.Days)
+	window, err := query.window(s.currentTime())
 	if err != nil {
 		return nil, err
 	}
 	if s.store == nil {
 		return nil, ErrUnsupported
 	}
-	loc := query.Location
-	if loc == nil {
-		loc = time.Local
+	out := []DailyBucket{}
+	index := map[string]int{}
+	for date := window.first; date.Before(window.end); date = date.AddDate(0, 0, 1) {
+		key := date.Format(DateLayout)
+		index[key] = len(out)
+		out = append(out, DailyBucket{Date: key})
 	}
-	out, index, start := dailyBucketsAt(days, loc, s.currentTime())
 	accs := make([]dayAccumulator, len(out))
 	for i := range accs {
 		accs[i] = newDayAccumulator()
 	}
-	events, err := s.store.UsageEventsSince(start.In(time.UTC))
+	start, end := window.bounds()
+	events, err := s.store.UsageEvents(start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +98,7 @@ func (s Service) Daily(query DailyQuery) ([]DailyBucket, error) {
 		if event.CreatedAt.Before(start) {
 			continue
 		}
-		i, ok := index[event.CreatedAt.In(loc).Format(DateLayout)]
+		i, ok := index[event.CreatedAt.In(window.location).Format(DateLayout)]
 		if !ok {
 			continue
 		}
@@ -132,20 +121,15 @@ func (s Service) Daily(query DailyQuery) ([]DailyBucket, error) {
 }
 
 func (s Service) Models(query DailyQuery) ([]ModelUsage, error) {
-	days, err := ValidateDays(query.Days)
+	window, err := query.window(s.currentTime())
 	if err != nil {
 		return nil, err
 	}
 	if s.store == nil {
 		return nil, ErrUnsupported
 	}
-	loc := query.Location
-	if loc == nil {
-		loc = time.Local
-	}
-	_, _, start := dailyBucketsAt(days, loc, s.currentTime())
-	end := start.AddDate(0, 0, days)
-	events, err := s.store.UsageEventsSince(start.In(time.UTC))
+	start, end := window.bounds()
+	events, err := s.store.UsageEvents(start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -209,52 +193,11 @@ func categoryUsageFromGroups(groups map[string]*usageGroup) []CategoryUsage {
 	return out
 }
 
-func ValidateDays(days int) (int, error) {
-	if days == 0 {
-		return DefaultDailyDays, nil
-	}
-	if days < 0 {
-		return 0, ErrInvalidDays
-	}
-	if days > MaxDailyDays {
-		return MaxDailyDays, nil
-	}
-	return days, nil
-}
-
-func NormalizeDays(days int) int {
-	if days <= 0 {
-		return DefaultDailyDays
-	}
-	if days > MaxDailyDays {
-		return MaxDailyDays
-	}
-	return days
-}
-
 func (s Service) currentTime() time.Time {
 	if s.now != nil {
 		return s.now()
 	}
 	return time.Now()
-}
-
-func DailyBuckets(days int, loc *time.Location) ([]DailyBucket, map[string]int, time.Time) {
-	return dailyBucketsAt(days, loc, time.Now())
-}
-
-func dailyBucketsAt(days int, loc *time.Location, now time.Time) ([]DailyBucket, map[string]int, time.Time) {
-	days = NormalizeDays(days)
-	now = now.In(loc)
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, -days+1)
-	out := make([]DailyBucket, days)
-	index := make(map[string]int, days)
-	for i := range days {
-		date := start.AddDate(0, 0, i).Format(DateLayout)
-		out[i] = DailyBucket{Date: date}
-		index[date] = i
-	}
-	return out, index, start
 }
 
 func AddDaily(total *UsageTotals, event storage.Usage) {

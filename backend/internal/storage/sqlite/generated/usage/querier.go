@@ -10,7 +10,7 @@ import (
 
 type Querier interface {
 	InsertUsageEvent(ctx context.Context, arg InsertUsageEventParams) error
-	ListUsageEventsSince(ctx context.Context, createdAtMs int64) ([]ListUsageEventsSinceRow, error)
+	ListUsageEvents(ctx context.Context, arg ListUsageEventsParams) ([]ListUsageEventsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

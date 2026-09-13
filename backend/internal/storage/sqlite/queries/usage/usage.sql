@@ -35,7 +35,7 @@ INSERT INTO usage_events (
   sqlc.arg(created_at_ms)
 );
 
--- name: ListUsageEventsSince :many
+-- name: ListUsageEvents :many
 SELECT
   thread_id,
   runtime,
@@ -52,5 +52,5 @@ SELECT
   source_type,
   created_at_ms
 FROM usage_events
-WHERE created_at_ms >= sqlc.arg(created_at_ms)
+WHERE created_at_ms >= sqlc.arg(since) AND created_at_ms < sqlc.arg(until)
 ORDER BY created_at_ms;

@@ -88,7 +88,7 @@ func (q *Queries) InsertUsageEvent(ctx context.Context, arg InsertUsageEventPara
 	return err
 }
 
-const listUsageEventsSince = `-- name: ListUsageEventsSince :many
+const listUsageEvents = `-- name: ListUsageEvents :many
 SELECT
   thread_id,
   runtime,
@@ -105,11 +105,16 @@ SELECT
   source_type,
   created_at_ms
 FROM usage_events
-WHERE created_at_ms >= ?1
+WHERE created_at_ms >= ?1 AND created_at_ms < ?2
 ORDER BY created_at_ms
 `
 
-type ListUsageEventsSinceRow struct {
+type ListUsageEventsParams struct {
+	Since int64 `json:"since"`
+	Until int64 `json:"until"`
+}
+
+type ListUsageEventsRow struct {
 	ThreadID              string `json:"thread_id"`
 	Runtime               string `json:"runtime"`
 	Agent                 string `json:"agent"`
@@ -126,15 +131,15 @@ type ListUsageEventsSinceRow struct {
 	CreatedAtMs           int64  `json:"created_at_ms"`
 }
 
-func (q *Queries) ListUsageEventsSince(ctx context.Context, createdAtMs int64) ([]ListUsageEventsSinceRow, error) {
-	rows, err := q.db.QueryContext(ctx, listUsageEventsSince, createdAtMs)
+func (q *Queries) ListUsageEvents(ctx context.Context, arg ListUsageEventsParams) ([]ListUsageEventsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listUsageEvents, arg.Since, arg.Until)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUsageEventsSinceRow{}
+	items := []ListUsageEventsRow{}
 	for rows.Next() {
-		var i ListUsageEventsSinceRow
+		var i ListUsageEventsRow
 		if err := rows.Scan(
 			&i.ThreadID,
 			&i.Runtime,

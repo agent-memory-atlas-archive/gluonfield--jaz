@@ -558,7 +558,7 @@ func TestAddUsageStoresCachedTokensAndMirrors(t *testing.T) {
 	if len(daily) != 1 || daily[0].SessionCount != 1 || daily[0].Usage != wantDaily {
 		t.Fatalf("daily usage = %#v, want one bucket with %#v", daily, wantDaily)
 	}
-	events, err := store.UsageEventsSince(time.Unix(0, 0))
+	events, err := store.UsageEvents(time.Unix(0, 0), time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -588,7 +588,7 @@ func TestAddUsageCarriesSessionSourceType(t *testing.T) {
 	if err := store.AddUsage(session.ID, storage.Usage{InputTokens: 12, OutputTokens: 3}); err != nil {
 		t.Fatal(err)
 	}
-	events, err := store.UsageEventsSince(time.Unix(0, 0))
+	events, err := store.UsageEvents(time.Unix(0, 0), time.Time{})
 	if err != nil {
 		t.Fatal(err)
 	}

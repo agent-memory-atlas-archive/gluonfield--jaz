@@ -103,3 +103,76 @@ func TestDailyHandlerRejectsInvalidDays(t *testing.T) {
 		}
 	}
 }
+
+func TestUsageHandlersRejectInvalidRanges(t *testing.T) {
+	for name, handler := range map[string]http.Handler{
+		"daily":  NewDailyHandler(usagecore.NewService(nil)),
+		"models": NewModelsHandler(usagecore.NewService(nil)),
+	} {
+		for _, query := range []string{
+			"start=",
+			"end=",
+			"start=&end=",
+			"start=%20&end=%20",
+			"start=2024-03-09",
+			"end=2024-03-11",
+			"start=2024-03-11&end=2024-03-09",
+			"start=2024-01-01&end=2024-12-31",
+			"start=2024-02-30&end=2024-03-01",
+			"start=invalid&end=2024-03-01",
+			"start=2024-03-09&end=2024-03-11&days=3",
+		} {
+			t.Run(name+"/"+query, func(t *testing.T) {
+				res := httptest.NewRecorder()
+				handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/?"+query, nil))
+				if res.Code != http.StatusBadRequest {
+					t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+				}
+			})
+		}
+	}
+}
+
+func TestDailyHandlerCustomDateRange(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/?start=2024-03-09&end=2024-03-11&timezone=America%2FNew_York", nil)
+	NewDailyHandler(usagecore.NewService(store)).ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var got dailyResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Days) != 3 || got.Days[0].Date != "2024-03-09" || got.Days[2].Date != "2024-03-11" {
+		t.Fatalf("days = %#v", got.Days)
+	}
+	query, err := parseDailyQuery(req)
+	if err != nil || query.Range == nil || query.Range.Start.Format(usagecore.DateLayout) != "2024-03-09" || query.Range.End.Format(usagecore.DateLayout) != "2024-03-11" || query.Location.String() != "America/New_York" {
+		t.Fatalf("query = %#v, err = %v", query, err)
+	}
+}
+
+func TestDailyHandlerDoesNotTreatZeroDateAsOmitted(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/?start=0001-01-01&end=0001-01-01&timezone=UTC", nil)
+	NewDailyHandler(usagecore.NewService(store)).ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	}
+	var got dailyResponse
+	if err := json.Unmarshal(res.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Days) != 1 || got.Days[0].Date != "0001-01-01" {
+		t.Fatalf("requested date was replaced by the default period: %#v", got.Days)
+	}
+}

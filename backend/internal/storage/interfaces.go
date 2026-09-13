@@ -59,8 +59,9 @@ type SessionEventStore interface {
 	LoadSessionOverviewEvents(id string) ([]sessionevents.Event, error)
 }
 
+// UsageEvents returns [since, until); a zero until leaves the upper bound open.
 type UsageEventStore interface {
-	UsageEventsSince(since time.Time) ([]UsageEvent, error)
+	UsageEvents(since, until time.Time) ([]UsageEvent, error)
 }
 
 type FeedStore interface {
