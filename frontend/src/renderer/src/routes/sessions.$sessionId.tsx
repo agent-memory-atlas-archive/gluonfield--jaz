@@ -514,6 +514,7 @@ function SessionPage({
                 ) : (
                   <>
                     <Transcript
+                      scrollRef={scrollRef}
                       key={session.id}
                       messages={transcriptMessages}
                       events={displayEvents}

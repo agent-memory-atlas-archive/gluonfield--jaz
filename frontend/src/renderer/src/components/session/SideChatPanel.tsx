@@ -145,6 +145,7 @@ export function SideChatPanel({
         <div ref={scrollRef} className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4">
           <div className="flex min-h-full flex-col justify-end">
             <Transcript
+              scrollRef={scrollRef}
               messages={transcriptMessages}
               events={transcript.events}
               sessionId={sideChatID}
