@@ -22,10 +22,11 @@ import (
 
 type testStore struct {
 	servers []mcpconfig.Server
+	err     error
 }
 
 func (s *testStore) ListMCPServers() ([]mcpconfig.Server, error) {
-	return append([]mcpconfig.Server(nil), s.servers...), nil
+	return append([]mcpconfig.Server(nil), s.servers...), s.err
 }
 
 func TestCallbackReceiverSurfacesAuthURLAndCompletesFromCallback(t *testing.T) {
