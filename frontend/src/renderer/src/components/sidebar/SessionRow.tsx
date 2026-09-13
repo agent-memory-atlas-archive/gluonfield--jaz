@@ -2,14 +2,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Archive, CornerDownRight, Pencil, Pin } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { SessionHoverDetails } from '@/components/sidebar/SessionHoverDetails'
 import { Button } from '@/components/ui/Button'
+import { HoverCard } from '@/components/ui/HoverCard'
 import { Input } from '@/components/ui/Input'
 import { KeyboardShortcut } from '@/components/ui/KeyboardShortcut'
 import { Modal } from '@/components/ui/Modal'
 import { ContextMenu, MenuRow } from '@/components/ui/Popover'
 import { setSessionArchived, setSessionPinned, setSessionTitle } from '@/lib/api/sessions'
 import type { Session } from '@/lib/api/types'
-import { recentTime } from '@/lib/format/time'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
 import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { RuntimeBadge } from './RuntimeBadge'
@@ -48,7 +49,7 @@ export function SessionRow({
   reserveIconSpace: boolean
 }) {
   const shortcut = shortcutMode && shortcutIndex ? shortcutIndex : undefined
-  const timeLabel = recentTime(session.last_attention_at || session.updated_at)
+  const title = sessionLabel(session)
   // Running and failed are the same kind of fact, so they share the trailing
   // state column rather than sitting on opposite sides of the row.
   const state = session.status === 'running' || session.status === 'error' ? session.status : null
@@ -65,60 +66,57 @@ export function SessionRow({
 
   return (
     <>
-      <Link
-        to="/sessions/$sessionId"
-        params={{ sessionId: session.id }}
-        className="group flex h-[30px] select-none items-center gap-2 rounded-full px-2.5 text-[13px] text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover max-sm:h-11 max-sm:gap-2.5 max-sm:px-3 max-sm:text-[15px]"
-        activeProps={{ className: 'bg-list-active!' }}
-        {...menuTriggers}
+      <HoverCard
+        disabled={rename !== null || menu !== null}
+        content={<SessionHoverDetails session={session} title={title} />}
       >
-        {!session.pinned && (reserveIconSpace || icon) && (
-          <span className="grid size-[18px] shrink-0 place-items-center">
-            {icon}
-          </span>
-        )}
-        {inlineEditing ? (
-          <RenameField session={session} onDone={() => setRename(null)} />
-        ) : (
-          <span className="min-w-0 flex-1 truncate-fade" title={sessionLabel(session)}>
-            {sessionLabel(session)}
-          </span>
-        )}
-        {inlineEditing ? null : shortcut ? (
-          <span className="flex min-w-8 shrink-0 justify-end">
-            <KeyboardShortcut value={shortcut} />
-          </span>
-        ) : state ? (
-          <span
-            className={`flex min-w-8 shrink-0 items-center justify-end ${
-              shortcutMode ? '' : 'group-hover:hidden'
-            }`}
-          >
+        <Link
+          to="/sessions/$sessionId"
+          params={{ sessionId: session.id }}
+          className="group flex h-[30px] select-none items-center gap-2 rounded-full px-2.5 text-[13px] text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover max-sm:h-11 max-sm:gap-2.5 max-sm:px-3 max-sm:text-[15px]"
+          activeProps={{ className: 'bg-list-active!' }}
+          {...menuTriggers}
+        >
+          {!session.pinned && (reserveIconSpace || icon) && (
+            <span className="grid size-[18px] shrink-0 place-items-center">
+              {icon}
+            </span>
+          )}
+          {inlineEditing ? (
+            <RenameField session={session} onDone={() => setRename(null)} />
+          ) : (
+            <span className="min-w-0 flex-1 truncate-fade">
+              {title}
+            </span>
+          )}
+          {inlineEditing ? null : shortcut ? (
+            <span className="flex min-w-8 shrink-0 justify-end">
+              <KeyboardShortcut value={shortcut} />
+            </span>
+          ) : state ? (
             <span
-              title={
-                state === 'running' ? 'Running' : session.error ? `Failed: ${session.error}` : 'Failed'
-              }
-              className={`size-1.5 shrink-0 rounded-full ${
-                state === 'running' ? 'animate-pulse bg-running' : 'bg-danger'
+              className={`flex min-w-8 shrink-0 items-center justify-end ${
+                shortcutMode ? '' : 'group-hover:hidden'
               }`}
-            />
-          </span>
-        ) : timeLabel ? (
-          <span
-            className={`min-w-8 shrink-0 text-right text-[11px] tabular-nums ${
-              shortcutMode ? 'text-ink-3' : 'text-ink-3 group-hover:hidden'
-            }`}
-          >
-            {timeLabel}
-          </span>
-        ) : null}
-        {shortcutMode || inlineEditing ? null : (
-          <>
-            <PinButton session={session} />
-            <ArchiveButton session={session} />
-          </>
-        )}
-      </Link>
+            >
+              <span
+                title={
+                  state === 'running' ? 'Running' : session.error ? `Failed: ${session.error}` : 'Failed'
+                }
+                className={`size-1.5 shrink-0 rounded-full ${
+                  state === 'running' ? 'animate-pulse bg-running' : 'bg-danger'
+                }`}
+              />
+            </span>
+          ) : null}
+          {shortcutMode || inlineEditing ? null : (
+            <>
+              <PinButton session={session} />
+              <ArchiveButton session={session} />
+            </>
+          )}
+        </Link>
+      </HoverCard>
       {menu ? (
         <RowActionsMenu
           session={session}
