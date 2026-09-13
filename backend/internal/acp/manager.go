@@ -71,14 +71,15 @@ type Manager struct {
 	// session id is the jaz session linked to the calling agent's ACP session.
 	PublishWidget func(WidgetPublishRequest) (WidgetPublishResult, error)
 
-	mu             sync.RWMutex
-	jobsByID       map[string]*jobState
-	jobsBySlug     map[string]*jobState
-	jobsByACP      map[string]*jobState
-	processes      map[string]*agentProcess
-	localAgents    map[string]LocalAgentRunner
-	turnReaders    map[string]int
-	pendingDiscard map[string]*jobState
+	mcpRevisionSource MCPRevisionSource
+	mu                sync.RWMutex
+	jobsByID          map[string]*jobState
+	jobsBySlug        map[string]*jobState
+	jobsByACP         map[string]*jobState
+	processes         map[string]*agentProcess
+	localAgents       map[string]LocalAgentRunner
+	turnReaders       map[string]int
+	pendingDiscard    map[string]*jobState
 
 	pendingPermission map[string]*pendingPermission
 	permissionMu      sync.Mutex
@@ -477,6 +478,7 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (SpawnResult, err
 		ac.close()
 		return fail(err)
 	}
+	mcpRevision := m.mcpRevision()
 	acpSession, err := m.newACPSession(mcpsession.With(ctx, session.ID), ac, req.ACPAgent, cfg, absCwd, session.RuntimeRef.ArtifactSurface, session.RuntimeRef.MCPServerPolicy, req.SystemPromptExtensions)
 	if err != nil {
 		ac.close()
@@ -497,6 +499,9 @@ func (m *Manager) Spawn(ctx context.Context, req SpawnRequest) (SpawnResult, err
 		}
 	}
 	process := newAgentProcess(ac)
+	process.mcpPolicy = session.RuntimeRef.MCPServerPolicy
+	process.mcpRevision = mcpRevision
+	process.mcpRefresh = supportedMCPRefresh(ac.initRaw, session.RuntimeRef.MCPServerPolicy)
 	job := newIdleJob(session, req.ACPAgent, acpSessionID, absCwd, modes)
 	job.steerMethod = supportedSteerMethod(ac.initRaw)
 	var persistSessionID func()

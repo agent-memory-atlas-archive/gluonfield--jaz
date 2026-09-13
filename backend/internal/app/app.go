@@ -404,10 +404,8 @@ func NewToolRegistry(commandManager *exectool.CommandManager, workspace Workspac
 	)
 }
 
-func StartMCPManager(lc fx.Lifecycle, manager *mcpruntime.Manager, logger *log.Logger) {
-	if manager == nil {
-		return
-	}
+func StartMCPManager(lc fx.Lifecycle, manager *mcpruntime.Manager, agents *acp.Manager, logger *log.Logger) {
+	agents.SetMCPRevisionSource(manager)
 	var cancel context.CancelFunc
 	lc.Append(fx.Hook{
 		// Connecting to MCP servers must never block or fail startup: a slow or

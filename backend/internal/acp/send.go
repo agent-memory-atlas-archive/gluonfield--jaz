@@ -141,6 +141,9 @@ func (m *Manager) sendOnce(ctx context.Context, req SendRequest, opts sendOption
 	if err := job.sendConflict(); err != nil {
 		return Job{}, fmt.Errorf("%s: %w", job.Slug, err)
 	}
+	if err := m.refreshMCPBeforeTurn(ctx, job); err != nil {
+		return Job{}, err
+	}
 	if err := m.prepareModeForTurn(ctx, job, req.PlanRequested); err != nil {
 		return Job{}, err
 	}

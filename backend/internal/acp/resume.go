@@ -112,6 +112,7 @@ func (m *Manager) resumeLocked(ctx context.Context, ref string) (*jobState, erro
 		ac.close()
 		return nil, err
 	}
+	mcpRevision := m.mcpRevision()
 	acpSessionID, modes, loaded, err := m.restoreACPSession(ctx, ac, agentName, session, cfg, cwd, mcpServerPolicy, systemPromptExtensions)
 	if err != nil {
 		ac.close()
@@ -149,7 +150,11 @@ func (m *Manager) resumeLocked(ctx context.Context, ref string) (*jobState, erro
 		persistSessionID = m.persistSessionOnPrompt(session.ID, agentName, acpSessionID)
 	}
 	ac.trackPromptSends(job, persistSessionID)
-	m.addJob(job, newAgentProcess(ac))
+	process := newAgentProcess(ac)
+	process.mcpPolicy = mcpServerPolicy
+	process.mcpRevision = mcpRevision
+	process.mcpRefresh = supportedMCPRefresh(ac.initRaw, mcpServerPolicy)
+	m.addJob(job, process)
 	m.disconnectBackgroundTasks(job)
 	ac.state.attach(m, job, cfg)
 	m.restoreSessionControls(ctx, job, overview)
