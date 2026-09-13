@@ -178,6 +178,7 @@ func fakeGrokInterject(t *testing.T, conn jsonrpc.MessageConn, message, pending 
 			sendResult(conn, pending, map[string]any{"stopReason": "end_turn", "_meta": map[string]any{"promptId": "original", "usage": map[string]any{"inputTokens": 100, "outputTokens": 10, "totalTokens": 110}}})
 		}
 		if os.Getenv("JAZ_FAKE_ACP_GROK_STOP") == "complete-disconnect" {
+			time.Sleep(50 * time.Millisecond)
 			os.Exit(0)
 		}
 	}()
