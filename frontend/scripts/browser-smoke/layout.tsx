@@ -33,9 +33,11 @@ export async function exerciseBrowserLayout(): Promise<void> {
         <div className="min-w-0 flex-1 p-6 text-ink" data-layout-chat>
           <p className="text-[15px]">Open the browser to review the page alongside this conversation.</p>
         </div>
-        {panel.view === 'preview' ? <SidePanelDrawer panel={panel} isMobile={false}>
-          <BrowserPanelSlot sessionId="layout" visible={panel.open} onClose={panel.toggle} />
-        </SidePanelDrawer> : null}
+        <SidePanelDrawer panel={panel} isMobile={false}>
+          {panel.view === 'preview'
+            ? <BrowserPanelSlot sessionId="layout" visible={panel.open} onClose={panel.toggle} />
+            : <div className="h-full bg-bg p-6" style={{ width: panel.width }}>Overview</div>}
+        </SidePanelDrawer>
       </div>
     </div>
   }
@@ -79,16 +81,49 @@ export async function exerciseBrowserLayout(): Promise<void> {
     await window.smoke.pointer('mouseDown', x, y)
     await window.smoke.pointer('mouseUp', x, y)
   }
-  const browserWidth = () => element.querySelector('[role="separator"]')?.parentElement?.getBoundingClientRect().width ?? 0
+  const drawerElement = () => element.querySelector('[data-layout-chat]')!.nextElementSibling as HTMLElement
+  const browserWidth = () => drawerElement().getBoundingClientRect().width
   const navigation = () => element.querySelector<HTMLElement>('nav:not([aria-hidden="true"])')
   const chatWidth = () => element.querySelector('[data-layout-chat]')!.getBoundingClientRect().width
+  const animatePanel = async (selector: string, destination: number) => {
+    const frames: { width: number; left: number; time: number }[] = []
+    let frame = 0
+    const record = () => {
+      const bounds = drawerElement().getBoundingClientRect()
+      frames.push({ width: bounds.width, left: bounds.left, time: performance.now() })
+      frame = requestAnimationFrame(record)
+    }
+    record()
+    try {
+      await click(selector)
+      await until(() => Math.abs(browserWidth() - destination) < 0.1)
+      await new Promise(requestAnimationFrame)
+    } finally {
+      cancelAnimationFrame(frame)
+    }
+    const start = frames[0].width
+    const distance = Math.abs(destination - start)
+    const intermediate = frames.filter(({ width }) => Math.abs(width - start) > 2 && Math.abs(width - destination) > 2)
+    const jumps = frames.slice(1).map((sample, index) => Math.abs(sample.left - frames[index].left))
+    if (intermediate.length < 3 || Math.max(...jumps) > distance * 0.65) {
+      console.warn(JSON.stringify({ panelFrames: frames }))
+      throw new Error(`Panel snapped: ${start}px to ${destination}px, ${intermediate.length} intermediate frames, ${Math.max(...jumps)}px largest edge jump`)
+    }
+    console.warn(JSON.stringify({ panelAnimation: { start, destination, frames: frames.length, intermediate: intermediate.length, maxEdgeJump: Math.max(...jumps) } }))
+  }
   try {
     await window.smoke.resize(1440, 900)
     await until(() => window.innerWidth === 1440)
     root.render(<Fixture />)
     await until(() => Boolean(element.querySelector('[title="Open Preview (⌘P)"]')))
-    await click('[title="Open Preview (⌘P)"]')
+    await animatePanel('[title="Open Preview (⌘P)"]', 864)
+    await window.smoke.capture('browser-preview-opening')
     await until(() => !navigation() && browserWidth() === 864)
+    await animatePanel('[title="Hide Preview panel (⌘P)"]', 0)
+    await animatePanel('[title="Open Preview (⌘P)"]', 864)
+    await window.smoke.capture('browser-preview-reopening')
+    await animatePanel('[title="Open Overview (⌘O)"]', 300)
+    await animatePanel('[title="Open Preview (⌘P)"]', 864)
     await click('[aria-label="Toggle navigation"]')
     await until(() => Boolean(navigation()) && browserWidth() === 800 && chatWidth() >= 360)
     await click('[aria-label="Toggle navigation"]')

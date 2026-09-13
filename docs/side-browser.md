@@ -39,6 +39,8 @@ Reopening or resizing navigation reduces the browser width to fit the remaining
 content area; closing navigation restores the preferred browser width. CSS sizes
 the desktop browser in the same layout pass as navigation, keeping their edges
 synchronized throughout opening, closing and interrupted animations.
+Opening, closing and switching desktop panels use the same spring curve through
+a CSS width transition. Drag resizing and Reduced Motion remain immediate.
 
 ## Saved passwords
 
@@ -321,6 +323,7 @@ navigation, hidden/read-only account identities and pages with multiple forms.
 The production panel controls are exercised with native mouse input:
 opening hides navigation, the browser gets its wider default, and the visible
 divider supports dragging and subsequent keyboard resizing. Frame measurements
+reject snaps when opening, closing and switching Preview; measurements
 through navigation opening, closing and interruption check the browser's width
 and retained surface edges; resized navigation checks the conversation width. Captures cover both
 themes. These password checks use only synthetic credentials in a fresh profile.
