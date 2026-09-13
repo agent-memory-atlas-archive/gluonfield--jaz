@@ -145,7 +145,7 @@ function ImageAttachmentModal({
   onError: () => void
 }) {
   return (
-    <Modal open={open} onClose={onClose} title={attachment.name} size="xl" chromeless>
+    <Modal open={open} onClose={onClose} title={attachment.name} size="fit" chromeless>
       <figure className="flex max-h-[calc(100dvh-3rem)] min-h-0 flex-col bg-black/90">
         <div className="grid min-h-0 flex-1 place-items-center p-3 sm:p-4">
           <img
@@ -155,7 +155,7 @@ function ImageAttachmentModal({
             className="max-h-[calc(100dvh-7rem)] max-w-full rounded-[8px] object-contain outline outline-1 -outline-offset-1 outline-white/10"
           />
         </div>
-        <figcaption className="flex min-h-9 items-center gap-2 px-3 py-2 text-[12px] text-white/70 sm:px-4">
+        <figcaption className="flex min-h-9 items-center gap-2 px-3 py-2 text-[12px] text-white/70 contain-inline-size sm:px-4">
           <span className="min-w-0 flex-1 truncate text-white/85">{attachment.name}</span>
           <span className="shrink-0 tabular-nums">{attachmentStatus(attachment) || formatAttachmentSize(attachment.size)}</span>
         </figcaption>

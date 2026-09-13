@@ -12,11 +12,12 @@ import {
 } from '@/lib/dom/escapeLayers'
 
 const SIZES = {
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  wide: 'max-w-3xl',
-  xl: 'max-w-5xl',
+  sm: 'w-full max-w-md',
+  md: 'w-full max-w-lg',
+  lg: 'w-full max-w-2xl',
+  wide: 'w-full max-w-3xl',
+  xl: 'w-full max-w-5xl',
+  fit: 'w-fit max-w-5xl',
 } as const
 
 export function Modal({
@@ -132,7 +133,7 @@ export function Modal({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-              className={`relative flex max-h-[calc(100dvh-2rem)] w-full ${SIZES[size]} flex-col overflow-hidden rounded-card bg-bg shadow-raised sm:max-h-[calc(100dvh-3rem)] ${className}`}
+              className={`relative flex max-h-[calc(100dvh-2rem)] ${SIZES[size]} flex-col overflow-hidden rounded-card bg-bg shadow-raised outline-none sm:max-h-[calc(100dvh-3rem)] ${className}`}
             >
               {chromeless ? (
                 <IconButton
