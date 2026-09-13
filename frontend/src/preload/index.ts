@@ -60,11 +60,8 @@ if (process.argv.includes(BROWSER_PRELOAD_ARGUMENT)) {
       },
     } satisfies DictationAPI,
     browserProfiles: {
-      dismissed: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.dismissed),
-      dismiss: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.dismiss),
       list: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.list),
-      sites: (profileId) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.sites, profileId),
-      import: (profileId, domains) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, profileId, domains),
+      import: (profileId, selection) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, profileId, selection),
     } satisfies BrowserProfileAPI,
     browserCommand: (request: BrowserCommandRequest): Promise<unknown> =>
       ipcRenderer.invoke(BROWSER_COMMAND_CHANNEL, request),

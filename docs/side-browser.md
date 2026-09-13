@@ -29,7 +29,9 @@ keeps at least 360 pixels on desktop. The visible grip on the panel's left edge
 can be dragged in either direction or clicked and adjusted with the arrow keys.
 Each panel view retains its own resized width while the conversation is mounted.
 Reopening or resizing navigation reduces the browser width to fit the remaining
-content area; closing navigation restores the preferred browser width.
+content area; closing navigation restores the preferred browser width. CSS sizes
+the desktop browser in the same layout pass as navigation, keeping their edges
+synchronized throughout opening, closing and interrupted animations.
 
 ## Saved passwords
 
@@ -38,7 +40,7 @@ Submitting a top-level HTTPS login form offers **Save password?** or
 or **Update**. **Not now** dismisses the proposal. An unchanged saved login
 does not prompt again.
 
-Use the toolbar's **Passwords** key button to fill a saved login or delete it.
+Use **Browser menu → Passwords** to fill a saved login or delete it.
 Filling requires selecting an account and matches the exact HTTPS origin,
 including the port. **Save login on this page** can capture filled login fields
 on sites that do not submit a standard HTML form. Embedded login frames and
@@ -60,28 +62,32 @@ main process. The app toolbar receives only origin, username and prompt metadata
 The Jaz server and browser MCP tools have no password-store API. Autofill writes
 the selected credential into the matching page's login fields.
 
-## Import browser sign-ins
+## Import cookies and passwords
 
-The desktop side browser offers **Import sign-ins** on first use. Choose a
-browser profile, then explicitly select the sites to copy. Dismissing the offer
-is remembered; reopen it from **Settings → Browser → Jaz side browser → Import sign-ins**.
-Chrome and Edge profiles are supported on macOS; Firefox profiles are supported
-on macOS, Windows and Linux. The import is shared by side-browser tabs on that
-computer and works independently of the selected ACP agent.
+Open **Browser menu → Import cookies and passwords**, or the same action in
+**Settings → Browser → Jaz side browser**. The dialog selects a browser profile
+and lets the user choose **Saved passwords** and **Cookies** independently.
+There is no permanent import banner. Close the source browser before importing.
 
-The Electron process reads the selected profile's cookie database locally and
-imports only the selected sites into the existing preview partition. Source
-profiles remain unchanged. On macOS, encrypted Chrome/Edge cookies require
-permission to read that browser's Safe Storage key from Keychain. Cookie values
-and keys are not returned through the import UI, MCP or server endpoints.
-Agents can subsequently use the signed-in browser and observe its pages.
+Chrome and Edge support cookies and saved passwords on macOS. Firefox supports
+cookies on macOS, Windows and Linux; its password toggle is unavailable.
+Passwords are read from the profile and account login databases, restricted to
+HTTPS form logins, and imported into the encrypted desktop vault. Existing Jaz
+passwords are preserved. Duplicate source logins use the newest password timestamp.
+The menu and import results contain counts and account metadata, never passwords.
 
-This copies cookies, without passwords, history, bookmarks, extensions or
-ongoing synchronization. Partitioned cookies and Firefox container cookies are
-excluded because Electron's cookie setter cannot preserve their isolation.
-Session cookies keep their original lifetime; some sites may require signing in
-again. Unsupported or damaged cookies are reported as failed imports.
-Database access uses Electron's built-in Node SQLite API and adds no dependency.
+Cookie import copies the selected profile's current cookies into the shared
+preview partition. Partitioned cookies and Firefox container cookies are excluded
+because Electron's cookie setter cannot preserve their isolation. Session cookies
+keep their original lifetime; some sites may still ask the user to sign in.
+Chrome/Edge encryption uses that browser's Safe Storage key from macOS Keychain.
+Source databases are read-only. The import adds no database dependency.
+
+Import results report successes and failures separately for each selected data
+type. Unsupported or damaged records are counted as failures; a failed type can
+be retried without replacing existing passwords. This is a one-time copy, with
+no ongoing synchronization, history, bookmarks, or extension import. Agents can
+subsequently use the signed-in side browser and observe its pages.
 
 ### Google sign-in
 
@@ -90,9 +96,8 @@ Its [supported-browser policy](https://support.google.com/accounts/answer/767542
 restricts embedded and automated browsers. Chromium compatibility and saved
 passwords do not establish support for signing in to Google inside Electron.
 
-Sign in to the destination site in Chrome first, then use **Import sign-ins**
-with that Chrome profile and select the relevant Google and destination-site
-domains. Open the destination URL again in Jaz, such as
+Sign in to the destination site in Chrome first, then use **Import cookies and passwords**
+with that Chrome profile and **Cookies** enabled. Open the destination URL again in Jaz, such as
 `https://console.firebase.google.com/`; reloading Google's `/signin/rejected`
 page can leave the rejection screen displayed. This attempts to reuse the
 existing session; Google may still require authentication in a supported browser.
@@ -303,8 +308,9 @@ account selection, deletion, dismissal, origin checks and rapid return-to-login
 navigation, hidden/read-only account identities and pages with multiple forms.
 The production panel controls are exercised with native mouse input:
 opening hides navigation, the browser gets its wider default, and the visible
-divider supports dragging and subsequent keyboard resizing. Reopening/resizing
-navigation checks the remaining conversation width. Captures cover both
+divider supports dragging and subsequent keyboard resizing. Frame measurements
+through navigation opening, closing and interruption check the browser's width
+and retained surface edges; resized navigation checks the conversation width. Captures cover both
 themes. These password checks use only synthetic credentials in a fresh profile.
 
 The production browser workspace is also exercised across chat and panel
@@ -332,14 +338,20 @@ hidden-frame exclusion, obscured-target rejection, wrapped text, smooth-scrollin
 scrolling, removed nodes, document replacement and full trees after screenshots.
 Unit checks cover ignored ancestors, frame hierarchy and
 structural moves. The cursor/input and direct-CDP checks run alongside these.
+A real new-tab Sign In click verifies that the webview forwards its URL to the
+external-browser handler and keeps the current preview open.
 
 The same fixture creates synthetic Chrome/Firefox profiles and exercises real
-SQLite reads, Chrome decryption/host verification, cookie flags, selected-site
-isolation, Keychain denial, unchanged source data and trusted-renderer IPC.
+SQLite reads, Chrome decryption/host verification, cookie flags, data-type
+selection, Keychain denial, unchanged source data and trusted-renderer IPC.
+Password fixtures cover exact microsecond timestamp ordering across both stores,
+existing-login preservation, corrupt/unsupported records and encrypted storage.
 It uses the production import UI to authenticate the side browser with an
-imported HttpOnly test cookie, checks dismissal/profile switching/failure retry,
+imported HttpOnly test cookie, fills a login with an imported password, and checks
+menu/profile switching and partial-import retry,
 and captures light, dark and narrow layouts. These tests never read the user's
-real sign-ins. Actual OS Keychain prompts and Windows/Linux runtime behavior
+real sign-ins. Annotation checks select a page element, add its comment to the
+real composer context store, and verify cancellation and callback reattachment. Actual OS Keychain prompts and Windows/Linux runtime behavior
 require platform testing; the fixture runs on the current desktop platform.
 
 The identity check inspects the first navigation and a subsequent fetch on a

@@ -1,12 +1,10 @@
-import { execFile } from 'node:child_process'
-import { createDecipheriv, createHash, pbkdf2Sync, timingSafeEqual } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
-import { promisify } from 'node:util'
 import type { CookiesSetDetails } from 'electron'
-import type { BrowserCookieSite, BrowserImportResult } from '@shared/browserProfile'
+import type { BrowserImportCount } from '@shared/browserProfile'
 import type { LocalBrowserProfile } from '@main/browserProfiles'
+import { browserStorageKey, decryptBrowserValue, readKeychainPassword } from '@main/browserSafeStorage'
 
-const execute = promisify(execFile)
 const CHROME_EPOCH_SECONDS = 11644473600
 
 type CookieRow = {
@@ -22,20 +20,18 @@ type CookieRow = {
   encrypted?: Uint8Array
 }
 
-function readCookies(profile: LocalBrowserProfile, domains: string[]): { rows: CookieRow[]; version: number } {
-  const db = new DatabaseSync(profile.database, { readOnly: true, timeout: 1000 })
+function readCookies(profile: LocalBrowserProfile): { rows: CookieRow[]; version: number } {
+  const db = new DatabaseSync(profile.database!, { readOnly: true, timeout: 1000 })
   try {
     const chromium = profile.family === 'chromium'
-    const column = chromium ? 'host_key' : 'host'
-    const filter = ` AND ${column} IN (${domains.map(() => '?').join(',')})`
     const statement = db.prepare(chromium
       ? `SELECT host_key AS domain, name, value, path, is_secure AS secure, is_httponly AS httpOnly,
           samesite AS sameSite, expires_utc AS expires, has_expires AS persistent, encrypted_value AS encrypted
-          FROM cookies WHERE top_frame_site_key = ''${filter}`
+          FROM cookies WHERE top_frame_site_key = ''`
       : `SELECT host AS domain, name, value, path, isSecure AS secure, isHttpOnly AS httpOnly,
-          sameSite, expiry AS expires, 1 AS persistent FROM moz_cookies WHERE originAttributes = ''${filter}`)
+          sameSite, expiry AS expires, 1 AS persistent FROM moz_cookies WHERE originAttributes = ''`)
     statement.setReadBigInts(true)
-    const rows = statement.all(...domains).map((row) => ({
+    const rows = statement.all().map((row) => ({
       ...row,
       expires: chromium ? Number(row.expires) / 1_000_000 - CHROME_EPOCH_SECONDS : Number(row.expires),
       secure: Number(row.secure), httpOnly: Number(row.httpOnly), sameSite: Number(row.sameSite), persistent: Number(row.persistent),
@@ -50,39 +46,24 @@ function readCookies(profile: LocalBrowserProfile, domains: string[]): { rows: C
   }
 }
 
-export function listCookieSites(profile: LocalBrowserProfile): BrowserCookieSite[] {
-  const db = new DatabaseSync(profile.database, { readOnly: true, timeout: 1000 })
-  try {
-    const statement = db.prepare(profile.family === 'chromium'
-      ? "SELECT ltrim(host_key, '.') AS domain, count(*) AS cookies FROM cookies WHERE top_frame_site_key = '' AND (has_expires = 0 OR expires_utc > ?) GROUP BY domain ORDER BY domain"
-      : "SELECT ltrim(host, '.') AS domain, count(*) AS cookies FROM moz_cookies WHERE originAttributes = '' AND expiry > ? GROUP BY domain ORDER BY domain")
-    const now = Date.now() / 1000
-    return statement.all(profile.family === 'chromium' ? (now + CHROME_EPOCH_SECONDS) * 1_000_000 : now).map((row) => ({ domain: String(row.domain), cookies: Number(row.cookies) }))
-  } finally {
-    db.close()
-  }
-}
-
 export async function importProfileCookies(
   profile: LocalBrowserProfile,
-  domains: string[],
   setCookie: (cookie: CookiesSetDetails) => Promise<void>,
   password: (service: string) => Promise<string> = readKeychainPassword,
-): Promise<BrowserImportResult> {
-  if (!Array.isArray(domains) || !domains.length || domains.length > 2000 || domains.some((domain) => typeof domain !== 'string' || !domain || domain.length > 253)) {
-    throw new Error('Choose the sites to import.')
+): Promise<BrowserImportCount> {
+  if (!profile.database) {
+    throw new Error('No cookies were found in this browser profile.')
   }
-  const selected = [...new Set(domains)]
-  const { rows, version } = readCookies(profile, selected.flatMap((domain) => [domain, '.' + domain]))
+  const { rows, version } = readCookies(profile)
   if (!rows.length) {
-    throw new Error('No current cookies found for the selected sites. Choose the profile again to refresh the list.')
+    return { imported: 0, failed: 0 }
   }
   let key: Buffer | undefined
   if (rows.some((row) => row.encrypted?.length)) {
     if (!profile.keychainService) {
       throw new Error('Encrypted cookies are unsupported for this browser.')
     }
-    key = pbkdf2Sync(await password(profile.keychainService), 'saltysalt', 1003, 16, 'sha1')
+    key = await browserStorageKey(profile.keychainService, password)
   }
   const result = { imported: 0, failed: 0 }
   try {
@@ -113,12 +94,7 @@ export async function importProfileCookies(
 }
 
 function decryptCookie(row: CookieRow, version: number, key: Buffer): string {
-  const encrypted = Buffer.from(row.encrypted!)
-  if (encrypted.subarray(0, 3).toString() !== 'v10') {
-    throw new Error('Unsupported cookie encryption')
-  }
-  const decipher = createDecipheriv('aes-128-cbc', key, Buffer.alloc(16, 32))
-  let value = Buffer.concat([decipher.update(encrypted.subarray(3)), decipher.final()])
+  let value = decryptBrowserValue(row.encrypted!, key)
   // Chromium schema 24 binds each encrypted value to the SHA-256 of its exact host.
   if (version >= 24) {
     const hash = createHash('sha256').update(row.domain).digest()
@@ -128,16 +104,4 @@ function decryptCookie(row: CookieRow, version: number, key: Buffer): string {
     value = value.subarray(hash.length)
   }
   return value.toString('utf8')
-}
-
-async function readKeychainPassword(service: string): Promise<string> {
-  if (process.platform !== 'darwin') {
-    throw new Error('This browser supports cookie import on macOS only.')
-  }
-  try {
-    const { stdout } = await execute('/usr/bin/security', ['find-generic-password', '-w', '-a', service.replace(/ Safe Storage$/, ''), '-s', service], { timeout: 30000, maxBuffer: 8192 })
-    return stdout.replace(/\r?\n$/, '')
-  } catch {
-    throw new Error('Keychain access was not granted. Allow access to the selected browser’s Safe Storage key, then try again.')
-  }
 }

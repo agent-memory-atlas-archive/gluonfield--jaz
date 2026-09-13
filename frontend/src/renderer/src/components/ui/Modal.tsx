@@ -30,6 +30,7 @@ export function Modal({
   children,
   size = 'md',
   chromeless = false,
+  className = '',
 }: {
   open: boolean
   onClose: () => void
@@ -45,6 +46,7 @@ export function Modal({
   // Drop the standard header and body padding so the children own the full
   // panel surface (e.g. a full-bleed hero). Close stays as a floating control.
   chromeless?: boolean
+  className?: string
 }) {
   const reduce = useReducedMotion()
   const panelRef = useRef<HTMLDivElement>(null)
@@ -130,7 +132,7 @@ export function Modal({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={reduce ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-              className={`relative flex max-h-[calc(100dvh-2rem)] w-full ${SIZES[size]} flex-col overflow-hidden rounded-card bg-bg shadow-raised sm:max-h-[calc(100dvh-3rem)]`}
+              className={`relative flex max-h-[calc(100dvh-2rem)] w-full ${SIZES[size]} flex-col overflow-hidden rounded-card bg-bg shadow-raised sm:max-h-[calc(100dvh-3rem)] ${className}`}
             >
               {chromeless ? (
                 <IconButton
