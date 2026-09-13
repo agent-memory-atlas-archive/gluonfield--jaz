@@ -1,7 +1,75 @@
-import { cloneElement, type ReactElement, type ReactNode, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { cloneElement, createContext, type ReactElement, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { layoutRect, layoutViewport } from '@/lib/dom/zoom'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
+
+type Card = {
+  triggerId: string
+  anchor: DOMRect
+  content: ReactNode
+}
+
+const HoverCardContext = createContext<{
+  id: string
+  triggerId?: string
+  show: (triggerId: string, target: HTMLElement, content: ReactNode) => void
+  leave: () => void
+  close: () => void
+} | null>(null)
+
+export function HoverCardGroup({ children }: { children: ReactNode }) {
+  const id = useId()
+  const [active, setActive] = useState(false)
+  const [card, setCard] = useState<Card | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const cancel = useCallback(() => clearTimeout(timer.current), [])
+  const close = useCallback(() => {
+    cancel()
+    setActive(false)
+    setCard(null)
+  }, [cancel])
+
+  useEffect(() => cancel, [cancel])
+  useWindowEvent('scroll', close, active, true)
+  useWindowEvent('resize', close, active)
+  useWindowEvent('blur', close, active)
+  useWindowEvent('keydown', (event) => {
+    if (event.key === 'Escape') {
+      close()
+    }
+  }, active)
+
+  const show = (triggerId: string, target: HTMLElement, content: ReactNode) => {
+    cancel()
+    setActive(true)
+    const open = () => setCard({ triggerId, anchor: layoutRect(target), content })
+    if (card) {
+      open()
+    } else {
+      timer.current = setTimeout(open, 700)
+    }
+  }
+  const leave = () => {
+    cancel()
+    if (card) {
+      timer.current = setTimeout(close, 150)
+    } else {
+      close()
+    }
+  }
+
+  return (
+    <HoverCardContext.Provider value={{ id, triggerId: card?.triggerId, show, leave, close }}>
+      {children}
+      {card && createPortal(
+        <HoverPanel id={id} anchor={card.anchor} onEnter={cancel} onLeave={leave}>
+          {card.content}
+        </HoverPanel>,
+        document.body,
+      )}
+    </HoverCardContext.Provider>
+  )
+}
 
 export function HoverCard({ children, content, disabled = false }: {
   children: ReactElement<{ 'aria-describedby'?: string }>
@@ -9,68 +77,26 @@ export function HoverCard({ children, content, disabled = false }: {
   disabled?: boolean
 }) {
   const id = useId()
-  const [target, setTarget] = useState<HTMLElement | null>(null)
-  const [anchor, setAnchor] = useState<DOMRect | null>(null)
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const cancelClose = useCallback(() => clearTimeout(closeTimer.current), [])
-  const close = useCallback(() => {
-    cancelClose()
-    setTarget(null)
-    setAnchor(null)
-  }, [cancelClose])
-
-  useEffect(() => {
-    if (!target || disabled) {
-      return
-    }
-    const timer = setTimeout(() => setAnchor(layoutRect(target)), 700)
-    return () => clearTimeout(timer)
-  }, [disabled, target])
-  useEffect(() => cancelClose, [cancelClose])
-  useWindowEvent('scroll', close, Boolean(target), true)
-  useWindowEvent('resize', close, Boolean(target))
-  useWindowEvent('blur', close, Boolean(target))
-  useWindowEvent('keydown', (event) => {
-    if (event.key === 'Escape') {
-      close()
-    }
-  }, Boolean(target))
-
-  const leave = () => {
-    cancelClose()
-    if (anchor) {
-      closeTimer.current = setTimeout(close, 100)
-    } else {
-      close()
-    }
-  }
+  const group = useContext(HoverCardContext)!
 
   return (
     <div
       onPointerEnter={(event) => {
-        if (disabled || event.pointerType !== 'mouse') {
-          return
+        if (!disabled && event.pointerType === 'mouse') {
+          group.show(id, event.currentTarget, content)
         }
-        cancelClose()
-        setTarget(event.currentTarget)
       }}
-      onPointerLeave={leave}
-      onPointerDownCapture={close}
-      onContextMenuCapture={close}
+      onPointerLeave={group.leave}
+      onPointerDownCapture={group.close}
+      onContextMenuCapture={group.close}
       onFocus={(event) => {
         if (!disabled && event.target.matches(':focus-visible')) {
-          setTarget(event.currentTarget)
+          group.show(id, event.currentTarget, content)
         }
       }}
-      onBlur={close}
+      onBlur={group.leave}
     >
-      {cloneElement(children, { 'aria-describedby': !disabled && anchor ? id : undefined })}
-      {!disabled && anchor && createPortal(
-        <HoverPanel id={id} anchor={anchor} onEnter={cancelClose} onLeave={leave}>
-          {content}
-        </HoverPanel>,
-        document.body,
-      )}
+      {cloneElement(children, { 'aria-describedby': group.triggerId === id ? group.id : undefined })}
     </div>
   )
 }

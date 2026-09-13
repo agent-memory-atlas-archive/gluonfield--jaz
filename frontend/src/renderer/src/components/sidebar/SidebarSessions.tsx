@@ -5,6 +5,7 @@ import { motion, Reorder, type Transition, useDragControls } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatedList, AnimatedListItem } from '@/components/ui/AnimatedList'
 import { Collapse } from '@/components/ui/Collapse'
+import { HoverCardGroup } from '@/components/ui/HoverCard'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import {
   projectsQuery,
@@ -411,37 +412,39 @@ export function SidebarSessions({ open }: { open: boolean }) {
   }
 
   return (
-    <section className="flex shrink-0 flex-col gap-3">
-      <PinnedSessions
-        items={sections.pinnedItems}
-        shortcutByID={shortcutByID}
-        shortcutMode={shortcutMode}
-      />
-      <div>
-        <SidebarOrganizationMenu organization={organization} onChange={changeOrganization} />
-        {organization === 'project' ? (
-          <ProjectSessionList
-            blocks={blocks}
-            onReorder={setDragOrder}
-            onReorderEnd={commitReorder}
-            onToggle={toggleProject}
-            onExpand={expandProject}
-            onExpandUngrouped={() => setShowAllUngrouped(true)}
-            shortcutByID={shortcutByID}
-            shortcutMode={shortcutMode}
-          />
-        ) : (
-          <RecentSessionList
-            {...recentPage}
-            onShowMore={() => setVisibleRecentCount((count) => count + SESSION_PAGE_SIZE)}
-            shortcutByID={shortcutByID}
-            shortcutMode={shortcutMode}
-          />
-        )}
-        {!hasSessions ? (
-          <p className="px-2.5 py-1 text-[13px] text-ink-3">No sessions yet</p>
-        ) : null}
-      </div>
-    </section>
+    <HoverCardGroup>
+      <section className="flex shrink-0 flex-col gap-3">
+        <PinnedSessions
+          items={sections.pinnedItems}
+          shortcutByID={shortcutByID}
+          shortcutMode={shortcutMode}
+        />
+        <div>
+          <SidebarOrganizationMenu organization={organization} onChange={changeOrganization} />
+          {organization === 'project' ? (
+            <ProjectSessionList
+              blocks={blocks}
+              onReorder={setDragOrder}
+              onReorderEnd={commitReorder}
+              onToggle={toggleProject}
+              onExpand={expandProject}
+              onExpandUngrouped={() => setShowAllUngrouped(true)}
+              shortcutByID={shortcutByID}
+              shortcutMode={shortcutMode}
+            />
+          ) : (
+            <RecentSessionList
+              {...recentPage}
+              onShowMore={() => setVisibleRecentCount((count) => count + SESSION_PAGE_SIZE)}
+              shortcutByID={shortcutByID}
+              shortcutMode={shortcutMode}
+            />
+          )}
+          {!hasSessions ? (
+            <p className="px-2.5 py-1 text-[13px] text-ink-3">No sessions yet</p>
+          ) : null}
+        </div>
+      </section>
+    </HoverCardGroup>
   )
 }
