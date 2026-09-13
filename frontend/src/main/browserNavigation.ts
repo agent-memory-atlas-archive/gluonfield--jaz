@@ -1,19 +1,8 @@
-import { BrowserWindow, type Input, type WebContents, shell, webContents } from 'electron'
-import { isPreviewURL } from '@shared/preview'
+import { BrowserWindow, type Input, type WebContents, webContents } from 'electron'
 import {
   BROWSER_NAVIGATION_CHANNEL,
   type BrowserNavigationDirection,
-} from '../shared/browserNavigation'
-
-export function attachExternalOpenHandler(contents: WebContents, openExternal = shell.openExternal): void {
-  contents.setWindowOpenHandler(({ url }) => {
-    if (contents.getType() === 'webview' && !isPreviewURL(url)) {
-      return { action: 'deny' }
-    }
-    void openExternal(url)
-    return { action: 'deny' }
-  })
-}
+} from '@shared/browserNavigation'
 
 function appCommandDirection(command: string): BrowserNavigationDirection | null {
   if (command === 'browser-backward') return 'back'

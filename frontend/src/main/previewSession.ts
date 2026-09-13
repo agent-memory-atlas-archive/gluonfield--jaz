@@ -1,6 +1,17 @@
 import { app, session, type WebContents, type WebPreferences } from 'electron'
 import { BROWSER_PRELOAD_ARGUMENT, PREVIEW_PARTITION, isPreviewURL } from '@shared/preview'
 
+export const PREVIEW_WEB_PREFERENCES: WebPreferences = {
+  nodeIntegration: false,
+  nodeIntegrationInSubFrames: false,
+  nodeIntegrationInWorker: false,
+  contextIsolation: true,
+  sandbox: true,
+  webSecurity: true,
+  allowRunningInsecureContent: false,
+  webviewTag: false,
+}
+
 export function attachPreviewWebviews(host: WebContents, preload: string): void {
   host.on('will-attach-webview', (event, preferences, params) => {
     if (!isPreviewURL(params.src) || params.partition !== PREVIEW_PARTITION) {
@@ -10,12 +21,7 @@ export function attachPreviewWebviews(host: WebContents, preload: string): void 
     delete (preferences as WebPreferences & { preloadURL?: string }).preloadURL
     preferences.preload = preload
     preferences.additionalArguments = [BROWSER_PRELOAD_ARGUMENT]
-    preferences.nodeIntegration = false
-    preferences.nodeIntegrationInSubFrames = false
-    preferences.contextIsolation = true
-    preferences.sandbox = true
-    preferences.webSecurity = true
-    preferences.allowRunningInsecureContent = false
+    Object.assign(preferences, PREVIEW_WEB_PREFERENCES)
   })
 }
 

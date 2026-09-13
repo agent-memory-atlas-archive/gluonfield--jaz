@@ -14,8 +14,8 @@ With **This machine** selected (a loopback backend on port 5299), localhost
 previews load directly and keep their original URLs, including paths, queries
 and fragments. **Open in Browser** opens that same URL. Remote backends, including
 loopback tunnels on other ports, use the server preview proxy.
-New-tab links and JavaScript popups open in the default external browser while
-preserving the current side-browser page.
+New-tab links and JavaScript popups open in Jaz windows sharing the browser
+session with standard `window.open` behavior. **Open in Browser** uses the system browser.
 
 Hidden browser sessions are eligible for unloading after five minutes without
 browser commands, including JavaScript sessions that have not opened a page.
@@ -353,8 +353,9 @@ hidden-frame exclusion, obscured-target rejection, wrapped text, smooth-scrollin
 scrolling, removed nodes, document replacement and full trees after screenshots.
 Unit checks cover ignored ancestors, frame hierarchy and
 structural moves. The cursor/input and direct-CDP checks run alongside these.
-A real new-tab Sign In click verifies that the webview forwards its URL to the
-external-browser handler and keeps the current preview open.
+A real new-tab click verifies that the webview opens a native popup and keeps
+the current preview open. Popup checks cover the opener callback, shared session,
+redirects, blank and nested windows, POST forms, closing and sandbox boundaries.
 
 The same fixture creates synthetic Chrome/Firefox profiles and exercises real
 SQLite reads, Chrome decryption/host verification, cookie flags, data-type

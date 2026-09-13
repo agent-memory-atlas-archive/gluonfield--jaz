@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('smoke', {
   backend: () => ipcRenderer.invoke('smoke:backend'),
   browserExists: (id: number) => ipcRenderer.invoke('smoke:browser-exists', id),
   openedURLs: () => ipcRenderer.invoke('smoke:opened-urls'),
+  popupURLs: () => ipcRenderer.invoke('smoke:popup-urls'),
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
   pointer: (type: string, x: number, y: number) => ipcRenderer.invoke('smoke:pointer', type, x, y),
   key: (key: string, modifiers?: string[]) => ipcRenderer.invoke('smoke:key', key, modifiers),

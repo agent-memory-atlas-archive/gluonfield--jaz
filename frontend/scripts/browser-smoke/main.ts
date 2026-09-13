@@ -5,19 +5,21 @@ import { X509Certificate } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { installBrowserControl } from '@main/browserControl'
-import { attachExternalOpenHandler } from '@main/browserNavigation'
+import { attachWindowOpenHandler } from '@main/browserPopups'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
 import { installBrowserPasswords } from '@main/browserPasswords'
 import { BrowserPasswordStore } from '@main/browserPasswordStore'
 import { PREVIEW_PARTITION } from '@shared/preview'
 import { assertUntrustedProfileCaller, prepareProfileFixture } from './profiles'
 import { accessibilityFixture, accessibilityFrame } from './accessibility'
+import { exerciseBrowserPopups } from './popups'
 
 app.setName('Jaz')
 app.setPath('userData', join(process.env.JAZ_BROWSER_SMOKE_DIR!, `profile-${process.pid}`))
 const timeout = Number(process.env.JAZ_BROWSER_SMOKE_TIMEOUT_MS || 30000)
 const openedURLs: string[] = []
-app.on('web-contents-created', (_event, contents) => attachExternalOpenHandler(contents, async (url) => {
+const popupURLs: string[] = []
+app.on('web-contents-created', (_event, contents) => attachWindowOpenHandler(contents, async (url) => {
   openedURLs.push(url)
 }))
 installBrowserControl()
@@ -29,6 +31,7 @@ process.on('unhandledRejection', (error) => {
 ipcMain.handle('smoke:backend', () => process.env.JAZ_BROWSER_SMOKE_BACKEND)
 ipcMain.handle('smoke:browser-exists', (_event, id: number) => Boolean(webContents.fromId(id)))
 ipcMain.handle('smoke:opened-urls', () => openedURLs)
+ipcMain.handle('smoke:popup-urls', () => popupURLs)
 
 let pendingProxy: { response: ServerResponse; url: string } | undefined
 let proxyWaiter: ServerResponse | undefined
@@ -173,6 +176,13 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     await new Promise((resolve) => setTimeout(resolve, 20))
   })
   await assertUntrustedProfileCaller(process.env.JAZ_BROWSER_SMOKE_DIR!)
+  await exerciseBrowserPopups(join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'index.js'), openedURLs)
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('did-create-window', (popup, { url }) => {
+      popupURLs.push(url)
+      popup.destroy()
+    })
+  })
   ipcMain.handle('smoke:capture', async (_event, name = 'browser') => {
     if (!/^[a-z-]+$/.test(name)) {
       throw new Error('Invalid screenshot name')

@@ -15,7 +15,8 @@ import {
 import appIcon from '../assets/jaz-icon-1024.png?asset'
 import { isPreviewURL } from '../shared/preview'
 import { startLocalBackend, stopLocalBackend } from './backend'
-import { attachBrowserNavigationCommands, attachBrowserNavigationShortcuts, attachExternalOpenHandler } from '@main/browserNavigation'
+import { attachBrowserNavigationCommands, attachBrowserNavigationShortcuts } from '@main/browserNavigation'
+import { attachWindowOpenHandler } from '@main/browserPopups'
 import { attachWindowLifecycle, installMainDiagnostics } from './diagnostics'
 import { getDeviceIdentity, getDeviceMetadata } from './deviceIdentity'
 import { registerDictation } from './dictation'
@@ -117,13 +118,6 @@ function openExternalURL(url: string): void {
   }
 }
 
-function attachPreviewNavigationGuard(contents: WebContents): void {
-  contents.on('will-navigate', (event, url) => {
-    if (contents.getType() !== 'webview' || isPreviewURL(url)) return
-    event.preventDefault()
-  })
-}
-
 // Electron ships no default right-click menu; build the link and standard text
 // actions wherever the click lands on a link, editable field, or text selection.
 function attachContextMenu(contents: WebContents): void {
@@ -221,8 +215,7 @@ app.on('web-contents-created', (_event, contents) => {
   attachBrowserNavigationShortcuts(contents)
   attachPreviewFindShortcuts(contents)
   attachContextMenu(contents)
-  attachExternalOpenHandler(contents)
-  attachPreviewNavigationGuard(contents)
+  attachWindowOpenHandler(contents)
 })
 
 function createWindow(): void {
@@ -333,10 +326,6 @@ function openBoardWindow(boardId: string): void {
   attachBrowserNavigationCommands(win)
   win.on('close', () => saveBoardBounds(boardId, win.getBounds()))
   win.on('closed', () => boardWindows.delete(boardId))
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
-    return { action: 'deny' }
-  })
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/boards/${boardId}`)
   } else {
