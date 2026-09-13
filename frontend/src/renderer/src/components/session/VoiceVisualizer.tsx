@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useMotionValue, useSpring } from 'motion/react'
 import { shapeById, type ShapeId } from '@/lib/vendor/mote/shapes'
 import { eyeById, type EyeId } from '@/lib/vendor/mote/eyes'
+import { useReducedEffectsMotion } from '@/lib/effectsMotion'
 import { audioLevel } from '@/lib/voice/audioLevel'
 import { VoiceAvatarActivity, type VoiceAvatarState } from '@/lib/voice/avatar'
 import type { VoiceState } from '@/lib/voice/session'
@@ -16,13 +17,13 @@ const poses: Record<VoiceAvatarState, { shape: ShapeId; eyes: EyeId; tilt: numbe
   error: { shape: 'pebble', eyes: 'uneasy', tilt: -4, gaze: 0, duration: 7 },
 }
 
-export function VoiceVisualizer({ voice, reducedMotion, level = 0, outputLevel = 0, size = 88 }: {
+export function VoiceVisualizer({ voice, level = 0, outputLevel = 0, size = 88 }: {
   voice: VoiceState
-  reducedMotion: boolean
   level?: number
   outputLevel?: number
   size?: number
 }) {
+  const reducedMotion = useReducedEffectsMotion()
   const input = useRef({ voice, level, outputLevel })
   const [meter] = useState(() => new VoiceAvatarActivity())
   const [state, setState] = useState(() => meter.sample(voice, level, outputLevel, performance.now()))
