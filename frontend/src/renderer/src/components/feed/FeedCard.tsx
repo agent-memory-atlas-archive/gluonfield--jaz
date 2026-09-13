@@ -39,6 +39,7 @@ export function FeedCard({
   onToggle: () => void
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const reducedMotion = useReducedMotion()
@@ -147,11 +148,12 @@ export function FeedCard({
             className="overflow-hidden"
           >
             <div className="bg-surface-2 px-3.5 py-3">
-              <div className="max-h-[42vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div ref={scrollRef} className="max-h-[42vh] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {lastTurn && detail.data ? (
                   <FileReaderLinkProvider sessionId={item.id} onOpen={openThread}>
                     <PreviewLinkProvider onOpen={openThread}>
                       <Transcript
+                        scrollRef={scrollRef}
                         messages={lastTurn.messages}
                         events={lastTurn.events}
                         sessionId={item.id}

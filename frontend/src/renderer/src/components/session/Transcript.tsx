@@ -1,7 +1,5 @@
-import { ChevronDown } from 'lucide-react'
-import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react'
 import type { ChatMessage, SessionEvent } from '@/lib/api/types'
-import { Button } from '@/components/ui/Button'
 import { Collapse } from '@/components/ui/Collapse'
 import { DisclosureTrigger } from '@/components/ui/DisclosureTrigger'
 import { taskSurfaceFromEvent } from '@/lib/taskSurface'
@@ -11,6 +9,7 @@ import {
   stableEventKey,
   type TimelineItem,
 } from './timeline'
+import { useHistoryScroll } from '@/components/session/useHistoryScroll'
 import { ActivityBlock } from './ActivityBlock'
 import { Bubble } from './Bubble'
 import { LiveEvent } from './LiveEvent'
@@ -67,36 +66,15 @@ function WorkSection({
   )
 }
 
-function EarlierHistoryButton({
-  hiddenCount,
-  unit,
-  hasMore,
-  loading,
-  onClick,
-}: {
-  hiddenCount: number
-  unit: string
-  hasMore?: boolean
-  loading?: boolean
-  onClick: () => void
-}) {
-  if (hiddenCount <= 0 && !hasMore) return null
-  return (
-    <div className="flex justify-center">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="border border-border bg-bg/90"
-        title={hiddenCount > 0 ? `${hiddenCount} earlier ${unit}` : 'Load earlier history'}
-        aria-expanded={false}
-        disabled={loading}
-        onClick={onClick}
-      >
-        <ChevronDown size={13} className="rotate-180" aria-hidden />
-        {loading ? 'Loading…' : 'Earlier history'}
-      </Button>
-    </div>
-  )
+function itemKey(item: TimelineItem): string {
+  switch (item.kind) {
+    case 'message':
+      return `message-${item.message.seq}`
+    case 'activity':
+      return item.key
+    case 'event':
+      return `event-${stableEventKey(item.event, item.eventIndex)}`
+  }
 }
 
 // Result cards read as a turn's outcome, so they anchor to the end of the turn
@@ -113,6 +91,7 @@ function trailingErrorEventIndex(chronological: TimelineItem[], anchored: Timeli
 export const Transcript = memo(function Transcript({
   messages,
   events,
+  scrollRef,
   sessionId,
   attachmentSessionId = sessionId,
   groupTurns = false,
@@ -129,6 +108,7 @@ export const Transcript = memo(function Transcript({
 }: {
   messages: ChatMessage[]
   events: SessionEvent[]
+  scrollRef: RefObject<HTMLDivElement | null>
   sessionId?: string
   attachmentSessionId?: string
   groupTurns?: boolean
@@ -184,11 +164,22 @@ export const Transcript = memo(function Transcript({
       setVisibleHistoryCount((count) => Math.min(historyCount, count + historyBatchSize))
       return
     }
-    if (!onLoadEarlierHistory) return
+    if (!onLoadEarlierHistory || loadingEarlierHistory) return
     void onLoadEarlierHistory().then((loaded) => {
       if (loaded) setVisibleHistoryCount(Number.MAX_SAFE_INTEGER)
     })
   }
+
+  const firstItem = groupTurns
+    ? visibleTurns[0]?.opener ?? visibleTurns[0]?.items[0]
+    : visibleChronological[0]
+  const { historyRef, sentinelRef } = useHistoryScroll({
+    scrollRef,
+    firstKey: firstItem && itemKey(firstItem),
+    hasMore: hiddenHistoryCount > 0 || hasEarlierHistory,
+    onLoadMore: revealEarlierHistory,
+  })
+  const historySentinel = <div ref={sentinelRef} className="pointer-events-none absolute inset-x-0 top-0 h-px" aria-hidden />
 
   const renderItem = (item: TimelineItem, options: RenderOptions = {}): ReactNode => {
     const showAssistantCopy = options.showAssistantCopy ?? true
@@ -196,7 +187,7 @@ export const Transcript = memo(function Transcript({
       case 'message':
         return (
           <div
-            key={`message-${item.message.seq}`}
+            key={itemKey(item)}
             data-message-seq={item.message.seq}
             className={`scroll-mt-24 ${groupTurns ? '' : 'my-1.5'}`}
           >
@@ -211,7 +202,7 @@ export const Transcript = memo(function Transcript({
       case 'activity':
         return (
           <ActivityBlock
-            key={item.key}
+            key={itemKey(item)}
             entries={item.entries}
             header={item.header}
             active={options.activityActive}
@@ -222,7 +213,7 @@ export const Transcript = memo(function Transcript({
         const taskSurface = taskSurfaceFromEvent(item.event)
         return (
           <LiveEvent
-            key={`event-${stableEventKey(item.event, item.eventIndex)}`}
+            key={itemKey(item)}
             event={item.event}
             showHeader={item.showHeader}
             working={working}
@@ -249,14 +240,7 @@ export const Transcript = memo(function Transcript({
 
   if (!groupTurns) {
     return (
-      <div className="flex flex-col gap-2">
-        <EarlierHistoryButton
-          hiddenCount={hiddenHistoryCount}
-          unit="history items"
-          hasMore={hasEarlierHistory}
-          loading={loadingEarlierHistory}
-          onClick={revealEarlierHistory}
-        />
+      <div ref={historyRef} className="relative flex flex-col gap-2" aria-busy={loadingEarlierHistory}>
         {visibleChronological.map((item, index) =>
           renderItem(item, {
             activityActive: working && index === visibleChronological.length - 1,
@@ -264,6 +248,7 @@ export const Transcript = memo(function Transcript({
         )}
         {tail}
         {anchored.map((item) => renderItem(item))}
+        {historySentinel}
       </div>
     )
   }
@@ -271,14 +256,7 @@ export const Transcript = memo(function Transcript({
   return (
     // Turns are spaced wider than the sections inside one turn; at the same gap
     // there is nothing marking where a turn ends and the next begins.
-    <div className="flex flex-col gap-7">
-      <EarlierHistoryButton
-        hiddenCount={hiddenHistoryCount}
-        unit="turns"
-        hasMore={hasEarlierHistory}
-        loading={loadingEarlierHistory}
-        onClick={revealEarlierHistory}
-      />
+    <div ref={historyRef} className="relative flex flex-col gap-7" aria-busy={loadingEarlierHistory}>
       {visibleTurns.map((turn, visibleTurnIndex) => {
         const turnIndex = historyStart + visibleTurnIndex
         const active = working && turnIndex === turns.length - 1
@@ -306,7 +284,7 @@ export const Transcript = memo(function Transcript({
               workItems[workItems.length - 1].at - (turn.opener?.at ?? workItems[0].at)
             sections.push(
               <WorkSection
-                key={`work-${turnIndex}`}
+                key="work"
                 items={workItems}
                 durationMs={durationMs}
                 defaultOpen={false}
@@ -319,13 +297,14 @@ export const Transcript = memo(function Transcript({
         }
         resultCards.forEach((item) => sections.push(renderItem(item)))
         return (
-          <div key={`turn-${turnIndex}`} className="flex flex-col gap-4">
+          <div key={itemKey(turn.opener ?? turn.items[0])} className="flex flex-col gap-4">
             {sections}
           </div>
         )
       })}
       {tail}
       {anchored.map((item) => renderItem(item))}
+      {historySentinel}
     </div>
   )
 })
