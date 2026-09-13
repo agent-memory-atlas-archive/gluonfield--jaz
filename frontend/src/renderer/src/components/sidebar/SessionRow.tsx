@@ -65,15 +65,15 @@ export function SessionRow({
         activeProps={{ className: 'bg-list-active!' }}
         {...menuTriggers}
       >
-        {/* Branch and runtime marks share one identity gutter so every label
-            keeps the same left edge. Branch identity wins for spawned threads. */}
-        <span className="grid size-[18px] shrink-0 place-items-center">
-          {child ? (
-            <CornerDownRight size={12} className="text-ink-3" />
-          ) : showRuntimeBadge && session.runtime === 'acp' ? (
-            <RuntimeBadge session={session} compact />
-          ) : null}
-        </span>
+        {!session.pinned && (
+          <span className="grid size-[18px] shrink-0 place-items-center">
+            {child ? (
+              <CornerDownRight size={12} className="text-ink-3" />
+            ) : showRuntimeBadge && session.runtime === 'acp' ? (
+              <RuntimeBadge session={session} compact />
+            ) : null}
+          </span>
+        )}
         {inlineEditing ? (
           <RenameField session={session} onDone={() => setRename(null)} />
         ) : (

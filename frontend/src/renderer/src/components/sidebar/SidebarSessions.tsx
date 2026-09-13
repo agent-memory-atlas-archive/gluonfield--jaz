@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ChevronDown, Folder, Pin, SquarePen } from 'lucide-react'
+import { ChevronDown, Folder, SquarePen } from 'lucide-react'
 import { motion, Reorder, type Transition, useDragControls } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { AnimatedList, AnimatedListItem } from '@/components/ui/AnimatedList'
@@ -121,11 +121,8 @@ function PinnedSessions({
   return (
     <div>
       <p
-        className={`flex h-[30px] items-center gap-2 px-2.5 max-sm:h-11 max-sm:gap-2.5 max-sm:px-3 ${SECTION_HEADING_CLASS}`}
+        className={`flex h-[30px] items-center px-2.5 max-sm:h-11 max-sm:px-3 ${SECTION_HEADING_CLASS}`}
       >
-        <span className="grid size-[18px] shrink-0 place-items-center">
-          <Pin size={14} className="text-ink-2" />
-        </span>
         Pinned
       </p>
       <SessionRows items={items} shortcutByID={shortcutByID} shortcutMode={shortcutMode} />
