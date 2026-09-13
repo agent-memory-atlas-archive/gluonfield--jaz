@@ -29,6 +29,7 @@ export function FloatingVoice({ voice, onReturn, level, outputLevel }: {
           if (event.button !== 0) {
             return
           }
+          event.preventDefault()
           event.currentTarget.setPointerCapture(event.pointerId)
           gesture.current = { x: event.screenX, y: event.screenY, moved: false, origin: offset }
           clientRuntime.voiceOverlay?.drag({ x: event.screenX, y: event.screenY })
