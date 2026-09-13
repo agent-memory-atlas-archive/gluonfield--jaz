@@ -54,7 +54,7 @@ export async function exercisePreviewLinks(browser: SideBrowser, evaluate: (expr
     if (await resolvePreviewSource(publicURL) !== publicURL || Number(proxyRequests) !== 1) {
       throw new Error('Public URLs must bypass proxy creation')
     }
-    for (const [url, script] of [[location.origin + '/popup-login', false], [publicURL, false], [publicURL + '-script', true]] as const) {
+    for (const [url, script] of [[location.origin + '/popup-login', false], [location.origin + '/popup-login-script', true]] as const) {
       const point = await evaluate(`(() => {
         const link = document.createElement('a')
         link.id = 'popup-fixture'
@@ -75,13 +75,16 @@ export async function exercisePreviewLinks(browser: SideBrowser, evaluate: (expr
       })()`) as { x: number; y: number }
       await browser.call({ method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed', ...point, button: 'left', clickCount: 1 } })
       await browser.call({ method: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 } })
-      await until(async () => (await window.smoke.openedURLs()).includes(url))
+      await until(async () => (await window.smoke.popupURLs()).includes(url))
+      if ((await window.smoke.openedURLs()).includes(url)) {
+        throw new Error('A browser popup escaped to the external browser')
+      }
       if (await evaluate('location.href') !== local) {
         throw new Error('A new-tab link replaced the current preview')
       }
       await evaluate('document.getElementById("popup-fixture").remove()')
     }
-    console.log('Local URLs, external toolbar, new-tab links and window.open passed')
+    console.log('Local URLs, external toolbar, native new-tab links and window.open passed')
   } finally {
     window.fetch = fetcher
     setApiBaseUrl(backend)

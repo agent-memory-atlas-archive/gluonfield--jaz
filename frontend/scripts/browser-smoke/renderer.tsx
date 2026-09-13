@@ -16,6 +16,7 @@ declare global {
   interface Window {
     smoke: {
       openedURLs(): Promise<string[]>
+      popupURLs(): Promise<string[]>
       backend(): Promise<string>
       browserExists(id: number): Promise<boolean>
       passwordStore(): Promise<{ count: number; plaintext: boolean }>
@@ -215,7 +216,7 @@ await tab.scroll('down', 0, targetRef)` } })
       await window.smoke.capture()
       socket.close()
       browser.dispose()
-      window.smoke.result({ ok: true, checks: ['new-tab Sign In reaches external browser handler without replacing preview', 'annotation survives renderer updates and reaches the composer; cancellation cleans up', 'browser opening collapses navigation, wider defaults, pointer and keyboard resizing', 'HTTPS password save/update/fill/delete, encrypted reload, consent and origin isolation', 'Chromium AX hierarchy, diffs, hidden-frame exclusion and root-index scrolling', 'trusted AX clicks on wrapped text, closed shadows and nested frames', 'hit-tested coordinates and obscured-target rejection', 'nested debugger sessions survive document replacement', 'native Chromium identity across first navigation, fetch, page, worker and client hints', 'cursor arrival precedes input', 'trusted click and hover', 'persistent direct CDP without overlay movement', 'zero scroll animates and hovers without scrolling', 'animated and raw-command cancellation', 'cancellation during preview URL resolution', 'webview ownership', 'MCP script through Go and Electron with verified page result', 'profile import rejects untrusted callers', 'encrypted cookies and passwords import with type selection and existing-login preservation', 'browser menu, profile selection, partial import retry, themes and narrow layout'] })
+      window.smoke.result({ ok: true, checks: ['new-tab links stay in Jaz without replacing preview; popup callbacks and session are preserved', 'annotation survives renderer updates and reaches the composer; cancellation cleans up', 'browser opening collapses navigation, wider defaults, pointer and keyboard resizing', 'HTTPS password save/update/fill/delete, encrypted reload, consent and origin isolation', 'Chromium AX hierarchy, diffs, hidden-frame exclusion and root-index scrolling', 'trusted AX clicks on wrapped text, closed shadows and nested frames', 'hit-tested coordinates and obscured-target rejection', 'nested debugger sessions survive document replacement', 'native Chromium identity across first navigation, fetch, page, worker and client hints', 'cursor arrival precedes input', 'trusted click and hover', 'persistent direct CDP without overlay movement', 'zero scroll animates and hovers without scrolling', 'animated and raw-command cancellation', 'cancellation during preview URL resolution', 'webview ownership', 'MCP script through Go and Electron with verified page result', 'profile import rejects untrusted callers', 'encrypted cookies and passwords import with type selection and existing-login preservation', 'browser menu, profile selection, partial import retry, themes and narrow layout'] })
     }
     void run().catch((error) => window.smoke.result({ ok: false, error: error.message, stack: error.stack, stage, pending: [...pending.values()] })).finally(() => clearTimeout(timeout))
   }, [browser])
