@@ -19,6 +19,7 @@ export class VoiceTaskStream {
   private lastContext = ''
   private status?: { activity: VoiceWorkActivity; error: string }
   private retry?: ReturnType<typeof setTimeout>
+  private outputTimer?: ReturnType<typeof setTimeout>
 
   constructor(
     private source: Source,
@@ -50,7 +51,15 @@ export class VoiceTaskStream {
         return
       }
       this.apply(this.snapshot, event)
-      this.deliver(this.tasks.filter((task) => task.user))
+      if (event.type === 'acp_message') {
+        this.publish()
+        this.outputTimer ??= setTimeout(() => {
+          this.outputTimer = undefined
+          this.deliver(this.tasks.filter((task) => task.user))
+        }, 200)
+      } else {
+        this.deliver(this.tasks.filter((task) => task.user))
+      }
     }, (connected) => {
       if (connected) {
         void this.refresh()
@@ -112,7 +121,6 @@ export class VoiceTaskStream {
     snapshot.latest_event_seq = Math.max(snapshot.latest_event_seq, event.seq ?? 0)
     snapshot.acp_state = event.acp?.state ?? snapshot.acp_state
     snapshot.acp_permissions = event.acp?.permissions ?? snapshot.acp_permissions
-    snapshot.acp_tool_calls = event.acp?.tool_calls ?? snapshot.acp_tool_calls
   }
 
   private deliver(tasks: VoiceTask[]) {
@@ -120,7 +128,7 @@ export class VoiceTaskStream {
     for (const task of [...tasks]) {
       const update = voiceTaskUpdate(task, snapshot)
       const finished = taskFinished(update)
-      const chunks = update.state === 'failed' || update.state === 'cancelled' ? [] : voiceReplyChunks(task, snapshot, update.state === 'completed')
+      const chunks = !finished || update.state === 'completed' ? voiceReplyChunks(task, snapshot) : []
       for (const chunk of chunks) {
         this.append(chunk, true, task.id)
       }
@@ -159,5 +167,6 @@ export class VoiceTaskStream {
     this.stopped = true
     this.stopEvents()
     clearTimeout(this.retry)
+    clearTimeout(this.outputTimer)
   }
 }

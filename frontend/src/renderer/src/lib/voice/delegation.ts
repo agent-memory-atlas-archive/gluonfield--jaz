@@ -32,11 +32,11 @@ export function voiceTaskActivity(task: VoiceTask, snapshot: SessionMessages): V
   return latest?.type === 'acp_thought' ? 'thinking' : 'working'
 }
 
-export function voiceReplyChunks(task: VoiceTask, snapshot: SessionMessages, completed: boolean): string[] {
+export function voiceReplyChunks(task: VoiceTask, snapshot: SessionMessages): string[] {
   const replies = task.user ? voiceTaskWindow(task.user, snapshot).events.filter((event) => event.type === 'acp_message' && event.content) : []
   const output = task.output ??= new Map()
   const chunks: string[] = []
-  for (const [index, reply] of replies.entries()) {
+  for (const reply of replies) {
     const key = reply.projection_key || reply.acp?.text_run_id || String(reply.seq)
     const text = reply.content!
     const sent = output.get(key) ?? ''
@@ -46,20 +46,10 @@ export function voiceReplyChunks(task: VoiceTask, snapshot: SessionMessages, com
     if (text === sent) {
       continue
     }
-    const boundary = completed || index < replies.length - 1
-      ? text.length
-      : [...text.matchAll(/[.!?。！？](?=\s)|\n/g)].at(-1)?.index
-    if (boundary === undefined) {
-      continue
-    }
-    const available = text.slice(0, boundary === text.length ? boundary : boundary + 1)
-    if (available.length <= sent.length && text.startsWith(sent)) {
-      continue
-    }
-    const delta = available.startsWith(sent) ? available.slice(sent.length) : `Updated agent reply: ${available}`
+    const delta = text.startsWith(sent) ? text.slice(sent.length) : `Updated agent reply: ${text}`
     if (delta.trim()) {
       chunks.push(delta)
-      output.set(key, available)
+      output.set(key, text)
       task.outputSeq = Math.max(task.outputSeq ?? 0, reply.seq ?? 0)
     }
   }
@@ -90,8 +80,7 @@ export function voiceTaskUpdate(task: VoiceTask, snapshot: SessionMessages): Tas
     if (answer) return { state: 'completed', text: answer }
     return { state: 'completed', text: 'The agent finished without a written answer. Check the chat for its tool results.' }
   }
-  const lastTool = snapshot.acp_tool_calls?.at(-1)
-  return { state: 'running', text: lastTool?.title ? `The agent is working: ${lastTool.title}` : 'The agent is working on the request.' }
+  return { state: 'running', text: 'The agent is working on the request.' }
 }
 
 export function taskFinished(update: TaskUpdate): boolean {

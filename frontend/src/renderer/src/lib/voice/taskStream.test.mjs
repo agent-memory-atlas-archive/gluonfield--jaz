@@ -53,6 +53,64 @@ const fixture = () => {
 }
 
 describe('voice consumes the existing agent event stream', () => {
+  test('tool changes preserve activity without feeding repeated working messages to voice', async () => {
+    const f = fixture()
+    await f.stream.context()
+    f.stream.start()
+    f.stream.follow(f.task())
+    await f.stream.refresh()
+    const initial = [...f.sent]
+    const event = disk.events[0]
+    for (let index = 0; index < 6; index += 1) {
+      f.emit({ ...event, seq: 100 + index, type: 'acp_tool', content: undefined,
+        projection_key: `tool:${index}`, projection_op: 'replace',
+        acp: { ...event.acp, tool_calls: [{ id: String(index), title: `Check ${index}`, status: 'completed' }] },
+      })
+    }
+    await f.stream.refresh()
+    expect(f.sent).toEqual(initial)
+    expect(f.states.at(-1)).toEqual({ activity: 'working', error: '' })
+    f.stream.stop()
+  })
+
+  test('a sentence at end of message and an unpunctuated tail stream without waiting for more output', async () => {
+    const f = fixture()
+    await f.stream.context()
+    f.stream.start()
+    f.stream.follow(f.task())
+    await f.stream.refresh()
+    const event = disk.events.findLast((event) => event.type === 'acp_message')
+    const sentence = 'The price range was an estimate, not a supplier quote.'
+    f.emit({ ...event, content: sentence })
+    await delay(250)
+    expect(f.sent.filter((item) => item.speak).map((item) => item.text).join('')).toBe(sentence)
+    f.emit({ ...event, seq: event.seq + 1, content: ' The verified price is' })
+    await delay(250)
+    expect(f.sent.filter((item) => item.speak).map((item) => item.text).join('')).toBe(`${sentence} The verified price is`)
+    expect(f.states.at(-1).activity).toBe('working')
+    f.stream.stop()
+  })
+
+  test('continuous deltas flush in batches and stopping discards the pending batch', async () => {
+    const f = fixture()
+    await f.stream.context()
+    f.stream.start()
+    f.stream.follow(f.task())
+    await f.stream.refresh()
+    const event = disk.events.findLast((event) => event.type === 'acp_message')
+    const parts = ['The disk ', 'has forty-two ', 'gigabytes free']
+    for (const [index, content] of parts.entries()) {
+      f.emit({ ...event, seq: 100 + index, content })
+      await delay(80)
+    }
+    expect(f.sent.filter((item) => item.speak).map((item) => item.text)).toEqual([parts.join('')])
+    f.emit({ ...event, seq: 103, content: ' out of one terabyte.' })
+    f.stream.stop()
+    const count = f.sent.length
+    await delay(250)
+    expect(f.sent).toHaveLength(count)
+  })
+
   test('streaming text publishes activity transitions without republishing each token', async () => {
     const f = fixture()
     await f.stream.context()
@@ -107,6 +165,7 @@ describe('voice consumes the existing agent event stream', () => {
     const final = disk.events.findLast((event) => event.type === 'acp_message')
     const terminal = disk.events.findLast((event) => event.type === 'acp')
     f.emit(final)
+    await delay(250)
     expect(f.sent.filter((item) => item.speak).map((item) => item.text).join('')).toContain('42 GB free')
     expect(f.states.at(-1).activity).toBe('working')
     expect(f.reads()).toBe(reads)
@@ -150,6 +209,7 @@ describe('voice consumes the existing agent event stream', () => {
     await f.stream.refresh()
     const final = disk.events.findLast((event) => event.type === 'acp_message')
     f.emit(final)
+    await delay(250)
     f.connect(false)
     expect(f.states.at(-1).error).toContain('Reconnecting')
     f.setRead(async () => structuredClone(disk))
@@ -174,6 +234,7 @@ describe('voice consumes the existing agent event stream', () => {
     f.emit({ ...final, acp: { ...final.acp, id: 'child', parent_id: disk.session.id }, content: 'child answer' })
     f.emit({ ...final, seq: final.seq + 1, content: 'The answer is still incomplete' })
     f.emit({ ...disk.events.at(-1), seq: final.seq + 2, acp: { ...final.acp, state: 'cancelled' } })
+    await delay(250)
     const spoken = f.sent.filter((item) => item.speak).map((item) => item.text).join('')
     expect(spoken).toContain('cancelled')
     expect(spoken).not.toContain('incomplete')
@@ -216,6 +277,7 @@ describe('voice consumes the existing agent event stream', () => {
       { seq: 2, role: 'user', content: 'Just list the files.', blocks: [], created_at: disk.events.at(-1).at },
     ] }))
     await f.stream.refresh()
+    await delay(250)
     expect(f.sent.filter((item) => item.speak)).toEqual([])
     expect(f.sent.at(-1).text).toContain('superseded')
     expect(f.states.at(-1).activity).toBe(null)
@@ -254,7 +316,7 @@ describe('voice consumes the existing agent event stream', () => {
     pending.resolve(structuredClone(initial))
     await refreshing
     const spoken = f.sent.filter((item) => item.speak).map((item) => item.text).join('')
-    expect(spoken).toBe('Disk check: 42 GB free.')
+    expect(spoken).toBe('Disk check: 42 GB free. ')
     f.stream.stop()
   })
 })
