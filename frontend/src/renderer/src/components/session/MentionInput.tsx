@@ -17,7 +17,7 @@ import { layoutRect, layoutViewport } from '@/lib/dom/zoom'
 import { searchThreads } from '@/lib/api/search'
 import { projectsQuery, workspaceFilesQuery } from '@/lib/api/sessions'
 import { skillsQuery } from '@/lib/api/skills'
-import type { ThreadSearchResult } from '@/lib/api/types'
+import type { AgentSessionCommand, ThreadSearchResult } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
 import { threadSearchTitle } from '@/lib/threadDisplay'
 import { ComposerSuggestions, type SuggestionItem, type SuggestionSection } from './ComposerSuggestions'
@@ -85,10 +85,12 @@ export function useMentionInput({
   storage = 'session',
   onValueChange,
   onTextChange,
+  commands = [],
 }: {
   /** server-side directory the @-mention file picker indexes (a project path,
       session cwd, or '' for the workspace root). undefined disables files */
   fileRoot?: string
+  commands?: AgentSessionCommand[]
   disabled?: boolean
   /** auto-grow cap for the textarea, in px */
   maxHeight?: number
@@ -116,6 +118,7 @@ export function useMentionInput({
   // MentionTextarea wires the focus/blur events.
   const [focused, setFocused] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const pendingCaret = useRef<number | null>(null)
   const mirrorRef = useRef<HTMLDivElement>(null)
   const composingRef = useRef(false)
 
@@ -171,6 +174,22 @@ export function useMentionInput({
   const sections = useMemo<SuggestionSection[]>(() => {
     if (!menuTrigger) return []
     const query = menuTrigger.query
+    if (menuTrigger.trigger === '/') {
+      const items = commands.flatMap((command) => {
+        const match = fuzzyMatch(query, command.name)
+        return match ? [{ command, match }] : []
+      }).sort((a, b) => b.match.score - a.match.score)
+        .slice(0, MAX_SUGGESTIONS)
+        .map(({ command, match }) => ({
+          kind: 'command' as const,
+          label: `/${command.name}`,
+          detail: command.input_hint || command.description,
+          indices: match.indices.map((index) => index + 1),
+          insert: `/${command.name}`,
+          expansion: `/${command.name}`,
+        }))
+      return items.length ? [{ title: 'Commands', items }] : []
+    }
     if (menuTrigger.trigger === '$') {
       const items = (skills.data ?? [])
         .flatMap((skill) => {
@@ -262,7 +281,7 @@ export function useMentionInput({
     if (threadItems.length > 0) sections.push({ title: 'Threads', items: threadItems })
     if (fileItems.length > 0) sections.push({ title: 'Files', items: fileItems })
     return sections
-  }, [menuTrigger, skills.data, projects.data, threadSearch.data, threadSearchEnabled, fileIndex.data])
+  }, [commands, menuTrigger, skills.data, projects.data, threadSearch.data, threadSearchEnabled, fileIndex.data])
 
   const flatItems = useMemo(() => sections.flatMap((section) => section.items), [sections])
   const menuOpen = menuTrigger !== null && flatItems.length > 0 && focused
@@ -306,14 +325,18 @@ export function useMentionInput({
   // Programmatic edits don't fire onChange; restore the caret and replay the
   // auto-grow after React commits the new value.
   const placeCaret = useCallback((pos: number) => {
-    requestAnimationFrame(() => {
-      const el = textareaRef.current
-      if (!el) return
-      el.focus()
-      el.setSelectionRange(pos, pos)
-      autoGrow(el)
-    })
-  }, [autoGrow])
+    pendingCaret.current = pos
+  }, [])
+
+  useLayoutEffect(() => {
+    const pos = pendingCaret.current
+    const el = textareaRef.current
+    if (pos === null || !el) return
+    pendingCaret.current = null
+    el.focus()
+    el.setSelectionRange(pos, pos)
+    autoGrow(el)
+  })
 
   const selectItem = (item: SuggestionItem) => {
     if (!menuTrigger) return
@@ -321,11 +344,14 @@ export function useMentionInput({
     // atomic backspace an obvious feel: one press eats the space, the next
     // eats the whole token.
     const next = `${text.slice(0, menuTrigger.start)}${item.insert} ${text.slice(caret)}`
-    const nextTokens = new Map(tokens).set(item.insert, {
-      trigger: menuTrigger.trigger,
-      display: item.insert,
-      expansion: item.expansion,
-    })
+    const nextTokens = new Map(tokens)
+    if (menuTrigger.trigger !== '/') {
+      nextTokens.set(item.insert, {
+        trigger: menuTrigger.trigger,
+        display: item.insert,
+        expansion: item.expansion,
+      })
+    }
     setDraft({ text: next, tokens: nextTokens })
     const pos = menuTrigger.start + item.insert.length + 1
     setCaret(pos)

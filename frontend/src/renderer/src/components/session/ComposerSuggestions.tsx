@@ -1,4 +1,4 @@
-import { FileText, Folder, Sparkles } from 'lucide-react'
+import { FileText, Folder, Sparkles, Terminal } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import { AgentAvatar } from '@/components/acp/AgentAvatar'
@@ -8,7 +8,7 @@ import { fullTime, hasTime, relativeTime } from '@/lib/format/time'
 // text placed in the textarea; `expansion` is what that text becomes in the
 // sent message (a skill reference, a thread id, an absolute path).
 export interface SuggestionItem {
-  kind: 'skill' | 'project' | 'thread' | 'file' | 'dir'
+  kind: 'command' | 'skill' | 'project' | 'thread' | 'file' | 'dir'
   label: string
   detail?: string
   /** label indices matched by the fuzzy query, for highlighting */
@@ -26,6 +26,7 @@ export interface SuggestionSection {
 }
 
 function ItemIcon({ item }: { item: SuggestionItem }) {
+  if (item.kind === 'command') return <Terminal size={13} className="mt-0.5 shrink-0 text-ink-3" />
   if (item.kind === 'skill') return <Sparkles size={13} className="mt-0.5 shrink-0 text-primary" />
   if (item.kind === 'thread') return <AgentAvatar agent={item.agent} size={15} className="mt-0.5" />
   if (item.kind === 'project' || item.kind === 'dir') return <Folder size={13} className="mt-0.5 shrink-0 text-primary" />

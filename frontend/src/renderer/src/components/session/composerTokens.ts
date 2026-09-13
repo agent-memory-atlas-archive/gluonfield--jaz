@@ -15,7 +15,7 @@ export interface InlineToken {
 }
 
 export interface ActiveTrigger {
-  trigger: '$' | '@'
+  trigger: '$' | '@' | '/'
   /** index of the trigger character in the value */
   start: number
   /** text between the trigger character and the caret */
@@ -33,6 +33,9 @@ export interface Segment {
 // closes the menu).
 export function findActiveTrigger(value: string, caret: number): ActiveTrigger | null {
   if (caret < 1 || caret > value.length) return null
+  if (value.startsWith('/') && !/\s/.test(value.slice(1, caret))) {
+    return { trigger: '/', start: 0, query: value.slice(1, caret) }
+  }
   for (let i = caret - 1; i >= 0; i--) {
     const ch = value[i]
     if (/\s/.test(ch)) return null

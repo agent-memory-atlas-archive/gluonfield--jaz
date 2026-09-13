@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,62 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
 )
+
+func TestACPStreamFollowUpAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		supported bool
+		steerErr  error
+		plan      bool
+		queued    int
+	}{
+		{name: "native steering", supported: true},
+		{name: "unsupported queues", queued: 1},
+		{name: "turn ended queues", supported: true, steerErr: acp.ErrSteeringUnsupported, queued: 1},
+		{name: "new plan queues", supported: true, plan: true, queued: 1},
+		{name: "rejection is not submitted twice", supported: true, steerErr: errors.New("provider rejected input")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store, err := sqlitestore.New(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			session, err := store.CreateSession(storage.CreateSession{Slug: "follow-up", Runtime: storage.RuntimeACP})
+			if err != nil {
+				t.Fatal(err)
+			}
+			session.Status = storage.StatusRunning
+			if err := store.SaveSession(session); err != nil {
+				t.Fatal(err)
+			}
+			manager := &fakeACPManager{
+				job:            acp.Job{ID: session.ID, State: acp.StateRunning},
+				steerSupported: tc.supported, steerErr: tc.steerErr,
+			}
+			server := &Server{Store: store, ACP: manager}
+			res := httptest.NewRecorder()
+			server.streamACPSession(res, res, context.Background(), session, acpStreamTurn{
+				Message: "also check this", PlanRequested: tc.plan,
+				Contexts: []storage.MessageContext{{Type: "selection", Text: "selected code"}},
+			})
+			loaded, err := store.LoadSession(session.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loaded.QueuedMessages) != tc.queued || manager.cancelled || manager.sent.Message != "" {
+				t.Fatalf("queue=%#v cancelled=%v sent=%#v", loaded.QueuedMessages, manager.cancelled, manager.sent)
+			}
+			failed := tc.steerErr != nil && !errors.Is(tc.steerErr, acp.ErrSteeringUnsupported)
+			if strings.Contains(res.Body.String(), `"type":"accepted"`) == failed {
+				t.Fatalf("unexpected acceptance: %s", res.Body.String())
+			}
+			if tc.supported && !tc.plan && (manager.steered.Message != "also check this" || len(manager.steered.Contexts) != 1) {
+				t.Fatalf("follow-up lost its payload: %#v", manager.steered)
+			}
+		})
+	}
+}
 
 func TestACPStreamQueuesPromptReservedByRunningTurn(t *testing.T) {
 	store, err := sqlitestore.New(t.TempDir())

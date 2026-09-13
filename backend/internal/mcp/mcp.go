@@ -52,10 +52,13 @@ type Manager struct {
 
 	localServers map[string]localServer
 
-	mu       sync.RWMutex
-	sessions map[string]*serverSession
-	statuses map[string]mcpconfig.ServerStatus
-	refresh  uint64
+	mu           sync.RWMutex
+	sessions     map[string]*serverSession
+	statuses     map[string]mcpconfig.ServerStatus
+	refreshMu    sync.Mutex
+	proxy        *mcpsdk.Server
+	proxyCatalog map[string]remoteTool
+	revision     uint64
 
 	proxyMu sync.Mutex
 
@@ -106,9 +109,9 @@ func WithBuiltinServerProvider(server mcpconfig.Server, provider func() *mcpsdk.
 }
 
 type serverSession struct {
-	session      *mcpsdk.ClientSession
-	localSession *mcpsdk.ServerSession
-	tools        []remoteTool
+	*serverConnection
+	key   [32]byte
+	tools []remoteTool
 }
 
 type remoteTool struct {
@@ -117,7 +120,7 @@ type remoteTool struct {
 	description string
 	inputSchema map[string]any
 	definition  tools.Definition
-	session     *mcpsdk.ClientSession
+	connection  *serverConnection
 	local       bool
 }
 
@@ -145,6 +148,8 @@ func NewManager(store mcpconfig.ServerReader, tokens tokenStore, registry *tools
 		sessions:     make(map[string]*serverSession),
 		statuses:     make(map[string]mcpconfig.ServerStatus),
 		authStates:   make(map[string]*authorizationPending),
+		proxyCatalog: make(map[string]remoteTool),
+		proxy:        mcpsdk.NewServer(&mcpsdk.Implementation{Name: ProxyServerName, Version: "0.1.0"}, &mcpsdk.ServerOptions{Capabilities: &mcpsdk.ServerCapabilities{Tools: &mcpsdk.ToolCapabilities{ListChanged: true}}}),
 	}
 	for _, opt := range opts {
 		opt(m)
@@ -163,31 +168,32 @@ func (m *Manager) backgroundHandler(server mcpconfig.Server) *oauthHandler {
 }
 
 func (m *Manager) Refresh(ctx context.Context) {
-	seq := m.beginRefresh()
-	servers := m.servers(ctx, nil)
-	m.refreshServerList(ctx, seq, servers)
+	m.refreshMu.Lock()
+	defer m.refreshMu.Unlock()
+	servers, err := m.servers(nil)
+	if err != nil {
+		return
+	}
+	m.refreshServerList(ctx, servers, false)
 }
 
 func (m *Manager) RefreshLocal(ctx context.Context) {
-	seq := m.beginRefresh()
-	servers := m.servers(ctx, func(server mcpconfig.Server) bool {
+	m.refreshMu.Lock()
+	defer m.refreshMu.Unlock()
+	servers, err := m.servers(func(server mcpconfig.Server) bool {
 		return m.hasLocalServer(server.ID)
 	})
-	m.refreshServerList(ctx, seq, servers)
+	if err != nil {
+		return
+	}
+	m.refreshServerList(ctx, servers, true)
 }
 
-func (m *Manager) beginRefresh() uint64 {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.refresh++
-	return m.refresh
-}
-
-func (m *Manager) servers(ctx context.Context, include func(mcpconfig.Server) bool) []mcpconfig.Server {
+func (m *Manager) servers(include func(mcpconfig.Server) bool) ([]mcpconfig.Server, error) {
 	servers, err := m.store.ListMCPServers()
 	if err != nil {
 		m.log.Error("load mcp servers failed", "error", err)
-		servers = nil
+		return nil, err
 	}
 	if include != nil {
 		filtered := make([]mcpconfig.Server, 0, len(servers))
@@ -212,10 +218,13 @@ func (m *Manager) servers(ctx context.Context, include func(mcpconfig.Server) bo
 			servers = append(servers, local.server)
 		}
 	}
-	return servers
+	return servers, nil
 }
 
-func (m *Manager) refreshServerList(ctx context.Context, seq uint64, servers []mcpconfig.Server) {
+func (m *Manager) refreshServerList(ctx context.Context, servers []mcpconfig.Server, localOnly bool) {
+	m.mu.RLock()
+	old := m.sessions
+	m.mu.RUnlock()
 	results := make([]refreshResult, len(servers))
 	var wg sync.WaitGroup
 	for i, server := range servers {
@@ -229,8 +238,24 @@ func (m *Manager) refreshServerList(ctx context.Context, seq uint64, servers []m
 			defer wg.Done()
 			sessionCtx, cancel := context.WithTimeout(ctx, remoteStatusTimeout)
 			defer cancel()
+			key, err := m.connectionKey(sessionCtx, server)
+			if err != nil {
+				results[index].status = connectErrorStatus(nil, err)
+				return
+			}
+			if previous := old[server.ID]; previous != nil && previous.key == key {
+				if updated, err := previous.listTools(sessionCtx, server); err == nil {
+					updated.key = key
+					results[index].session = updated
+					results[index].status = connectedStatus(updated.tools)
+					return
+				}
+			}
 			handler := m.backgroundHandler(server)
 			result, err := m.connectForStatus(sessionCtx, server, handler)
+			if result.session != nil {
+				result.session.key = key
+			}
 			results[index].status = result.status
 			if err != nil {
 				m.log.Warn("mcp server unavailable", "server", server.Name, "error", err)
@@ -276,20 +301,30 @@ func (m *Manager) refreshServerList(ctx context.Context, seq uint64, servers []m
 		statuses[result.server.ID] = statusWithTools(result.status, kept)
 	}
 
-	m.mu.Lock()
-	if seq != m.refresh {
-		m.mu.Unlock()
-		closeSessions(next)
-		return
+	if localOnly {
+		for id, session := range old {
+			if !m.hasLocalServer(id) {
+				next[id] = session
+				statuses[id] = m.Status(id)
+				for _, tool := range session.tools {
+					remoteTools = append(remoteTools, tool)
+				}
+			}
+		}
 	}
-	old := m.sessions
+	m.mu.Lock()
 	m.sessions = next
 	m.statuses = statuses
 	m.registry.SetGroup(BuiltinRegistryGroup, builtinTools)
 	m.registry.SetGroup(RegistryGroup, remoteTools)
+	m.updateProxyLocked()
 	m.mu.Unlock()
 
-	closeSessions(old)
+	for id, previous := range old {
+		if current := next[id]; current == nil || current.serverConnection != previous.serverConnection {
+			closeSession(previous)
+		}
+	}
 }
 
 func (m *Manager) builtinToolName(server mcpconfig.Server, remote string, used map[string]string) string {
@@ -307,99 +342,17 @@ func (m *Manager) builtinToolName(server mcpconfig.Server, remote string, used m
 }
 
 func (m *Manager) Close() {
+	m.refreshMu.Lock()
+	defer m.refreshMu.Unlock()
 	m.mu.Lock()
 	sessions := m.sessions
 	m.sessions = make(map[string]*serverSession)
+	m.updateProxyLocked()
 	m.statuses = make(map[string]mcpconfig.ServerStatus)
 	m.mu.Unlock()
 	m.registry.RemoveGroup(BuiltinRegistryGroup)
 	m.registry.RemoveGroup(RegistryGroup)
 	closeSessions(sessions)
-}
-
-func (m *Manager) Handler() http.Handler {
-	m.handlerOnce.Do(func() {
-		m.handler = mcpsdk.NewStreamableHTTPHandler(func(req *http.Request) *mcpsdk.Server {
-			m.ensureProxyReady(req.Context())
-			return m.proxyServer()
-		}, &mcpsdk.StreamableHTTPOptions{
-			JSONResponse:   true,
-			SessionTimeout: 30 * time.Minute,
-		})
-	})
-	return m.handler
-}
-
-func (m *Manager) ensureProxyReady(ctx context.Context) {
-	if !m.proxyRefreshNeeded() {
-		return
-	}
-	m.proxyMu.Lock()
-	defer m.proxyMu.Unlock()
-	if !m.proxyRefreshNeeded() {
-		return
-	}
-	ctx, cancel := context.WithTimeout(ctx, remoteStatusTimeout)
-	defer cancel()
-	m.Refresh(ctx)
-}
-
-func (m *Manager) proxyRefreshNeeded() bool {
-	if len(m.proxyTools()) > 0 {
-		return false
-	}
-	servers := m.remoteServers()
-	if len(servers) == 0 {
-		return false
-	}
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	for _, server := range servers {
-		if _, ok := m.statuses[server.ID]; !ok {
-			return true
-		}
-	}
-	return false
-}
-
-func (m *Manager) remoteServers() []mcpconfig.Server {
-	return m.servers(context.Background(), func(server mcpconfig.Server) bool {
-		return server.Enabled && !m.hasLocalServer(server.ID)
-	})
-}
-
-func (m *Manager) proxyServer() *mcpsdk.Server {
-	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: ProxyServerName, Version: "0.1.0"}, nil)
-	for _, tool := range m.proxyTools() {
-		name := tools.DefinitionName(tool.definition)
-		if name == "" {
-			continue
-		}
-		tool := tool
-		server.AddTool(&mcpsdk.Tool{
-			Name:        name,
-			Description: tool.description,
-			InputSchema: tool.inputSchema,
-		}, func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
-			return tool.callRaw(ctx, req)
-		})
-	}
-	return server
-}
-
-func (m *Manager) proxyTools() []remoteTool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	var out []remoteTool
-	for _, session := range m.sessions {
-		for _, tool := range session.tools {
-			if tool.local {
-				continue
-			}
-			out = append(out, tool)
-		}
-	}
-	return out
 }
 
 func closeSessions(sessions map[string]*serverSession) {
@@ -412,10 +365,7 @@ func closeSession(ss *serverSession) {
 	if ss == nil {
 		return
 	}
-	_ = ss.session.Close()
-	if ss.localSession != nil {
-		_ = ss.localSession.Close()
-	}
+	ss.retire()
 }
 
 func (m *Manager) Status(id string) mcpconfig.ServerStatus {
@@ -551,26 +501,12 @@ func (m *Manager) connect(ctx context.Context, server mcpconfig.Server, handler 
 	if err != nil {
 		return nil, err
 	}
-	list, err := session.ListTools(ctx, nil)
+	connection := &serverConnection{session: session}
+	ss, err := connection.listTools(ctx, server)
 	if err != nil {
-		_ = session.Close()
-		return nil, err
+		connection.close()
 	}
-	ss := &serverSession{session: session}
-	for _, tool := range list.Tools {
-		if tool == nil || strings.TrimSpace(tool.Name) == "" {
-			continue
-		}
-		rt := remoteTool{
-			serverName:  server.Name,
-			remoteName:  tool.Name,
-			session:     session,
-			description: toolDescription(server, tool),
-			inputSchema: inputSchema(tool.InputSchema),
-		}
-		ss.tools = append(ss.tools, rt)
-	}
-	return ss, nil
+	return ss, err
 }
 
 func (m *Manager) localServer(id string) *mcpsdk.Server {
@@ -598,28 +534,12 @@ func (m *Manager) connectLocal(ctx context.Context, server mcpconfig.Server, loc
 		_ = localSession.Close()
 		return nil, err
 	}
-	list, err := session.ListTools(ctx, nil)
+	connection := &serverConnection{session: session, localSession: localSession}
+	ss, err := connection.listTools(ctx, server)
 	if err != nil {
-		_ = session.Close()
-		_ = localSession.Close()
-		return nil, err
+		connection.close()
 	}
-	ss := &serverSession{session: session, localSession: localSession}
-	for _, tool := range list.Tools {
-		if tool == nil || strings.TrimSpace(tool.Name) == "" {
-			continue
-		}
-		rt := remoteTool{
-			serverName:  server.Name,
-			remoteName:  tool.Name,
-			session:     session,
-			local:       true,
-			description: toolDescription(server, tool),
-			inputSchema: inputSchema(tool.InputSchema),
-		}
-		ss.tools = append(ss.tools, rt)
-	}
-	return ss, nil
+	return ss, err
 }
 
 type headerTransport struct {
@@ -647,7 +567,7 @@ func (t remoteTool) Definition() tools.Definition {
 }
 
 func (t remoteTool) Execute(ctx context.Context, inputs map[string]any) (tools.Result, error) {
-	res, err := t.session.CallTool(ctx, &mcpsdk.CallToolParams{
+	res, err := t.connection.callTool(ctx, &mcpsdk.CallToolParams{
 		Name:      t.remoteName,
 		Arguments: inputs,
 	})
@@ -684,7 +604,7 @@ func (t remoteTool) callRaw(ctx context.Context, req *mcpsdk.CallToolRequest) (*
 	if req != nil && req.Params != nil && len(req.Params.Arguments) > 0 {
 		arguments = json.RawMessage(req.Params.Arguments)
 	}
-	return t.session.CallTool(ctx, &mcpsdk.CallToolParams{
+	return t.connection.callTool(ctx, &mcpsdk.CallToolParams{
 		Name:      t.remoteName,
 		Arguments: arguments,
 	})

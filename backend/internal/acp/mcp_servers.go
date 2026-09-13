@@ -13,6 +13,13 @@ import (
 
 const jaztoolsSurfaceQueryParam = "jaztools_surface"
 
+type httpMCPServer struct {
+	Type    string             `json:"type"`
+	Name    string             `json:"name"`
+	URL     string             `json:"url"`
+	Headers []mcpconfig.Header `json:"headers"`
+}
+
 func (m *Manager) mcpServersForAgent(ctx context.Context, initRaw json.RawMessage, policy string) []json.RawMessage {
 	var init struct {
 		AgentCapabilities acpschema.AgentCapabilities `json:"agentCapabilities"`
@@ -58,12 +65,7 @@ func enabledHTTPMCPServers(ctx context.Context, store mcpconfig.ServerReader, po
 			// codex-acp's schema requires an array; null fails session/new.
 			headers = []mcpconfig.Header{}
 		}
-		payload := struct {
-			Type    string             `json:"type"`
-			Name    string             `json:"name"`
-			URL     string             `json:"url"`
-			Headers []mcpconfig.Header `json:"headers"`
-		}{
+		payload := httpMCPServer{
 			Type:    "http",
 			Name:    server.Name,
 			URL:     mcpServerURL(policy, server),

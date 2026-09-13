@@ -1,5 +1,20 @@
 import { expect, test } from 'bun:test'
 import { deriveSessionView } from '@/components/session/sessionView'
+import { findActiveTrigger } from '@/components/session/composerTokens'
+
+test('native commands autocomplete only at the start and retain ordinary arguments', () => {
+  expect(findActiveTrigger('/comp', 5)).toEqual({ trigger: '/', start: 0, query: 'comp' })
+  expect(findActiveTrigger('/compact preserve context', 25)).toBeNull()
+  expect(findActiveTrigger('see /tmp', 8)).toBeNull()
+})
+
+test('native controls survive history pagination and clear when the provider withdraws them', () => {
+  const state = { config_options: [{ id: 'fast-mode', current_value: 'on' }], commands: [{ name: 'compact' }] }
+  const overview = { agent_events: [event(2, 'agent_session', { agent_session: state })] }
+  expect(deriveSessionView(data(), [], overview).agentSession).toEqual(state)
+  const cleared = { config_options: [], commands: [] }
+  expect(deriveSessionView(data(), [event(3, 'agent_session', { agent_session: cleared })], overview).agentSession).toEqual(cleared)
+})
 
 const at = (seconds) => new Date(seconds * 1000).toISOString()
 const event = (seq, type, fields = {}) => ({

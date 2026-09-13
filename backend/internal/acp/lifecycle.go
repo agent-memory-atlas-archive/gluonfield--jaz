@@ -9,13 +9,16 @@ import (
 )
 
 type agentProcess struct {
-	conn      jsonrpc.MessageConn
-	peer      *jsonrpc.Peer
-	cancel    context.CancelFunc
-	closed    <-chan struct{}
-	stderr    *processStderrTail
-	serveErr  error
-	serveDone chan struct{}
+	mcpPolicy   string
+	mcpRefresh  string
+	mcpRevision uint64
+	conn        jsonrpc.MessageConn
+	peer        *jsonrpc.Peer
+	cancel      context.CancelFunc
+	closed      <-chan struct{}
+	stderr      *processStderrTail
+	serveErr    error
+	serveDone   chan struct{}
 }
 
 func newAgentProcess(ac *agentConn) *agentProcess {

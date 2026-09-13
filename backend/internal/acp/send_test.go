@@ -14,6 +14,14 @@ import (
 
 type rejectingMessageStore struct{ Store }
 
+func TestSteerBeforeAgentStartsIsUnsupported(t *testing.T) {
+	manager := &Manager{}
+	_, err := manager.Steer(context.Background(), SteerRequest{Session: "starting", Message: "follow-up"})
+	if !errors.Is(err, ErrSteeringUnsupported) {
+		t.Fatalf("steer without an active agent = %v", err)
+	}
+}
+
 func (s rejectingMessageStore) AppendMessages(string, ...provider.Message) error {
 	return errors.New("message persistence failed")
 }

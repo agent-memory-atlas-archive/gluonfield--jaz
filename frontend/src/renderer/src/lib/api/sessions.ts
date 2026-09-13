@@ -51,6 +51,10 @@ export function getSession(id: string, signal?: AbortSignal): Promise<Session> {
   return get<Session>(`/v1/sessions/${id}`, { signal })
 }
 
+export function setSessionAgentConfig(sessionId: string, id: string, value: string): Promise<void> {
+  return put<void>(`/v1/sessions/${sessionId}/agent/config`, { id, value })
+}
+
 export const sessionQuery = (id: string) =>
   queryOptions({
     queryKey: keys.session(id),

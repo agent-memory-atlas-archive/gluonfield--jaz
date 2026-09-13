@@ -4,7 +4,7 @@ import { type ClipboardEvent, type ReactNode, useCallback, useEffect, useRef, us
 import { FileDropOverlay, useFileDropTarget } from '@/components/ui/FileDrop'
 import { IconButton } from '@/components/ui/IconButton'
 import { composerPasteFiles } from '@/components/session/composerPasteFiles'
-import type { Attachment, QueuedMessage } from '@/lib/api/types'
+import type { AgentSessionCommand, Attachment, QueuedMessage } from '@/lib/api/types'
 import type { ComposerContext, SendMessageHandler } from '@/lib/sendMessage'
 import { Popover } from '@/components/ui/Popover'
 import { RAINBOW_BEAM } from '@/components/ui/rainbow'
@@ -74,7 +74,7 @@ export function ComposerCard({
   goalControlVisible = false,
   goalAvailable = false,
   goalEngaged = false,
-  queueWhenStreaming = false,
+  sendWhileStreaming = false,
   draftStorageKey,
   draftStorage = 'session',
   clearTiming = 'resolved',
@@ -83,6 +83,9 @@ export function ComposerCard({
   attachmentSessionId,
   contexts = [],
   onSend,
+  onQueuePrompt,
+  commands,
+  optionsSlot,
   onStop,
   onClearGoal,
   onVoice,
@@ -101,7 +104,7 @@ export function ComposerCard({
   goalControlVisible?: boolean
   goalAvailable?: boolean
   goalEngaged?: boolean
-  queueWhenStreaming?: boolean
+  sendWhileStreaming?: boolean
   draftStorageKey?: string
   draftStorage?: ComposerDraftStorage
   clearTiming?: 'immediate' | 'resolved' | 'never'
@@ -114,6 +117,9 @@ export function ComposerCard({
   /** text selections and browser annotations attached to the next message */
   contexts?: ComposerContext[]
   onSend: SendMessageHandler
+  onQueuePrompt?: SendMessageHandler
+  commands?: AgentSessionCommand[]
+  optionsSlot?: ReactNode
   onStop?: () => void
   /** stops the goal auto-continuation loop server-side */
   onClearGoal?: () => void
@@ -144,6 +150,7 @@ export function ComposerCard({
   const goalModeOn = goalAvailable && (goalRequested || goalEngaged)
   const showGoalChip = goalModeOn
   const mention = useMentionInput({
+    commands,
     fileRoot,
     disabled,
     storageKey: draftStorageKey,
@@ -156,16 +163,16 @@ export function ComposerCard({
     disabled,
     onUploadAttachment,
   })
-  const canQueueWhileStreaming = streaming && queueWhenStreaming
+  const canSendWhileStreaming = streaming && sendWhileStreaming
   const attachmentBusy = attachmentDraft.busy
   const hasNonTextDraftContent =
     attachmentDraft.files.length > 0 || attachmentDraft.uploaded.length > 0 || contexts.length > 0
   const hasSendableDraft = (messageEmpty: boolean) => !messageEmpty || hasNonTextDraftContent
   const hasDraftContent = hasSendableDraft(mention.isEmpty)
   const showVoiceButton = !hasDraftContent && Boolean(onVoice)
-  const actionLabel = showVoiceButton ? 'Voice mode' : streaming ? 'Queue message' : 'Send message'
-  const submitDisabled = !hasDraftContent || disabled || attachmentBusy || (streaming && !canQueueWhileStreaming)
-  const showStopButton = !voiceActive && streaming && onStop && (!queueWhenStreaming || !hasDraftContent)
+  const actionLabel = showVoiceButton ? 'Voice mode' : 'Send message'
+  const submitDisabled = !hasDraftContent || disabled || attachmentBusy || (streaming && !canSendWhileStreaming)
+  const showStopButton = !voiceActive && streaming && onStop && (!sendWhileStreaming || !hasDraftContent)
   const dictation = useDictation({
     identity: `${draftStorage}:${draftStorageKey ?? ''}`,
     disabled: disabled || voiceActive,
@@ -289,7 +296,7 @@ export function ComposerCard({
     }
   }
 
-  const submit = async (value = mention.value()) => {
+  const submit = async (value = mention.value(), handler = onSend) => {
     // Tokens expand on the way out: tagged paths become absolute, skill
     // references pass through for the agent's skill catalog to resolve.
     const trimmed = value.trim()
@@ -297,12 +304,12 @@ export function ComposerCard({
       !hasSendableDraft(trimmed === '') ||
       disabled ||
       attachmentBusy ||
-      (streaming && !canQueueWhileStreaming)
+      (streaming && !canSendWhileStreaming)
     ) {
       return
     }
     const send = () =>
-      onSend(trimmed, {
+      handler(trimmed, {
         planRequested: planModeOn,
         goalRequested: goalModeOn,
         files: attachmentDraft.files,
@@ -412,6 +419,13 @@ export function ComposerCard({
             readOnly={dictation.phase !== null}
             autoFocus={autoFocus}
             onKeyDown={(e) => {
+              if (
+                e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey &&
+                streaming && onQueuePrompt && hasDraftContent && !dictation.phase
+              ) {
+                e.preventDefault()
+                void submit(mention.value(), onQueuePrompt)
+              }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
                 if (dictation.phase) {
@@ -485,6 +499,7 @@ export function ComposerCard({
                     <GoalUnsupportedRow />
                   )
                 ) : null}
+                {optionsSlot}
               </Popover>
               {leftSlot}
               <AnimatePresence initial={false}>
@@ -547,6 +562,18 @@ export function ComposerCard({
                 </IconButton>
               ) : null}
               {voiceControls}
+              {streaming && onQueuePrompt && hasDraftContent && !voiceActive ? (
+                <button
+                  type="button"
+                  title="Queue message (Tab)"
+                  aria-label="Queue message"
+                  disabled={submitDisabled}
+                  onClick={() => void submit(mention.value(), onQueuePrompt)}
+                  className="h-10 rounded-full px-2 text-[13px] text-ink-2 transition-colors hover:bg-surface-2 disabled:opacity-50"
+                >
+                  Queue
+                </button>
+              ) : null}
               {showStopButton ? (
                 <IconButton
                   variant="primary"
@@ -575,7 +602,7 @@ export function ComposerCard({
           </div>
           {dictation.phase ? (
             <div className="absolute inset-x-0 bottom-0">
-              <DictationControls dictation={dictation} canSend={!disabled && !attachmentBusy && (!streaming || canQueueWhileStreaming)} queue={streaming} />
+              <DictationControls dictation={dictation} canSend={!disabled && !attachmentBusy && (!streaming || canSendWhileStreaming)} queue={false} />
             </div>
           ) : null}
         </div>
@@ -600,6 +627,9 @@ export function Composer({
   attachmentSessionId,
   contexts,
   onSend,
+  onQueuePrompt,
+  commands,
+  optionsSlot,
   onStop,
   onClearGoal,
   onVoice,
@@ -628,6 +658,9 @@ export function Composer({
   attachmentSessionId?: string
   contexts?: ComposerContext[]
   onSend: SendMessageHandler
+  onQueuePrompt?: SendMessageHandler
+  commands?: AgentSessionCommand[]
+  optionsSlot?: ReactNode
   onStop: () => void
   onClearGoal?: () => void
   onVoice?: () => void
@@ -667,7 +700,7 @@ export function Composer({
         goalControlVisible={goalControlVisible}
         goalAvailable={goalAvailable}
         goalEngaged={goalEngaged}
-        queueWhenStreaming
+        sendWhileStreaming
         clearTiming="immediate"
         draftStorageKey={draftStorageKey}
         draftStorage="local"
@@ -675,6 +708,9 @@ export function Composer({
         attachmentSessionId={attachmentSessionId}
         contexts={contexts}
         onSend={onSend}
+        onQueuePrompt={onQueuePrompt}
+        commands={commands}
+        optionsSlot={optionsSlot}
         onStop={onStop}
         onClearGoal={onClearGoal}
         onVoice={onVoice}

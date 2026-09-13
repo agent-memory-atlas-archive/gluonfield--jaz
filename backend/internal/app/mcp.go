@@ -16,34 +16,16 @@ import (
 )
 
 type acpMCPServerReader struct {
-	base        mcpconfig.ServerReader
 	proxyURL    string
 	jaztoolsURL string
 }
 
 func (r acpMCPServerReader) ListMCPServers() ([]mcpconfig.Server, error) {
-	servers, err := r.base.ListMCPServers()
-	if err != nil {
-		return nil, err
-	}
-	out := []mcpconfig.Server{}
-	if hasEnabledUserMCPServer(servers) && r.proxyURL != "" {
-		out = append(out, mcpruntime.ProxyServerConfig(r.proxyURL))
-	}
-	return append(out, jaztools.ServerConfig(r.jaztoolsURL)), nil
+	return []mcpconfig.Server{mcpruntime.ProxyServerConfig(r.proxyURL), jaztools.ServerConfig(r.jaztoolsURL)}, nil
 }
 
-func hasEnabledUserMCPServer(servers []mcpconfig.Server) bool {
-	for _, server := range servers {
-		if server.Enabled {
-			return true
-		}
-	}
-	return false
-}
-
-func NewACPMCPServerReader(store *sqlitestore.Store, catalog *connections.Catalog, jaz *jaztools.Service, urls serverconfig.URLs) mcpconfig.ServerReader {
-	return acpMCPServerReader{base: connectionMCPServerReader{store: store, catalog: catalog}, proxyURL: urls.MCPProxy, jaztoolsURL: jaz.URL()}
+func NewACPMCPServerReader(jaz *jaztools.Service, urls serverconfig.URLs) mcpconfig.ServerReader {
+	return acpMCPServerReader{proxyURL: urls.MCPProxy, jaztoolsURL: jaz.URL()}
 }
 
 func NewMCPManager(store *sqlitestore.Store, catalog *connections.Catalog, registry *tools.Registry, jaz *jaztools.Service, logger *log.Logger) *mcpruntime.Manager {

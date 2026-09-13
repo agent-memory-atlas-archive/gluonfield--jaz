@@ -52,7 +52,7 @@ export function useLiveSessionSend({
       const attachments = files.length
         ? await Promise.all(files.map((file) => uploadSessionAttachment(sessionId, file, controller.signal)))
         : []
-      if (attachments.length) {
+      if (attachments.length && abortRef.current === controller) {
         setLive((prev) =>
           prev ? { ...prev, attachments: [...draftAttachments, ...contextAttachments, ...attachments] } : prev,
         )
@@ -67,6 +67,7 @@ export function useLiveSessionSend({
         goalRequested: options.goalRequested,
         signal: controller.signal,
         onEvent: (event) => {
+          if (abortRef.current !== controller) return
           setLive((prev) => (prev ? mergeLiveStreamEvent(prev, event) : prev))
         },
       })
@@ -75,23 +76,20 @@ export function useLiveSessionSend({
     void started
       .then((stream) => stream.finished)
       .catch((err: Error) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || abortRef.current !== controller) return
         onCriticalError(err.message || 'Something went wrong.')
         setLive((prev) =>
           prev ? { ...prev, attachments: finishLiveAttachments(prev.attachments), error: err.message } : prev,
         )
       })
       .finally(async () => {
-        const current = abortRef.current === controller
-        if (current) {
-          setStreaming(false)
-          abortRef.current = null
-        }
         await queryClient.refetchQueries({ queryKey: keys.sessionMessages(sessionId) })
         queryClient.invalidateQueries({ queryKey: keys.sidebarSessions })
         queryClient.invalidateQueries({ queryKey: keys.usage })
         queryClient.invalidateQueries({ queryKey: keys.sessionRepo(sessionId) })
-        if (current) {
+        if (abortRef.current === controller) {
+          setStreaming(false)
+          abortRef.current = null
           setLive((prev) => (prev?.error ? prev : null))
         }
       })

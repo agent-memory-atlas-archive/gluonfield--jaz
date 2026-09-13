@@ -320,7 +320,11 @@ export function deriveSessionView(
   const sideChatEvents = coalesceSessionEvents(
     [...persistedEvents, ...liveEvents].filter((event) => sessionEventPlacement(event) === 'side_chat'),
   )
+  const agentSession = coalesceSessionEvents([
+    ...(overview?.agent_events ?? []), ...persistedEvents, ...liveEvents,
+  ]).findLast((event) => event.session_id === session.id && event.agent_session)?.agent_session
   return {
+    agentSession,
     transcriptEvents: settledTranscriptEvents,
     sideChatEvents,
     displayEvents,
