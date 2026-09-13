@@ -1,6 +1,6 @@
 import { type HTMLMotionProps, motion } from 'motion/react'
 
-type Variant = 'ghost' | 'primary' | 'danger'
+type Variant = 'ghost' | 'inverse' | 'primary' | 'danger'
 type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 // Heights mirror the text Button scale (sm h-7 / md h-8 / lg h-9) so icon and
@@ -14,6 +14,7 @@ const sizes: Record<Size, string> = {
 
 const variants: Record<Variant, string> = {
   ghost: 'text-ink-3 hover:bg-surface-2 hover:text-ink disabled:opacity-50',
+  inverse: 'text-white/80 hover:bg-white/15 hover:text-white disabled:opacity-50',
   primary:
     'bg-primary text-on-primary shadow-sm hover:bg-primary-strong disabled:bg-surface-2 disabled:text-ink-3 disabled:shadow-none',
   danger: 'text-ink-3 hover:bg-danger-soft hover:text-danger disabled:opacity-50',

@@ -13,8 +13,6 @@ export type VoiceOverlayState = VoiceStatus & {
   docked: boolean
   level: number
   outputLevel: number
-  dark: boolean
-  reducedMotion: boolean
 }
 
 export type VoiceCommand = 'mute' | 'muteSpeaker' | 'exit' | 'reconnect' | 'return'

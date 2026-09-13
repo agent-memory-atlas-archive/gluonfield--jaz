@@ -16,12 +16,12 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     }
     if (!overlay) {
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+      const size = { width: 128, height: 160 }
       overlay = new BrowserWindow({
         title: 'Jaz Voice',
-        width: 220,
-        height: 276,
-        x: workArea.x + workArea.width - 240,
-        y: workArea.y + workArea.height - 296,
+        ...size,
+        x: workArea.x + workArea.width - size.width - 20,
+        y: workArea.y + workArea.height - size.height - 20,
         show: false,
         frame: false,
         transparent: true,

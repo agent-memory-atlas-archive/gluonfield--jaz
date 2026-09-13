@@ -1,16 +1,16 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
-import { VoiceControls, VoiceMode } from '@/components/session/VoiceMode'
+import { VoiceControls } from '@/components/session/VoiceMode'
+import { VoiceVisualizer } from '@/components/session/VoiceVisualizer'
 import type { VoiceHandle } from '@/lib/voice/session'
 import { useGlobalVoice } from '@/lib/voice/VoiceProvider'
 import { clientRuntime } from '@/lib/clientRuntime'
 import { useRef, useState } from 'react'
 
-export function FloatingVoice({ voice, onReturn, level, outputLevel, reducedMotion }: {
+export function FloatingVoice({ voice, onReturn, level, outputLevel }: {
   voice: VoiceHandle
   onReturn: () => void
   level?: number
   outputLevel?: number
-  reducedMotion?: boolean
 }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const gesture = useRef<{ x: number; y: number; moved: boolean; origin: typeof offset } | null>(null)
@@ -19,12 +19,12 @@ export function FloatingVoice({ voice, onReturn, level, outputLevel, reducedMoti
     gesture.current = null
   }
   return (
-    <div style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }} aria-label="Floating voice conversation" className="flex w-[196px] flex-col items-center rounded-[28px] bg-bg/95 px-4 pt-2 pb-4 text-ink shadow-[0_6px_30px_rgba(0,0,0,0.14)]">
+    <div style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }} aria-label="Floating voice conversation" className="flex flex-col items-center gap-1">
       <button
         type="button"
         aria-label="Return to voice chat"
-        title="Open voice chat · Drag to move"
-        className="touch-none cursor-grab active:cursor-grabbing [-webkit-app-region:no-drag]"
+        title={voice.error || 'Open voice chat · Drag to move'}
+        className="touch-none cursor-grab drop-shadow-[0_6px_14px_rgba(0,0,0,0.28)] active:cursor-grabbing [-webkit-app-region:no-drag]"
         onPointerDown={(event) => {
           if (event.button !== 0) {
             return
@@ -65,11 +65,9 @@ export function FloatingVoice({ voice, onReturn, level, outputLevel, reducedMoti
           }
         }}
       >
-        <VoiceMode voice={voice} size={128} level={level} outputLevel={outputLevel} compact reducedMotion={reducedMotion} />
+        <VoiceVisualizer voice={voice} size={96} level={level} outputLevel={outputLevel} />
       </button>
-      <div className="flex items-center gap-3">
-        <VoiceControls voice={voice} floating />
-      </div>
+      <VoiceControls voice={voice} floating />
     </div>
   )
 }
