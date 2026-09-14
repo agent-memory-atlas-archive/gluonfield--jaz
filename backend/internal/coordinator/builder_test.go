@@ -205,7 +205,7 @@ func TestBuilderBrowserPromptFollowsSetting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(prompt, "## Browser tools\n\nUse Jaztools browser tools only") {
+	if !strings.Contains(prompt, "## Browser tools\n\nJaz has an integrated browser") {
 		t.Fatalf("enabled browser prompt missing from system prompt:\n%s", prompt)
 	}
 }

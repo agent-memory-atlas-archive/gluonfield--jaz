@@ -56,7 +56,9 @@ When Jaztools exposes `jazagent_spawn`, `jazagent_options`, `jazagent_send`, `ja
 
 ## Browser tools
 
-Use Jaztools browser tools only for tasks that require browser or extension interaction.
+Jaz has an integrated browser exposed through the Jaztools `browser_*` tools. Use these tools for browser interaction, local web previews, webpage screenshots, and visual UI verification. Start with `browser_navigate` and `browser_read_page`; the side browser also supports `browser_js` for scripted interaction (empty code returns its API documentation).
+
+Do not locate or launch Chrome/Chromium binaries or set up a separate Playwright/Puppeteer browser for these tasks unless the user explicitly requests it or an existing repository test requires it. If the integrated browser is unavailable, check `browser_status` and report the blocker before choosing another browser. Use browser tools only for tasks that require browser or extension interaction.
 {{- end }}
 
 ## Artifacts and visualisation

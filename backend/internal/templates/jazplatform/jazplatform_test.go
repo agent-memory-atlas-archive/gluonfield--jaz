@@ -85,7 +85,11 @@ func TestRenderNamesEverySurfaceExplicitly(t *testing.T) {
 		"## Jaz agent sessions",
 		"one of: `codex`, `claude`",
 		"## Browser tools",
-		"Use Jaztools browser tools only for tasks that require browser or extension interaction.",
+		"Jaz has an integrated browser exposed through the Jaztools `browser_*` tools.",
+		"Start with `browser_navigate` and `browser_read_page`",
+		"Do not locate or launch Chrome/Chromium binaries",
+		"unless the user explicitly requests it or an existing repository test requires it",
+		"check `browser_status` and report the blocker",
 		"## Artifacts and visualisation",
 		"Artifact usage criteria:",
 		"Always call `visualise_read_me` before the first artifact",
@@ -170,7 +174,7 @@ func TestRenderOmitsBrowserPolicyWhenDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, reject := range []string{"## Browser tools", "Jaztools browser tools", "browser or extension interaction"} {
+	for _, reject := range []string{"## Browser tools", "Jaz has an integrated browser", "`browser_*`", "browser or extension interaction"} {
 		if strings.Contains(prompt, reject) {
 			t.Fatalf("disabled browser tools must omit %q:\n%s", reject, prompt)
 		}

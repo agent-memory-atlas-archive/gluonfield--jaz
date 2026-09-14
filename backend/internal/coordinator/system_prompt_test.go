@@ -46,7 +46,7 @@ func TestSystemPromptEndToEnd(t *testing.T) {
 		"## Jaz agent sessions",
 		"one of: `codex`, `claude`",
 		"## Browser tools",
-		"Use Jaztools browser tools only for tasks that require browser or extension interaction.",
+		"Jaz has an integrated browser exposed through the Jaztools `browser_*` tools.",
 		"## Artifacts and visualisation",
 		"Few-shot trace:",
 		"## memory",
