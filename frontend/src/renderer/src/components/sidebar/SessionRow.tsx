@@ -33,6 +33,18 @@ function isCoarsePointer() {
   return window.matchMedia?.('(pointer: coarse)').matches === true
 }
 
+// Running, failed and unread are the same kind of fact, so they share the
+// trailing dot column rather than sitting on opposite sides of the row. Unread
+// follows the Feed: a finished turn nobody has opened yet.
+function stateDot(session: Session): { title: string; className: string } | null {
+  if (session.status === 'running') return { title: 'Running', className: 'animate-pulse bg-running' }
+  if (session.status === 'error') {
+    return { title: session.error ? `Failed: ${session.error}` : 'Failed', className: 'bg-danger' }
+  }
+  if (session.status === 'idle' && session.unread) return { title: 'Unread reply', className: 'bg-primary' }
+  return null
+}
+
 export function SessionRow({
   session,
   child = false,
@@ -50,9 +62,7 @@ export function SessionRow({
 }) {
   const shortcut = shortcutMode && shortcutIndex ? shortcutIndex : undefined
   const title = sessionLabel(session)
-  // Running and failed are the same kind of fact, so they share the trailing
-  // state column rather than sitting on opposite sides of the row.
-  const state = session.status === 'running' || session.status === 'error' ? session.status : null
+  const state = stateDot(session)
   const [rename, setRename] = useState<null | 'inline' | 'modal'>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const menuTriggers = useContextMenuTrigger(setMenu)
@@ -99,14 +109,7 @@ export function SessionRow({
                 shortcutMode ? '' : 'group-hover:hidden'
               }`}
             >
-              <span
-                title={
-                  state === 'running' ? 'Running' : session.error ? `Failed: ${session.error}` : 'Failed'
-                }
-                className={`size-1.5 shrink-0 rounded-full ${
-                  state === 'running' ? 'animate-pulse bg-running' : 'bg-danger'
-                }`}
-              />
+              <span title={state.title} className={`size-1.5 shrink-0 rounded-full ${state.className}`} />
             </span>
           ) : null}
           {shortcutMode || inlineEditing ? null : (

@@ -50,6 +50,7 @@ import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
 import { useSessionQueue } from '@/lib/hooks/useSessionQueue'
 import { useVoiceMode } from '@/lib/hooks/useVoiceMode'
 import { VoiceMode, VoiceControls } from '@/components/session/VoiceMode'
+import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { keys } from '@/lib/query/keys'
 import { type PlanApprovalAction } from '@/lib/taskSurface'
 import { preparedSendMessage, type SendMessageOptions } from '@/lib/sendMessage'
@@ -384,7 +385,7 @@ function SessionPage({
   useEffect(() => {
     if (seenRequestedRef.current) return
     seenRequestedRef.current = true
-    void markThreadSeen(sessionId).finally(() => queryClient.invalidateQueries({ queryKey: keys.feed }))
+    void markThreadSeen(sessionId).finally(() => invalidateSessionLists(queryClient))
   }, [sessionId, queryClient])
 
   // A deep link jumps once. Without this the effect re-fires on every streamed

@@ -69,7 +69,7 @@ export function FeedCard({
   const done = useMutation({
     mutationFn: () => markThreadSeen(item.id),
     onMutate: removeFromFeed,
-    onSettled: () => queryClient.invalidateQueries({ queryKey: keys.feed }),
+    onSettled: () => invalidateSessionLists(queryClient),
   })
 
   const archive = useMutation({

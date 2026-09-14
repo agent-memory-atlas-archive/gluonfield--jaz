@@ -67,6 +67,9 @@ export interface Session {
   error?: string
   archived?: boolean
   pinned?: boolean
+  // Set when a turn completes, cleared by the /seen action; the Feed lists the
+  // idle threads carrying it.
+  unread?: boolean
   runtime: 'acp'
   runtime_ref?: RuntimeRef
   model_provider?: string
