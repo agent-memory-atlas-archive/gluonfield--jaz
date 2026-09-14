@@ -10,7 +10,6 @@ import (
 
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/httpapi"
-	"github.com/wins/jaz/backend/internal/sessioncontext"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/sessionview"
 	"github.com/wins/jaz/backend/internal/storage"
@@ -79,22 +78,12 @@ func (h *MessagesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := view.Page
-	events := page.Events
-	children := view.Children
-	if sessioncontext.ClientPlatform(r.Context()) == "mobile" {
-		events = mobileEvents(events)
-		children = mobileJobs(children)
-		if view.Snapshot != nil {
-			snapshot := mobileJob(*view.Snapshot)
-			view.Snapshot = &snapshot
-		}
-	}
 	response := messagesResponse{
 		Session: sessionview.Public(view.Session), Messages: sessionview.Messages(page.Messages),
-		Events: sessionview.Events(events), HasEarlier: page.HasEarlier,
+		Events: sessionview.Events(page.Events), HasEarlier: page.HasEarlier,
 		BeforeMessageSeq: page.BeforeMessageSeq, BeforeEventSeq: page.BeforeEventSeq,
 		HistoryRevision: page.HistoryRevision, LatestEventSeq: page.LatestEventSeq,
-		ACPMeta: view.Meta, ACPChildren: children, ChildPermissions: view.ChildPermissions,
+		ACPMeta: view.Meta, ACPChildren: view.Children, ChildPermissions: view.ChildPermissions,
 	}
 	if view.Snapshot != nil {
 		response.acpStateResponse = stateResponse(*view.Snapshot)

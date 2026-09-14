@@ -194,64 +194,6 @@ func TestStreamSessionEventsResumesFromLastEventID(t *testing.T) {
 	}
 }
 
-func TestStreamSessionEventsMobileProjectsToolPayload(t *testing.T) {
-	store, err := jsonstore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	session, err := store.CreateSession(storage.CreateSession{Slug: "mobile-events", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
-	heavyCall := sessionevents.ACPToolCall{
-		ID:       "tool-1",
-		Title:    "rg release",
-		Status:   "completed",
-		Kind:     "terminal",
-		ToolName: "shell",
-		Content: []sessionevents.ACPToolContent{{
-			Type: "text",
-			Text: "very large replayed tool result",
-		}},
-		RawInput: map[string]any{
-			"cmd": "expensive replayed command input",
-		},
-		Runtime: sessionevents.ACPToolRuntime{ElapsedTimeSeconds: 12.5},
-	}
-	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{
-		Type: "acp_tool",
-		ACP: &sessionevents.ACPEvent{
-			ID:        session.ID,
-			Slug:      session.Slug,
-			Agent:     "codex",
-			SessionID: "acp-session",
-			State:     acp.StateIdle,
-			ToolCalls: []sessionevents.ACPToolCall{heavyCall},
-		},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	srv := &Server{Store: store, Events: sessionevents.New()}
-	res := streamSessionEventsForTest(t, srv, session.ID, "/v1/sessions/"+session.ID+"/events", "", "mobile")
-	body := res.Body.String()
-
-	for _, forbidden := range []string{
-		"very large replayed tool result",
-		"expensive replayed command input",
-		`"kind":"terminal"`,
-		`"tool_name":"shell"`,
-		`"elapsed_time_seconds"`,
-	} {
-		if strings.Contains(body, forbidden) {
-			t.Fatalf("mobile SSE contains stripped payload %q: %s", forbidden, body)
-		}
-	}
-	if !strings.Contains(body, `"id":"tool-1"`) || !strings.Contains(body, `"title":"rg release"`) {
-		t.Fatalf("mobile SSE missing tool summary: %s", body)
-	}
-}
-
 func TestStreamSessionEventsClearsRequestedGoalSnapshots(t *testing.T) {
 	store, err := jsonstore.New(t.TempDir())
 	if err != nil {

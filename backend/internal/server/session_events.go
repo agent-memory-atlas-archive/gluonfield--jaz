@@ -17,7 +17,6 @@ func (s *Server) streamSessionEvents(w http.ResponseWriter, r *http.Request, ses
 		writeError(w, http.StatusInternalServerError, fmt.Errorf("session events are not configured"))
 		return
 	}
-	mobile := requestClientPlatform(r) == "mobile"
 	afterSeq, err := sessionEventsAfterSeq(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -79,9 +78,6 @@ func (s *Server) streamSessionEvents(w http.ResponseWriter, r *http.Request, ses
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 	for _, event := range replay {
-		if mobile {
-			event = mobileSessionEvent(event)
-		}
 		writeSessionEventSSE(w, flusher, event)
 	}
 	for event := range events {
@@ -97,9 +93,6 @@ func (s *Server) streamSessionEvents(w http.ResponseWriter, r *http.Request, ses
 			continue
 		}
 		event = sessionevents.EnsureStatelessProjection(event)
-		if mobile {
-			event = mobileSessionEvent(event)
-		}
 		writeSessionEventSSE(w, flusher, event)
 	}
 }
