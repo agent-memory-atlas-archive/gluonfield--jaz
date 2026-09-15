@@ -32,6 +32,7 @@ import { useThreadAutoScroll } from '@/components/session/useThreadAutoScroll'
 import { liveOptimisticUserMessage } from '@/components/session/liveTranscript'
 import { useLiveSessionSend } from '@/components/session/useLiveSessionSend'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Button } from '@/components/ui/Button'
 import { FileDropScope } from '@/components/ui/FileDrop'
 import { useToast } from '@/components/ui/toast'
 import { markThreadSeen } from '@/lib/api/feed'
@@ -411,10 +412,16 @@ function SessionPage({
     return <PendingSessionHistory sessionId={sessionId} initialPrompt={initialPrompt} />
   }
 
-  if (detail.isError) {
+  if (detail.isError && !detail.data) {
     return (
       <EmptyState title="Couldn't load this session">
-        <p>{detail.error.message}</p>
+        <Button
+          className="mt-2 min-h-10"
+          variant="primary"
+          onClick={() => void detail.refetch()}
+        >
+          Retry
+        </Button>
       </EmptyState>
     )
   }
