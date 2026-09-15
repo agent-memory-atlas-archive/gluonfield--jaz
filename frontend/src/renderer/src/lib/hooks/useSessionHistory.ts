@@ -27,6 +27,8 @@ export function useSessionHistory(sessionId: string, onLoadError: (message: stri
   const [loadingEarlierHistory, setLoadingEarlierHistory] = useState(false)
   const query = useQuery<SessionMessages>({
     queryKey: keys.sessionMessages(sessionId),
+    retry: (failureCount, error) =>
+      (error instanceof ApiError && error.status === 409) || failureCount < 1,
     queryFn: async ({ signal }) => {
       const latest = await getSessionMessagesPage(sessionId, {}, signal)
       const complete = await fetchCompleteHistoryBatch(sessionId, latest, signal)
