@@ -52,7 +52,14 @@ func TestCreateDirectoryRejectsInvalidPaths(t *testing.T) {
 			}
 			res := httptest.NewRecorder()
 			CreateDirectory(res, httptest.NewRequest(http.MethodPost, "/v1/filesystem/dirs", strings.NewReader(string(body))))
-			if res.Code != http.StatusBadRequest {
+			want := http.StatusBadRequest
+			if strings.HasPrefix(name, "file") {
+				want = http.StatusConflict
+				if !strings.Contains(res.Body.String(), "A file already exists along this path.") {
+					t.Fatalf("unexpected conflict message: %s", res.Body.String())
+				}
+			}
+			if res.Code != want {
 				t.Fatalf("status = %d: %s", res.Code, res.Body.String())
 			}
 		})
