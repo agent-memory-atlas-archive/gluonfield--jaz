@@ -13,56 +13,66 @@ import (
 )
 
 func TestNativeCodexUsageAcrossActivities(t *testing.T) {
-	raw, err := os.ReadFile("testdata/codex-usage-0.153.4.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var fixture struct {
-		Prompts []struct {
-			Updates  []json.RawMessage `json:"updates"`
-			Response json.RawMessage   `json:"response"`
-		} `json:"prompts"`
-	}
-	if err := json.Unmarshal(raw, &fixture); err != nil {
-		t.Fatal(err)
-	}
-	for _, source := range []string{"", storage.SourceMemorySearch, storage.SourceMemorySource, storage.SourceLoopRun} {
-		t.Run(source, func(t *testing.T) {
-			store, err := sqlitestore.New(t.TempDir())
+	for _, tc := range []struct {
+		version                                  string
+		input, cached, output, total, uncachedIO int64
+	}{
+		{"0.153.4", 68_962, 58_368, 169, 69_131, 10_763},
+		{"0.154.0", 89_828, 52_224, 143, 89_971, 37_747},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			raw, err := os.ReadFile("testdata/codex-usage-" + tc.version + ".json")
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer store.Close()
-			session, err := store.CreateSession(storage.CreateSession{Slug: "native-usage", Runtime: storage.RuntimeACP, SourceType: source})
-			if err != nil {
+			var fixture struct {
+				Prompts []struct {
+					Updates  []json.RawMessage `json:"updates"`
+					Response json.RawMessage   `json:"response"`
+				} `json:"prompts"`
+			}
+			if err := json.Unmarshal(raw, &fixture); err != nil {
 				t.Fatal(err)
 			}
-			manager := NewManager(store, Config{}, nil)
-			manager.Events = sessionevents.New()
-			job := &jobState{Job: Job{ID: session.ID, Slug: session.Slug, ACPAgent: AgentCodex, ACPSession: "native-session"}}
-			manager.jobsByID[session.ID] = job
-			manager.jobsByACP[job.ACPSession] = job
-			for _, prompt := range fixture.Prompts {
-				job.startTurn(CompletionInline, false, false)
-				for _, update := range prompt.Updates {
-					manager.applyUpdate(job.ACPSession, update)
-					manager.applyUpdate(job.ACPSession, update)
-				}
-				manager.recordRawUsage(job, prompt.Response)
-			}
-			loaded, err := store.LoadSession(session.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if loaded.Usage.InputTokens != 68_962 || loaded.Usage.CachedInputTokens != 58_368 || loaded.Usage.OutputTokens != 169 || loaded.Usage.TotalTokens != 69_131 {
-				t.Fatalf("native usage = %#v", loaded.Usage)
-			}
-			days, err := usagecore.NewService(store).Daily(usagecore.DailyQuery{Days: 1, Location: time.UTC})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if days[0].Usage.InputOutputTokens() != 10_763 || len(days[0].Categories) != 1 || days[0].Categories[0].Usage.InputOutputTokens() != 10_763 {
-				t.Fatalf("activity totals = %#v", days[0])
+			for _, source := range []string{"", storage.SourceMemorySearch, storage.SourceMemorySource, storage.SourceMemoryDream, storage.SourceLoopRun} {
+				t.Run(source, func(t *testing.T) {
+					store, err := sqlitestore.New(t.TempDir())
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer store.Close()
+					session, err := store.CreateSession(storage.CreateSession{Slug: "native-usage", Runtime: storage.RuntimeACP, SourceType: source})
+					if err != nil {
+						t.Fatal(err)
+					}
+					manager := NewManager(store, Config{}, nil)
+					manager.Events = sessionevents.New()
+					job := &jobState{Job: Job{ID: session.ID, Slug: session.Slug, ACPAgent: AgentCodex, ACPSession: "native-session"}}
+					manager.jobsByID[session.ID] = job
+					manager.jobsByACP[job.ACPSession] = job
+					for _, prompt := range fixture.Prompts {
+						job.startTurn(CompletionInline, false, false)
+						for _, update := range prompt.Updates {
+							manager.applyUpdate(job.ACPSession, update)
+							manager.applyUpdate(job.ACPSession, update)
+						}
+						manager.recordRawUsage(job, prompt.Response)
+					}
+					loaded, err := store.LoadSession(session.ID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if loaded.Usage.InputTokens != tc.input || loaded.Usage.CachedInputTokens != tc.cached || loaded.Usage.OutputTokens != tc.output || loaded.Usage.TotalTokens != tc.total {
+						t.Fatalf("native usage = %#v", loaded.Usage)
+					}
+					days, err := usagecore.NewService(store).Daily(usagecore.DailyQuery{Days: 1, Location: time.UTC})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if days[0].Usage.InputOutputTokens() != tc.uncachedIO || len(days[0].Categories) != 1 || days[0].Categories[0].Usage.InputOutputTokens() != tc.uncachedIO {
+						t.Fatalf("activity totals = %#v", days[0])
+					}
+				})
 			}
 		})
 	}

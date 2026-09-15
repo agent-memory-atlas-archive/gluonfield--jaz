@@ -4,15 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/gluonfield/jazmem/pkg/jazmem"
 	"github.com/wins/jaz/backend/internal/acp"
 	agentsettings "github.com/wins/jaz/backend/internal/settings"
+	"github.com/wins/jaz/backend/internal/sourcequeue"
 	"github.com/wins/jaz/backend/internal/storage"
 	"github.com/wins/jaz/backend/internal/templates/memorydreamprompt"
 )
@@ -29,14 +30,14 @@ type Manager interface {
 type Runner struct {
 	Store   storage.SettingsStorage
 	Manager Manager
-	Log     *log.Logger
+	Queue   *sourcequeue.Queue
 }
 
-func New(store storage.SettingsStorage, manager Manager, logger *log.Logger) *Runner {
-	return &Runner{Store: store, Manager: manager, Log: logger}
+func New(store storage.SettingsStorage, manager Manager, queue *sourcequeue.Queue) *Runner {
+	return &Runner{Store: store, Manager: manager, Queue: queue}
 }
 
-func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (jazmem.DreamReport, error) {
+func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (report jazmem.DreamReport, err error) {
 	settings, err := agentsettings.LoadMemorySettings(r.Store)
 	if err != nil {
 		return jazmem.DreamReport{}, err
@@ -54,18 +55,36 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (jazmem.
 	} else if err != nil {
 		return jazmem.DreamReport{}, err
 	}
+	sources, err := r.Queue.Reserve(ctx, math.MaxInt)
+	if err != nil {
+		return jazmem.DreamReport{}, err
+	}
+	defer func() {
+		if len(sources) > 0 {
+			err = errors.Join(err, r.Queue.Release(context.WithoutCancel(ctx), sources))
+		}
+	}()
 	date := req.Date
 	if date.IsZero() {
 		date = time.Now()
 	}
 	date = date.Local()
-	suffix := runSuffix(date)
+	suffix := fmt.Sprintf("%s-%d", runSuffix(date), time.Now().UnixNano())
 	runSlug := "dreams/runs/" + suffix
 	reviewSlug := "dreams/review/dream-" + suffix
+	receipt := filepath.Join(req.Root, ".state", "consolidation", suffix+".json")
+	if err := os.MkdirAll(filepath.Dir(receipt), 0o755); err != nil {
+		return jazmem.DreamReport{}, err
+	}
+	defer os.Remove(receipt)
+	prompt, err := agentPrompt(req, runSlug, reviewSlug, receipt, sources)
+	if err != nil {
+		return jazmem.DreamReport{}, err
+	}
 
 	spawned, err := r.Manager.Spawn(ctx, acp.SpawnRequest{
 		ACPAgent:        agent,
-		Slug:            fmt.Sprintf("memory-dream-%s-%s-%d", agent, suffix, time.Now().UnixNano()),
+		Slug:            fmt.Sprintf("memory-dream-%s-%s", agent, suffix),
 		Title:           "Memory Dream " + runLabel(date),
 		Directory:       req.Root,
 		Model:           settings.WorkerModel(agentDefaults),
@@ -76,10 +95,15 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (jazmem.
 	if err != nil {
 		return jazmem.DreamReport{}, err
 	}
-	prompt, err := agentPrompt(req, runSlug, reviewSlug)
-	if err != nil {
-		return jazmem.DreamReport{}, err
-	}
+	active := true
+	defer func() {
+		if active {
+			cancelCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			_, cancelErr := r.Manager.Cancel(cancelCtx, spawned.SessionID)
+			err = errors.Join(err, cancelErr)
+		}
+	}()
 	if _, err := r.Manager.Send(ctx, acp.SendRequest{
 		Session:    spawned.SessionID,
 		Message:    prompt,
@@ -92,65 +116,56 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (jazmem.
 		return jazmem.DreamReport{}, err
 	}
 	if job.State == acp.StateRunning || job.State == acp.StateStarting {
-		cancelCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		_, _ = r.Manager.Cancel(cancelCtx, spawned.SessionID)
 		return jazmem.DreamReport{}, fmt.Errorf("memory dream timed out after %s", Timeout)
 	}
+	active = false
 	if job.State != acp.StateIdle {
 		if strings.TrimSpace(job.Error) != "" {
 			return jazmem.DreamReport{}, fmt.Errorf("memory dream failed: %s", job.Error)
 		}
 		return jazmem.DreamReport{}, fmt.Errorf("memory dream finished with state %q", job.State)
 	}
-	warnings := ensureRunPage(req.Root, runSlug, date, agent, spawned.SessionID, job.Assistant)
-	if len(warnings) > 0 && r.Log != nil {
-		r.Log.Warn("dream runner wrote fallback run page", "run", runSlug)
+	runPage, err := os.ReadFile(filepath.Join(req.Root, filepath.FromSlash(runSlug)+".md"))
+	if err != nil {
+		return jazmem.DreamReport{}, fmt.Errorf("read consolidation report: %w", err)
+	}
+	if strings.TrimSpace(string(runPage)) == "" {
+		return jazmem.DreamReport{}, errors.New("consolidation report is empty")
+	}
+	completed, pending, err := readReceipt(receipt, sources)
+	if err != nil {
+		return jazmem.DreamReport{}, err
+	}
+	if err := r.Queue.Settle(ctx, completed, pending); err != nil {
+		return jazmem.DreamReport{}, err
+	}
+	sources = nil
+	var warnings []string
+	if len(pending) > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d source pages remain for the next consolidation", len(pending)))
 	}
 	return jazmem.DreamReport{
-		RunSlug:   runSlug,
-		ModelUsed: "acp:" + agent,
-		Warnings:  warnings,
+		RunSlug:    runSlug,
+		ReviewSlug: reviewSlug,
+		ModelUsed:  "acp:" + agent,
+		Warnings:   warnings,
 	}, nil
 }
 
-func agentPrompt(req jazmem.DreamRequest, runSlug, reviewSlug string) (string, error) {
+func agentPrompt(req jazmem.DreamRequest, runSlug, reviewSlug, receipt string, sources []sourcequeue.Source) (string, error) {
+	paths := make([]string, 0, len(sources))
+	for _, source := range sources {
+		paths = append(paths, source.Path)
+	}
 	return memorydreamprompt.Render(memorydreamprompt.Data{
 		Root:            req.Root,
 		RunSlug:         runSlug,
 		ReviewSlug:      reviewSlug,
+		ReceiptPath:     receipt,
+		Sources:         paths,
 		LongTermPolicy:  jazmem.LongTermDreamGuidance(),
 		ShortTermPolicy: jazmem.ShortTermDreamGuidance(),
 	})
-}
-
-func ensureRunPage(root, runSlug string, date time.Time, agent, sessionID, assistant string) []string {
-	path := filepath.Join(root, filepath.FromSlash(runSlug)+".md")
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return []string{"agent did not write dream run page and fallback creation failed: " + err.Error()}
-	}
-	assistant = strings.TrimSpace(assistant)
-	if len(assistant) > 4000 {
-		assistant = assistant[:4000] + "\n...[truncated]"
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "---\ntitle: \"Dream %s\"\ntype: dream_run\ndate: %s\n---\n\n", runLabel(date), date.Format("2006-01-02"))
-	fmt.Fprintf(&b, "# Dream %s\n\n", runLabel(date))
-	fmt.Fprintf(&b, "- Model: `acp:%s`\n", agent)
-	fmt.Fprintf(&b, "- ACP session: `%s`\n", sessionID)
-	b.WriteString("- Warning: agent did not write the requested run page; Jaz created this fallback.\n")
-	if assistant != "" {
-		b.WriteString("\n## Agent Final Status\n\n")
-		b.WriteString(assistant)
-		b.WriteString("\n")
-	}
-	if err := os.WriteFile(path, []byte(b.String()), 0o644); err != nil {
-		return []string{"agent did not write dream run page and fallback creation failed: " + err.Error()}
-	}
-	return []string{"agent did not write dream run page; Jaz created a fallback run page"}
 }
 
 func runSuffix(t time.Time) string {

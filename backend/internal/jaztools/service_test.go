@@ -529,16 +529,18 @@ func TestSourceWorkerSurfaceIsRestrictedToMemoryTools(t *testing.T) {
 
 	// Both routes (session source type and the acp-emitted query param) must
 	// resolve to the restricted source surface.
-	srcSession, err := store.CreateSession(storage.CreateSession{
-		Slug:       "memory-source",
-		Runtime:    storage.RuntimeACP,
-		SourceType: storage.SourceMemorySource,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if service.surface(sessionRequest(srcSession.ID)) != sourceWorkerSurface {
-		t.Fatal("memory-source session did not route to source worker surface")
+	for _, sourceType := range []string{storage.SourceMemorySource, storage.SourceMemoryDream} {
+		srcSession, err := store.CreateSession(storage.CreateSession{
+			Slug:       sourceType,
+			Runtime:    storage.RuntimeACP,
+			SourceType: sourceType,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if service.surface(sessionRequest(srcSession.ID)) != sourceWorkerSurface {
+			t.Fatalf("%s did not route to memory worker surface", sourceType)
+		}
 	}
 	queryReq, _ := http.NewRequest(http.MethodPost, "http://127.0.0.1/mcp/jaztools?jaztools_surface=memory_source_worker", nil)
 	if service.surface(queryReq) != sourceWorkerSurface {
