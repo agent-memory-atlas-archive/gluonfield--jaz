@@ -13,6 +13,7 @@ import (
 	connectionsapi "github.com/wins/jaz/backend/internal/httpapi/connections"
 	deviceapi "github.com/wins/jaz/backend/internal/httpapi/devices"
 	feedapi "github.com/wins/jaz/backend/internal/httpapi/feed"
+	filesystemapi "github.com/wins/jaz/backend/internal/httpapi/filesystem"
 	modelcapabilitiesapi "github.com/wins/jaz/backend/internal/httpapi/modelcapabilities"
 	previewapi "github.com/wins/jaz/backend/internal/httpapi/preview"
 	sessionsapi "github.com/wins/jaz/backend/internal/httpapi/sessions"
@@ -54,6 +55,7 @@ type routeDeps struct {
 
 func NewRoutes(deps routeDeps) server.Routes {
 	routes := server.Routes{
+		{Pattern: "POST /v1/filesystem/dirs", Handler: http.HandlerFunc(filesystemapi.CreateDirectory)},
 		{Pattern: "GET /v1/sessions", Handler: sessionsapi.NewListHandler(deps.Store)},
 		{Pattern: "PUT /v1/sessions/{session}/agent/config", Handler: http.HandlerFunc(deps.AgentSession.SetConfig)},
 		{Pattern: "POST /v1/sessions/{session}/agent/tasks/{task}/stop", Handler: http.HandlerFunc(deps.AgentSession.StopTask)},

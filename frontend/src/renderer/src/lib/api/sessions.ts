@@ -165,6 +165,10 @@ export function addProject(path: string): Promise<Project> {
   return post<Project>('/v1/projects', { path })
 }
 
+export function createFilesystemDir(parent: string, name: string): Promise<{ path: string }> {
+  return post<{ path: string }>('/v1/filesystem/dirs', { parent, name })
+}
+
 export function deleteProject(path: string): Promise<Project[]> {
   return del<{ projects: Project[] | null }>(`/v1/projects?path=${encodeURIComponent(path)}`).then(
     (data) => data.projects ?? [],
