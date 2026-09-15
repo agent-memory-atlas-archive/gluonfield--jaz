@@ -60,7 +60,10 @@ function withLocalChildState(items: SessionListItem[]): SessionListItem[] {
 }
 
 function sessionsBySavedProject(items: SessionListItem[], projects: Project[]) {
-  const projectByPath = new Map(projects.map((project) => [project.path, project]))
+  const groups = new Map<string, SessionProjectGroup>(projects.map((project) => [
+    project.path,
+    { key: project.path, label: project.name, items: [] },
+  ]))
   const byID = new Map(items.map((item) => [item.session.id, item]))
   const childProjectByParentID = new Map<string, string>()
   for (const item of items) {
@@ -70,25 +73,19 @@ function sessionsBySavedProject(items: SessionListItem[], projects: Project[]) {
       childProjectByParentID.set(parentID, path)
     }
   }
-  const groups = new Map<string, SessionProjectGroup>()
   const ungrouped: SessionListItem[] = []
 
   for (const item of items) {
-    const project = projectByPath.get(sidebarProjectPath(item, byID, childProjectByParentID))
-    if (!project) {
+    const group = groups.get(sidebarProjectPath(item, byID, childProjectByParentID))
+    if (!group) {
       ungrouped.push(item)
       continue
     }
-    const group = groups.get(project.path) ?? { key: project.path, label: project.name, items: [] }
     group.items.push(item)
-    groups.set(project.path, group)
   }
 
   return {
-    groups: projects
-      .map((project) => groups.get(project.path))
-      .filter((group): group is SessionProjectGroup => Boolean(group))
-      .map((group) => ({ ...group, items: withLocalChildState(group.items) })),
+    groups: [...groups.values()].map((group) => ({ ...group, items: withLocalChildState(group.items) })),
     ungrouped: withLocalChildState(ungrouped),
   }
 }

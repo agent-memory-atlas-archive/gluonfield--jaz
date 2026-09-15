@@ -119,3 +119,18 @@ describe('sidebar session organization', () => {
     expect(ordered.map((project) => project.path)).toEqual(['/beta', '/hidden', '/alpha'])
   })
 })
+
+
+test('new projects remain visible before their first session', () => {
+  const projects = [
+    { path: '/empty', name: 'Empty' },
+    { path: '/active', name: 'Active' },
+  ]
+  const sections = sidebarSessionSections([item('thread', { path: '/active' })], projects)
+  expect(sections.groups.map((group) => [group.key, group.items.length])).toEqual([
+    ['/empty', 0],
+    ['/active', 1],
+  ])
+  const blocks = sessionDisplayBlocks(sections.groups, [], new Set(), false, new Set())
+  expect(blocks.map((block) => block.key)).toEqual(['project:/empty', 'project:/active'])
+})

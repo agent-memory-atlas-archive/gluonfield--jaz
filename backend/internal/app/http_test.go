@@ -2,8 +2,12 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +85,7 @@ func TestHTTPModuleProvidesRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	requireRoute(t, routes, "GET /v1/usage/daily")
+	requireRoute(t, routes, "POST /v1/filesystem/dirs")
 	requireRoute(t, routes, "GET /v1/usage/models")
 	requireRoute(t, routes, "GET /v1/feed")
 	requireRoute(t, routes, "GET /v1/sessions")
@@ -99,6 +104,53 @@ func TestHTTPModuleProvidesRoute(t *testing.T) {
 	(&server.Server{Store: store, Routes: routes, AuthKey: "secret"}).Handler().ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("session list status = %d: %s", response.Code, response.Body.String())
+	}
+	parent := t.TempDir()
+	body, err := json.Marshal(map[string]string{"parent": parent, "name": "new project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := (&server.Server{Store: store, Routes: routes, AuthKey: "secret"}).Handler()
+	for _, authenticated := range []bool{false, true} {
+		request := httptest.NewRequest(http.MethodPost, "/v1/filesystem/dirs", strings.NewReader(string(body)))
+		want := http.StatusUnauthorized
+		if authenticated {
+			request.Header.Set("Authorization", "Bearer secret")
+			want = http.StatusOK
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != want {
+			t.Fatalf("create directory status = %d: %s", response.Code, response.Body.String())
+		}
+		if !authenticated {
+			if _, err := os.Stat(filepath.Join(parent, "new project")); !os.IsNotExist(err) {
+				t.Fatalf("unauthenticated request created a directory: %v", err)
+			}
+			continue
+		}
+		request = httptest.NewRequest(http.MethodPost, "/v1/projects", strings.NewReader(response.Body.String()))
+		request.Header.Set("Authorization", "Bearer secret")
+		response = httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("save project status = %d: %s", response.Code, response.Body.String())
+		}
+	}
+	request = httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	var saved struct {
+		Projects []struct {
+			Path string `json:"path"`
+		} `json:"projects"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &saved); err != nil {
+		t.Fatal(err)
+	}
+	if len(saved.Projects) != 1 || saved.Projects[0].Path != filepath.Join(parent, "new project") {
+		t.Fatalf("saved projects = %#v", saved.Projects)
 	}
 	if len(publicRoutes) != 1 ||
 		publicRoutes[0].Match == nil ||
