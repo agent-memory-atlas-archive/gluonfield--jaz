@@ -1,0 +1,199 @@
+{
+  "provenance": "Codex 0.154.0 with cumulative ACP accounting; captured 2026-09-15 via native OAuth. File-read turn (two model calls), process reload, compaction, and post-compaction turn.",
+  "prompts": [
+    {
+      "updates": [
+        {
+          "sessionUpdate": "usage_update",
+          "used": 22058,
+          "size": 258400,
+          "_meta": {
+            "usageId": "01a0a68f-2bcc-7a62-80f9-0979ab269784",
+            "usage": {
+              "totalTokens": 22058,
+              "inputTokens": 15028,
+              "cachedReadTokens": 6912,
+              "outputTokens": 118,
+              "thoughtTokens": 16
+            }
+          }
+        },
+        {
+          "sessionUpdate": "usage_update",
+          "used": 22097,
+          "size": 258400,
+          "_meta": {
+            "usageId": "01a0a68f-2bcc-7a62-80f9-0979ab269784",
+            "usage": {
+              "totalTokens": 44155,
+              "inputTokens": 15870,
+              "cachedReadTokens": 28160,
+              "outputTokens": 125,
+              "thoughtTokens": 16
+            }
+          }
+        }
+      ],
+      "response": {
+        "stopReason": "end_turn",
+        "usage": {
+          "totalTokens": 44155,
+          "inputTokens": 15870,
+          "cachedReadTokens": 28160,
+          "outputTokens": 125,
+          "thoughtTokens": 16
+        },
+        "_meta": {
+          "usageId": "01a0a68f-2bcc-7a62-80f9-0979ab269784",
+          "quota": {
+            "token_count": {
+              "inputTokens": 15870,
+              "cachedInputTokens": 28160,
+              "outputTokens": 125,
+              "reasoningOutputTokens": 16,
+              "totalTokens": 44155
+            },
+            "model_usage": [
+              {
+                "model": "gpt-5.6-terra",
+                "token_count": {
+                  "inputTokens": 15870,
+                  "cachedInputTokens": 28160,
+                  "outputTokens": 125,
+                  "reasoningOutputTokens": 16,
+                  "totalTokens": 44155
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "updates": [
+        {
+          "sessionUpdate": "usage_update",
+          "used": 27551,
+          "size": 258400,
+          "_meta": {
+            "usageId": "01a0a690-a8d6-7161-a776-b9f3cb59e28b",
+            "usage": {
+              "totalTokens": 27551,
+              "inputTokens": 15510,
+              "cachedReadTokens": 12032,
+              "outputTokens": 9,
+              "thoughtTokens": 0
+            }
+          }
+        }
+      ],
+      "response": {
+        "stopReason": "end_turn",
+        "usage": {
+          "totalTokens": 27551,
+          "inputTokens": 15510,
+          "cachedReadTokens": 12032,
+          "outputTokens": 9,
+          "thoughtTokens": 0
+        },
+        "_meta": {
+          "usageId": "01a0a690-a8d6-7161-a776-b9f3cb59e28b",
+          "quota": {
+            "token_count": {
+              "inputTokens": 15510,
+              "cachedInputTokens": 12032,
+              "outputTokens": 9,
+              "reasoningOutputTokens": 0,
+              "totalTokens": 27551
+            },
+            "model_usage": [
+              {
+                "model": "gpt-6-astra",
+                "token_count": {
+                  "inputTokens": 15510,
+                  "cachedInputTokens": 12032,
+                  "outputTokens": 9,
+                  "reasoningOutputTokens": 0,
+                  "totalTokens": 27551
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "updates": [
+        {
+          "sessionUpdate": "usage_update",
+          "used": 5655,
+          "size": 258400
+        }
+      ],
+      "response": {
+        "stopReason": "end_turn",
+        "usage": null,
+        "_meta": {
+          "usageId": "01a0a690-ba90-7d22-ad53-004e5f0f08e5",
+          "quota": {
+            "token_count": null,
+            "model_usage": []
+          }
+        }
+      }
+    },
+    {
+      "updates": [
+        {
+          "sessionUpdate": "usage_update",
+          "used": 18265,
+          "size": 258400,
+          "_meta": {
+            "usageId": "01a0a690-de10-74a0-ab65-4c3b31cf0a3e",
+            "usage": {
+              "totalTokens": 18265,
+              "inputTokens": 6224,
+              "cachedReadTokens": 12032,
+              "outputTokens": 9,
+              "thoughtTokens": 0
+            }
+          }
+        }
+      ],
+      "response": {
+        "stopReason": "end_turn",
+        "usage": {
+          "totalTokens": 18265,
+          "inputTokens": 6224,
+          "cachedReadTokens": 12032,
+          "outputTokens": 9,
+          "thoughtTokens": 0
+        },
+        "_meta": {
+          "usageId": "01a0a690-de10-74a0-ab65-4c3b31cf0a3e",
+          "quota": {
+            "token_count": {
+              "inputTokens": 6224,
+              "cachedInputTokens": 12032,
+              "outputTokens": 9,
+              "reasoningOutputTokens": 0,
+              "totalTokens": 18265
+            },
+            "model_usage": [
+              {
+                "model": "gpt-6-astra",
+                "token_count": {
+                  "inputTokens": 6224,
+                  "cachedInputTokens": 12032,
+                  "outputTokens": 9,
+                  "reasoningOutputTokens": 0,
+                  "totalTokens": 18265
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

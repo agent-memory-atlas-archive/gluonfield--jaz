@@ -38,7 +38,6 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
 	"github.com/wins/jaz/backend/internal/templates/acpcompletion"
-	"github.com/wins/jaz/backend/internal/templates/memorysourceprompt"
 	"github.com/wins/jaz/backend/internal/threads"
 	"github.com/wins/jaz/backend/internal/tools"
 	agentcancel "github.com/wins/jaz/backend/internal/tools/agent/cancel"
@@ -348,8 +347,6 @@ func NewACPConfig(cfg Config, store *sqlitestore.Store, workspace Workspace, pro
 	}
 	cfg.ACP.ResumePrompt = func(session storage.Session) (promptmodule.Modules, error) {
 		switch session.SourceType {
-		case storage.SourceMemorySource:
-			return promptmodule.New(memorysourceprompt.System()), nil
 		case storage.SourceLoopRun:
 			if session.SourceID == "" {
 				return nil, nil

@@ -310,6 +310,7 @@ func (s *Service) surface(r *http.Request) toolSurface {
 var workerSurfaceBySourceType = map[string]toolSurface{
 	storage.SourceMemorySearch:      searchWorkerSurface,
 	storage.SourceMemorySource:      sourceWorkerSurface,
+	storage.SourceMemoryDream:       sourceWorkerSurface,
 	storage.LegacySourceBrowserTask: retiredWorkerSurface,
 }
 

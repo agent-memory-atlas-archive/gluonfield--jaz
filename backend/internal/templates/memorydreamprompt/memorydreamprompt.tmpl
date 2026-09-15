@@ -1,6 +1,6 @@
 # Memory Dream
 
-You are running Jaz's periodic memory consolidation job as a coding agent.
+You are running Jaz's daily memory consolidation job. Promote useful knowledge from changed sources and consolidate existing notes in this one session.
 
 Memory root:
 {{ .Root }}
@@ -9,16 +9,26 @@ Rules:
 - Use at most 100 meaningful tool/edit steps.
 - Read before editing.
 - Do not run jazmem index or memory maintenance commands; Jaz reindexes after you finish.
-- Do not read or re-process `sources/`; the source-memory worker owns provider source capture.
+- Read only the changed source pages listed below; other sources remain searchable when a specific fact needs verification. Read sources in batches and avoid rereading them.
+- Use `jazmem_search_raw` and `jazmem_get_page` for existing memory. Their results are direct retrieval; interpret them yourself. These are the only Jaz memory tools on this worker surface.
+- Skip receipts, OTPs, automated alerts, marketing and facts already recorded. New durable context, decisions, relationships and commitments belong in canonical pages with source citations. A source can be fully processed with no edit.
 - Every durable fact needs an absolute-date source citation.
-- Leave uncertain candidates in {{ .ReviewSlug }}.
-- Write a run report to {{ .RunSlug }} with inputs, changed files, promotions, skipped material, and warnings.
+- Leave uncertain candidates in `{{ .ReviewSlug }}.md`.
+- Write a Markdown run report to `{{ .RunSlug }}.md` with inputs, changed files, promotions, skipped material, and warnings.
+- Write a JSON array of the exact source paths you finished checking to {{ .ReceiptPath }}. Include inspected sources that needed no edit or no longer exist; omit unfinished sources. Write [] when none were processed. Jaz uses this receipt to preserve unfinished and concurrently updated sources for a later run. Do not edit queue state.
 
 Required work:
 - Read LONG_TERM.md, SHORT_TERM.md, today's and recent daily pages, recent inbox pages, and relevant canonical people/company/project/concept pages.
 - Move durable stale material out of SHORT_TERM.md into canonical pages with citations, then rewrite SHORT_TERM.md to the active working set at or below 5,000 characters. If it begins above the ceiling, the run is incomplete until it is reduced.
 - Update LONG_TERM.md only for facts that satisfy the long-term policy.
 - Create canonical pages when the user discussed an entity beyond public-knowledge facts.
+
+Changed source pages:
+{{- range .Sources }}
+- {{ . }}
+{{- else }}
+None queued.
+{{- end }}
 
 Long-term policy:
 {{ .LongTermPolicy }}

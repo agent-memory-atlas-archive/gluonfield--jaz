@@ -16,6 +16,7 @@ import (
 var restrictedWorkerPolicies = map[string]string{
 	storage.SourceMemorySearch:      MCPServerPolicyMemorySearchWorker,
 	storage.SourceMemorySource:      MCPServerPolicyMemorySourceWorker,
+	storage.SourceMemoryDream:       MCPServerPolicyMemorySourceWorker,
 	storage.LegacySourceBrowserTask: MCPServerPolicyRetiredWorker,
 }
 
