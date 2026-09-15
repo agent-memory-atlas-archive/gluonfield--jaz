@@ -410,7 +410,7 @@ export function SidebarSessions({ open }: { open: boolean }) {
   if (sessions.isPending || organization === 'project' && projects.isPending) {
     return <SkeletonRows count={4} />
   }
-  if (sessions.isError) {
+  if (sessions.isError && !sessions.data) {
     return <p className="px-2.5 py-1 text-[13px] text-ink-3">Backend unreachable</p>
   }
 

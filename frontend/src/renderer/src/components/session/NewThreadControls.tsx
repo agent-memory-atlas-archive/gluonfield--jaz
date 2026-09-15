@@ -254,6 +254,7 @@ export function ProjectPicker({
   onChange: (path: string, git: boolean) => void
 }) {
   const queryClient = useQueryClient()
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [menu, setMenu] = useState<{ point: { x: number; y: number }; project: Project } | null>(null)
@@ -304,6 +305,7 @@ export function ProjectPicker({
             </button>
           ) : null}
           <button
+            ref={triggerRef}
             type="button"
             className={`flex h-full min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 disabled:cursor-default ${value ? 'pl-0' : ''}`}
             aria-haspopup="dialog"
@@ -323,6 +325,7 @@ export function ProjectPicker({
         <button
           type="button"
           onClick={() => {
+            triggerRef.current?.focus()
             setOpen(false)
             setAdding(true)
           }}

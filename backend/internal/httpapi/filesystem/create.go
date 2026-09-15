@@ -2,11 +2,12 @@ package filesystem
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/wins/jaz/backend/internal/httpapi"
 )
@@ -23,12 +24,19 @@ func CreateDirectory(w http.ResponseWriter, r *http.Request) {
 	req.Parent = strings.TrimSpace(req.Parent)
 	req.Name = strings.TrimSpace(req.Name)
 	if !filepath.IsAbs(req.Parent) || !filepath.IsLocal(req.Name) || filepath.Clean(req.Name) == "." {
-		httpapi.WriteError(w, http.StatusBadRequest, fmt.Errorf("an absolute parent path and a folder name are required"))
+		httpapi.WriteError(w, http.StatusBadRequest, errors.New("an absolute parent path and a folder name are required"))
 		return
 	}
 	path := filepath.Join(req.Parent, req.Name)
 	if err := os.MkdirAll(path, 0o755); err != nil {
-		httpapi.WriteError(w, http.StatusBadRequest, err)
+		status, message := http.StatusInternalServerError, "Couldn't create this folder."
+		switch {
+		case errors.Is(err, os.ErrPermission):
+			status, message = http.StatusForbidden, "You don't have permission to create a folder here."
+		case errors.Is(err, syscall.ENOTDIR), errors.Is(err, os.ErrExist):
+			status, message = http.StatusConflict, "A file already exists along this path."
+		}
+		httpapi.WriteError(w, status, errors.New(message))
 		return
 	}
 	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"path": path})
