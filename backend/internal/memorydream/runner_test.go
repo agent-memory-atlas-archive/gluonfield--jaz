@@ -2,8 +2,11 @@ package memorydream
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +55,7 @@ func TestAgentPromptIncludesLongTermPromotionBar(t *testing.T) {
 	prompt, err := agentPrompt(jazmem.DreamRequest{
 		Root: "/tmp/memory",
 		Date: time.Date(2026, 6, 17, 9, 0, 0, 0, time.UTC),
-	}, "dreams/runs/test", "dreams/review/test", "/tmp/processed.json", nil)
+	}, "dreams/runs/test", "dreams/review/test", "/tmp/processed.json", "/tmp/sources.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -197,8 +200,9 @@ func TestConsolidationPreservesUnfinishedAndConcurrentSourceUpdates(t *testing.T
 	}
 	manager := &fakeManager{job: acp.Job{State: acp.StateIdle}}
 	manager.finish = func() {
+		paths := workerSources(t, manager)
 		for _, path := range []string{"sources/first.md", "sources/second.md"} {
-			if !strings.Contains(manager.send.Message, path) {
+			if !slices.Contains(paths, path) {
 				t.Fatalf("worker missing queued source %s", path)
 			}
 		}
@@ -224,6 +228,76 @@ func TestConsolidationPreservesUnfinishedAndConcurrentSourceUpdates(t *testing.T
 			t.Fatal("newer source revision was lost")
 		}
 	}
+}
+
+func TestConsolidationLargeBacklogKeepsStartupPromptBounded(t *testing.T) {
+	store := newStore(t)
+	if _, err := jazsettings.SaveMemorySettings(store, jazsettings.MemorySettings{Enabled: true, Agent: acp.AgentCodex}); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	queue := sourcequeue.New(root)
+	const count = 20000
+	pending := make(map[string]map[string]time.Time, count)
+	for i := range count {
+		path := fmt.Sprintf("sources/email/gmail/personal/messages/2026-09-15-%032d.md", i)
+		pending[path] = map[string]time.Time{"pending_at": time.Now().UTC()}
+	}
+	state, err := json.Marshal(map[string]any{"pending": pending})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".state"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".state", "pending-sources.json"), state, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := &fakeManager{job: acp.Job{State: acp.StateIdle}}
+	manager.finish = func() {
+		if len(manager.send.Message) > 8192 {
+			t.Fatalf("startup prompt grew to %d bytes for %d sources", len(manager.send.Message), count)
+		}
+		paths := workerSources(t, manager)
+		if len(paths) != count {
+			t.Fatalf("worker received %d sources, want %d", len(paths), count)
+		}
+		for _, path := range paths {
+			if _, ok := pending[path]; !ok {
+				t.Fatalf("unexpected or duplicate source %q", path)
+			}
+			delete(pending, path)
+		}
+		finishDream(t, manager, fmt.Sprintf("[%q]", paths[0]), true)
+	}
+	if _, err := New(store, manager, queue).RunDream(t.Context(), jazmem.DreamRequest{Root: root}); err != nil {
+		t.Fatal(err)
+	}
+	stats, err := queue.Stats(t.Context())
+	if err != nil || stats.Pending != count-1 || stats.Processing != 0 {
+		t.Fatalf("queue=%#v err=%v", stats, err)
+	}
+	files, err := os.ReadDir(filepath.Join(root, ".state", "consolidation"))
+	if err != nil || len(files) != 0 {
+		t.Fatalf("temporary files remain: %v, err=%v", files, err)
+	}
+}
+
+func workerSources(t *testing.T, manager *fakeManager) []string {
+	t.Helper()
+	file := filepath.Join(manager.spawn.Directory, ".state", "consolidation", manager.spawn.SourceID+".sources.json")
+	if !strings.Contains(manager.send.Message, file) {
+		t.Fatal("worker was not told where to read changed source paths")
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	if err := json.Unmarshal(data, &paths); err != nil || paths == nil {
+		t.Fatalf("invalid source list: %s, err=%v", data, err)
+	}
+	return paths
 }
 
 func TestConsolidationRequiresAcknowledgedWork(t *testing.T) {

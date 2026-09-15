@@ -11,7 +11,7 @@ func TestRenderKeepsPolicyAndSlugBoundaries(t *testing.T) {
 		RunSlug:         "dreams/runs/2026-06-17",
 		ReviewSlug:      "dreams/review/2026-06-17",
 		ReceiptPath:     "/tmp/memory/.state/consolidation/run.json",
-		Sources:         []string{"sources/chat/decision.md"},
+		SourcesPath:     "/tmp/memory/.state/consolidation/run.sources.json",
 		LongTermPolicy:  "profile-level memory only",
 		ShortTermPolicy: "active working set only",
 	})
@@ -27,7 +27,7 @@ func TestRenderKeepsPolicyAndSlugBoundaries(t *testing.T) {
 		"Write a Markdown run report to `dreams/runs/2026-06-17.md`",
 		"Leave uncertain candidates in `dreams/review/2026-06-17.md`",
 		"/tmp/memory/.state/consolidation/run.json",
-		"- sources/chat/decision.md",
+		"/tmp/memory/.state/consolidation/run.sources.json",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("rendered memory dream prompt missing %q:\n%s", want, got)
