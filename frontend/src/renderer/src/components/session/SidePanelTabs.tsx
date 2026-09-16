@@ -23,11 +23,11 @@ export function SidePanelTabMenu({ sideChatAvailable, onAdd, empty = false }: {
   const rows = options.map((kind) => {
     const { label, icon: Icon } = TAB_TYPES[kind]
     return (
-      <button type="button" className="flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-[9px] px-3 text-left text-[13px] text-ink-2 hover:bg-surface-2 hover:text-ink" key={kind} onClick={() => {
+      <button type="button" className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] text-ink-2 hover:bg-surface-2 hover:text-ink pointer-coarse:h-10" key={kind} onClick={() => {
         onAdd(kind)
         setOpen(false)
       }}>
-        <Icon size={16} className="shrink-0 text-ink-3" />
+        <Icon size={14} className="shrink-0 text-ink-3" />
         {label}
       </button>
     )
