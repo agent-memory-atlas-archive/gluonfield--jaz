@@ -85,7 +85,9 @@ function sessionsBySavedProject(items: SessionListItem[], projects: Project[]) {
   }
 
   return {
-    groups: [...groups.values()].map((group) => ({ ...group, items: withLocalChildState(group.items) })),
+    groups: [...groups.values()]
+      .filter((group) => group.items.length > 0)
+      .map((group) => ({ ...group, items: withLocalChildState(group.items) })),
     ungrouped: withLocalChildState(ungrouped),
   }
 }

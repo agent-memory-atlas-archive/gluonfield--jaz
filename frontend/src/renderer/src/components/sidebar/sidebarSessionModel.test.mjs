@@ -121,16 +121,23 @@ describe('sidebar session organization', () => {
 })
 
 
-test('new projects remain visible before their first session', () => {
+test('shows project groups only when they contain visible unpinned sessions', () => {
   const projects = [
     { path: '/empty', name: 'Empty' },
+    { path: '/pinned', name: 'Pinned only' },
     { path: '/active', name: 'Active' },
   ]
-  const sections = sidebarSessionSections([item('thread', { path: '/active' })], projects)
+  const sessions = [item('pinned', { path: '/pinned', pinned: true }), item('thread', { path: '/active' })]
+  const sections = sidebarSessionSections(sessions, projects)
   expect(sections.groups.map((group) => [group.key, group.items.length])).toEqual([
-    ['/empty', 0],
     ['/active', 1],
   ])
   const blocks = sessionDisplayBlocks(sections.groups, [], new Set(), false, new Set())
-  expect(blocks.map((block) => block.key)).toEqual(['project:/empty', 'project:/active'])
+  expect(blocks.map((block) => block.key)).toEqual(['project:/active'])
+  expect(sections.pinnedItems.map((entry) => entry.session.id)).toEqual(['pinned'])
+  expect(sidebarSessionSections([], projects).groups).toEqual([])
+
+  const removed = sidebarSessionSections(sessions, projects.filter((project) => project.path !== '/active'))
+  expect(removed.groups).toEqual([])
+  expect(removed.ungrouped.map((entry) => entry.session.id)).toEqual(['thread'])
 })
