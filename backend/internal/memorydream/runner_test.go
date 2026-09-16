@@ -375,6 +375,45 @@ func TestConsolidationSettlesOnlyAfterWorkerStops(t *testing.T) {
 	}
 }
 
+func TestConsolidationPreservesSourcesWhenWorkDirectoryCannotBeCreated(t *testing.T) {
+	store := newStore(t)
+	if _, err := jazsettings.SaveMemorySettings(store, jazsettings.MemorySettings{Enabled: true, Agent: acp.AgentCodex}); err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	queue := sourcequeue.New(root)
+	if err := queue.MarkPendingSource(t.Context(), sourcequeue.Source{Path: "sources/a.md"}); err != nil {
+		t.Fatal(err)
+	}
+	blocked := filepath.Join(root, ".state", "consolidation")
+	if err := os.WriteFile(blocked, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := &fakeManager{job: acp.Job{State: acp.StateIdle}}
+	manager.finish = func() { finishDream(t, manager, `["sources/a.md"]`, true) }
+	runner := New(store, manager, queue)
+	if _, err := runner.RunDream(t.Context(), jazmem.DreamRequest{Root: root}); err == nil {
+		t.Fatal("expected a work-directory error")
+	}
+	if manager.spawn.ACPAgent != "" {
+		t.Fatal("worker started before its inputs could be written")
+	}
+	stats, err := queue.Stats(t.Context())
+	if err != nil || stats.Pending != 1 || stats.Processing != 0 {
+		t.Fatalf("queue=%#v err=%v", stats, err)
+	}
+	if err := os.Remove(blocked); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runner.RunDream(t.Context(), jazmem.DreamRequest{Root: root}); err != nil {
+		t.Fatal(err)
+	}
+	stats, err = queue.Stats(t.Context())
+	if err != nil || stats.Pending != 0 || stats.Processing != 0 {
+		t.Fatalf("queue=%#v err=%v", stats, err)
+	}
+}
+
 func newStore(t *testing.T) *sqlitestore.Store {
 	t.Helper()
 	store, err := sqlitestore.New(t.TempDir())

@@ -69,6 +69,7 @@ type Scheduler struct {
 
 	mu     sync.Mutex
 	cancel context.CancelFunc
+	done   chan struct{}
 }
 
 func NewScheduler(memory *jazmem.Memory, allowed bool, logger *log.Logger) *Scheduler {
@@ -82,8 +83,17 @@ func (s *Scheduler) Start() {
 		return
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
 	s.cancel = cancel
+	s.done = done
 	go func() {
+		defer func() {
+			cancel()
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			s.cancel = nil
+			close(done)
+		}()
 		if err := s.memory.StartScheduler(ctx); err != nil && ctx.Err() == nil {
 			s.log.Error("scheduler stopped", "error", err)
 		}
@@ -92,10 +102,13 @@ func (s *Scheduler) Start() {
 
 func (s *Scheduler) Stop() {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	done := s.done
 	if s.cancel != nil {
 		s.cancel()
-		s.cancel = nil
+	}
+	s.mu.Unlock()
+	if done != nil {
+		<-done
 	}
 }
 
