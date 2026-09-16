@@ -36,7 +36,7 @@ import { OverviewDisclosureSection, OverviewRuns, SectionHeader } from './Overvi
 import { TaskStepIcon } from './TaskStepIcon'
 import { useRepoActions } from './useRepoActions'
 
-export const OVERVIEW_PANEL_WIDTH = 300
+import { OVERVIEW_PANEL_WIDTH } from '@/lib/sidePanelTabs'
 
 export function OverviewPanel({
   session,

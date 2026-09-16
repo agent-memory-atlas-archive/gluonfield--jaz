@@ -1,11 +1,8 @@
-import { X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileDropScope } from '@/components/ui/FileDrop'
-import { IconButton } from '@/components/ui/IconButton'
 import type { Attachment, ChatMessage, SessionEvent } from '@/lib/api/types'
 import { contextInputs, type SendMessageOptions } from '@/lib/sendMessage'
 import { ComposerCard } from './Composer'
-import { SidePanelShell } from './SidePanelShell'
 import { Transcript } from './Transcript'
 import {
   latestSideChatID,
@@ -16,8 +13,6 @@ import {
   sideChatTranscript,
   sideChatUserMessage,
 } from './sideChatTranscript'
-
-export const SIDE_CHAT_PANEL_WIDTH = 520
 
 type LiveSideChatTurn = {
   sideChatID: string
@@ -36,7 +31,6 @@ export function SideChatPanel({
   visible,
   onSend,
   onUploadAttachment,
-  onClose,
   fileRoot,
 }: {
   sessionId: string
@@ -44,7 +38,6 @@ export function SideChatPanel({
   visible: boolean
   onSend: (sideChatID: string, message: string, options?: SendMessageOptions) => Promise<void>
   onUploadAttachment?: (file: File) => Promise<Attachment>
-  onClose: () => void
   fileRoot?: string
 }) {
   const [sideChatID, setSideChatID] = useState(() => latestSideChatID(events) || newSideChatID())
@@ -99,11 +92,6 @@ export function SideChatPanel({
     if (transcriptMessages.length > 0) setError('')
   }, [transcriptMessages.length])
 
-  const close = () => {
-    onClose()
-    setError('')
-  }
-
   const submit = (message: string, options?: SendMessageOptions) => {
     if (pendingTurn) return
     setError('')
@@ -133,15 +121,7 @@ export function SideChatPanel({
 
   return (
     <FileDropScope className="h-full">
-      <SidePanelShell width={SIDE_CHAT_PANEL_WIDTH}>
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-3">
-          <div className="min-w-0 text-sm font-medium text-ink">Side chat</div>
-          <div className="flex items-center gap-1">
-            <IconButton size="sm" aria-label="Close side chat" title="Close side chat" onClick={close}>
-              <X size={15} />
-            </IconButton>
-          </div>
-        </div>
+      <div className="flex h-full min-h-0 flex-col">
         <div ref={scrollRef} className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto bg-bg px-4 py-4">
           <div className="flex min-h-full flex-col justify-end">
             <Transcript
@@ -175,7 +155,7 @@ export function SideChatPanel({
             }}
           />
         </div>
-      </SidePanelShell>
+      </div>
     </FileDropScope>
   )
 }

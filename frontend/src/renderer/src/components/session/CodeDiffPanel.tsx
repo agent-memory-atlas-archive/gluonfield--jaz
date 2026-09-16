@@ -1,29 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, FolderGit2, LoaderCircle, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, FolderGit2, LoaderCircle } from 'lucide-react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { sessionRepoChangesQuery, sessionRepoFileDiffQuery, sessionRepoQuery } from '@/lib/api/sessions'
-import { fileKey, type RepoFileChange, type Session } from '@/lib/api/types'
+import { fileKey, type RepoFileChange } from '@/lib/api/types'
 import { DiffView, FileCounts } from './DiffView'
-import { SidePanelShell } from './SidePanelShell'
 
-export const CODE_DIFF_PANEL_WIDTH = 640
-
-export function CodeDiffPanel({
-  session,
+export const CodeDiffPanel = memo(function CodeDiffPanel({
+  sessionId,
   visible,
-  onClose,
 }: {
-  session: Session
+  sessionId: string
   visible: boolean
-  onClose: () => void
 }) {
-  const changes = useQuery({ ...sessionRepoChangesQuery(session.id), enabled: visible })
-  const repo = useQuery({ ...sessionRepoQuery(session.id), enabled: visible })
+  const changes = useQuery({ ...sessionRepoChangesQuery(sessionId), enabled: visible })
+  const repo = useQuery({ ...sessionRepoQuery(sessionId), enabled: visible })
   const data = changes.data
   const firstKey = data?.files[0] ? fileKey(data.files[0]) : ''
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
-  useEffect(() => setExpanded({}), [session.id])
+  useEffect(() => setExpanded({}), [sessionId])
   useEffect(() => {
     if (!firstKey) return
     setExpanded((current) => (Object.keys(current).length ? current : { [firstKey]: true }))
@@ -37,7 +32,7 @@ export function CodeDiffPanel({
   const base = shortRef(repo.data?.main_branch || repo.data?.default_branch || data?.base || 'main')
 
   return (
-    <SidePanelShell width={CODE_DIFF_PANEL_WIDTH}>
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         <FolderGit2 size={15} className="shrink-0 text-ink-3" aria-hidden />
         <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
@@ -50,14 +45,6 @@ export function CodeDiffPanel({
             {summary}
           </span>
         </div>
-        <button
-          type="button"
-          aria-label="Hide side panel"
-          onClick={onClose}
-          className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-[8px] text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
-        >
-          <X size={15} />
-        </button>
       </div>
       <div className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto">
         {changes.isPending ? (
@@ -75,10 +62,11 @@ export function CodeDiffPanel({
               return (
                 <DiffFileSection
                   key={key}
-                  sessionId={session.id}
+                  sessionId={sessionId}
                   base={data.base}
                   file={file}
                   expanded={Boolean(expanded[key])}
+                  visible={visible}
                   onToggle={() =>
                     setExpanded((current) => ({ ...current, [key]: !current[key] }))
                   }
@@ -87,9 +75,9 @@ export function CodeDiffPanel({
             })
           : null}
       </div>
-    </SidePanelShell>
+    </div>
   )
-}
+})
 
 const STATUS_LABEL: Record<RepoFileChange['status'], string> = {
   added: 'added',
@@ -104,12 +92,14 @@ function DiffFileSection({
   base,
   file,
   expanded,
+  visible,
   onToggle,
 }: {
   sessionId: string
   base?: string
   file: RepoFileChange
   expanded: boolean
+  visible: boolean
   onToggle: () => void
 }) {
   const status = STATUS_LABEL[file.status]
@@ -140,7 +130,7 @@ function DiffFileSection({
           <DiffView patch="" path={file.path} binary />
         </div>
       ) : null}
-      {expanded && !file.binary ? <FileDiffBody sessionId={sessionId} base={base} file={file} /> : null}
+      {expanded && !file.binary ? <FileDiffBody sessionId={sessionId} base={base} file={file} visible={visible} /> : null}
     </section>
   )
 }
@@ -149,12 +139,14 @@ function FileDiffBody({
   sessionId,
   base,
   file,
+  visible,
 }: {
   sessionId: string
   base?: string
   file: RepoFileChange
+  visible: boolean
 }) {
-  const diff = useQuery(sessionRepoFileDiffQuery(sessionId, file, base))
+  const diff = useQuery({ ...sessionRepoFileDiffQuery(sessionId, file, base), enabled: visible })
   if (diff.isPending) {
     return (
       <div className="flex items-center gap-2 border-t border-border px-3 py-3 text-[12px] text-ink-3">

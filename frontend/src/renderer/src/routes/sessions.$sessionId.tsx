@@ -15,9 +15,11 @@ import { SessionLivenessIndicator } from '@/components/session/SessionLivenessIn
 import { GoalStatusBar } from '@/components/session/GoalStatusBar'
 import { PendingSteerBubble } from '@/components/session/PendingSteerBubble'
 import { PendingSessionHistory } from '@/components/session/PendingSessionHistory'
-import { SidePanel, type SidePanelView } from '@/components/session/SidePanel'
+import { SidePanel } from '@/components/session/SidePanel'
+import type { SidePanelMode } from '@/lib/sidePanelTabs'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
-import { SidePanelControl, useSidePanelState } from '@/components/session/SidePanelState'
+import { useSidePanelState } from '@/components/session/SidePanelState'
+import { SidePanelControl } from '@/components/session/SidePanelControl'
 import { RuntimeBadge } from '@/components/sidebar/RuntimeBadge'
 import { ThinkingBlock } from '@/components/session/ThinkingBlock'
 import { ThreadFindBar } from '@/components/session/ThreadFindBar'
@@ -90,24 +92,12 @@ function SessionRoute() {
   )
 }
 
-function SessionTitlebar({
-  session,
-  isMobile,
-  sidePanelOpen,
-  sidePanelView,
-  sideChatAvailable,
-  fileAvailable,
-  onToggleSidePanel,
-  onSelectSidePanelView,
-}: {
+function SessionTitlebar({ session, isMobile, sidePanelOpen, sidePanelMode, onToggleSidePanel }: {
   session: Session
   isMobile: boolean
   sidePanelOpen: boolean
-  sidePanelView: SidePanelView
-  sideChatAvailable: boolean
-  fileAvailable: boolean
-  onToggleSidePanel: () => void
-  onSelectSidePanelView: (view: SidePanelView) => void
+  sidePanelMode: SidePanelMode
+  onToggleSidePanel: (mode: SidePanelMode) => void
 }) {
   const slot = useMemo(
     () => (
@@ -119,29 +109,11 @@ function SessionTitlebar({
     [isMobile, session],
   )
   useTitlebarSlot(slot)
-
   const actions = useMemo(
-    () => (
-      <SidePanelControl
-        open={sidePanelOpen}
-        view={sidePanelView}
-        sideChatAvailable={sideChatAvailable}
-        fileAvailable={fileAvailable}
-        onToggle={onToggleSidePanel}
-        onSelectView={onSelectSidePanelView}
-      />
-    ),
-    [
-      fileAvailable,
-      onSelectSidePanelView,
-      onToggleSidePanel,
-      sideChatAvailable,
-      sidePanelOpen,
-      sidePanelView,
-    ],
+    () => <SidePanelControl open={sidePanelOpen} mode={sidePanelMode} onToggle={onToggleSidePanel} />,
+    [sidePanelOpen, sidePanelMode, onToggleSidePanel],
   )
   useTitlebarActions(actions)
-
   return null
 }
 
@@ -490,17 +462,14 @@ function SessionPage({
             session={session}
             isMobile={isMobile}
             sidePanelOpen={sidePanel.open}
-            sidePanelView={sidePanel.view}
-            sideChatAvailable={sideChatAvailable}
-            fileAvailable={Boolean(sidePanel.fileRef)}
-            onToggleSidePanel={sidePanel.toggle}
-            onSelectSidePanelView={sidePanel.selectView}
+            sidePanelMode={sidePanel.mode}
+            onToggleSidePanel={sidePanel.toggleMode}
           />
           {/* Phone: the open panel covers the chat full-width, so the only
               non-panel area left is the title bar. This catches taps on its empty
               space (the header controls sit above it) to dismiss the panel. */}
           {isMobile && sidePanel.open ? (
-            <div className="fixed inset-0 z-scrim" aria-hidden onClick={() => sidePanel.toggle()} />
+            <div className="fixed inset-0 z-scrim" aria-hidden onClick={sidePanel.close} />
           ) : null}
           {sidePanel.resizing ? <div className="fixed inset-0 z-modal cursor-col-resize" aria-hidden /> : null}
 
@@ -681,21 +650,15 @@ function SessionPage({
               subagents={providerSubagents}
               spawnedThreads={spawnedThreads}
               working={sessionRunning}
-              visible={sidePanel.open}
-              view={sidePanel.view}
-              previewTarget={sidePanel.previewTarget}
-              fileRef={sidePanel.fileRef}
+              panel={sidePanel}
               sideChatAvailable={sideChatAvailable}
               sideChatEvents={sideChatEvents}
-              onPreviewTargetChange={sidePanel.setPreviewTarget}
-              onOpenFile={sidePanel.openFile}
               onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
               onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
               onSend={handleSend}
               onQueuePrompt={queue.onQueuePrompt}
               onQueueAction={queue.onQueueAction}
               onSendSideChat={handleSideChatSend}
-              onClose={sidePanel.toggle}
             />
           </SidePanelDrawer>
         </FileDropScope>

@@ -1,15 +1,19 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useSyncExternalStore } from 'react'
+import { createContext, useContext, useLayoutEffect } from 'react'
 import type { Attachment } from '@/lib/api/types'
 import type { BrowserAnnotation } from '@/lib/messageContext'
 
-export type PreviewTarget = { displayUrl: string; sourceUrl: string }
+export type PreviewTarget = { displayUrl: string; sourceUrl: string; title?: string }
 export type BrowserPresentation = {
-  onClose: () => void
+  onClose?: () => void
+  embedded?: boolean
   onAddBrowserAnnotation?: (annotation: BrowserAnnotation, screenshot?: Attachment) => void
   onUploadAttachment?: (file: File) => Promise<Attachment>
 }
 export type BrowserSession = {
   id: string
+  ownerId?: string
+  generation?: number
+  embedded?: boolean
   target: PreviewTarget
   presentation?: BrowserPresentation
 }
@@ -37,8 +41,19 @@ export class BrowserSessions {
   }
 
   open(id: string, url: string): void {
-    this.update(id, { target: { displayUrl: url, sourceUrl: url } })
+    this.update(id, { ownerId: id, target: { displayUrl: url, sourceUrl: url } })
     this.viewers.get(id)?.()
+  }
+
+  openTab(ownerId: string, url = ''): string {
+    const existing = url && this.sessions.find((entry) => entry.ownerId === ownerId && entry.target.displayUrl === url)
+    if (existing) {
+      return existing.id
+    }
+    const primary = this.sessions.find((entry) => entry.id === ownerId)
+    const id = primary?.ownerId ? crypto.randomUUID() : ownerId
+    this.update(id, { ownerId, target: { displayUrl: url, sourceUrl: url } })
+    return id
   }
 
   update(id: string, patch: Partial<Omit<BrowserSession, 'id'>>): void {
@@ -51,11 +66,24 @@ export class BrowserSessions {
   }
 
   present(id: string, presentation: BrowserPresentation): () => void {
-    this.update(id, { presentation })
+    this.update(id, { presentation, embedded: presentation.embedded })
     return () => {
       if (this.sessions.find((session) => session.id === id)?.presentation === presentation) {
         this.update(id, { presentation: undefined })
       }
+    }
+  }
+
+  close(id: string): void {
+    const entry = this.sessions.find((session) => session.id === id)
+    if (!entry) {
+      return
+    }
+    if (!entry.ownerId || entry.ownerId === id) {
+      this.update(id, { ownerId: undefined, target: EMPTY_TARGET, presentation: undefined, generation: (entry.generation ?? 0) + 1 })
+    } else {
+      this.sessions = this.sessions.filter((session) => session.id !== id)
+      this.listeners.forEach((listener) => listener())
     }
   }
 
@@ -76,11 +104,5 @@ export function useBrowserSessions(): BrowserSessions {
 
 export function useSessionPreview(sessionId: string, show: () => void) {
   const sessions = useBrowserSessions()
-  const getTarget = useCallback(() => sessions.getSnapshot().find((session) => session.id === sessionId)?.target ?? EMPTY_TARGET, [sessions, sessionId])
-  const target = useSyncExternalStore(sessions.subscribe, getTarget)
   useLayoutEffect(() => sessions.bind(sessionId, show), [sessions, sessionId, show])
-  const setTarget = useCallback((target: PreviewTarget) => {
-    sessions.update(sessionId, { target })
-  }, [sessions, sessionId])
-  return { target, setTarget }
 }
