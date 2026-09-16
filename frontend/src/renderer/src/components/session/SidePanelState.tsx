@@ -1,21 +1,39 @@
-import { useCallback, useContext, useEffect, useMemo, useReducer, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { clientRuntime } from '@/lib/clientRuntime'
+import { useBackendChange } from '@/lib/connection'
 import { modalDialogOpen } from '@/lib/dom/modal'
 import { isMobileViewport } from '@/lib/hooks/useIsMobile'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
 import { parseFileReference, type FileReference } from '@shared/fileReader'
 import { useBrowserSessions, useSessionPreview } from '@/lib/browserSessions'
 import { SidebarVisibility } from '@/lib/sidebar'
-import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type SidePanelMode, type SidePanelTab } from '@/lib/sidePanelTabs'
+import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type SidePanelMode, type SidePanelTab, type SidePanelTabs } from '@/lib/sidePanelTabs'
 
 const PANEL_OPEN_KEY = 'jaz.sessionPanel'
 const PANEL_MAX_WIDTH = 1180
 const PANEL_MIN_THREAD_WIDTH = 360
 
+type SavedPanel = { state: SidePanelTabs; open: boolean; mode: SidePanelMode; widthOverride?: number }
+const PanelStates = createContext<Map<string, SavedPanel> | null>(null)
+
+export function SidePanelStateProvider({ children }: { children: ReactNode }) {
+  const [panels] = useState(() => new Map<string, SavedPanel>())
+  useBackendChange(() => panels.clear())
+  return <PanelStates.Provider value={panels}>{children}</PanelStates.Provider>
+}
+
 export function useSidePanelState(sessionId: string, sideChatAvailable = false) {
+  const panels = useContext(PanelStates)
+  if (!panels) {
+    throw new Error('Side panel state requires SidePanelStateProvider')
+  }
+  const saved = panels.get(sessionId)
   const setSidebarOpen = useContext(SidebarVisibility)
   const browsers = useBrowserSessions()
   const [state, dispatch] = useReducer(sidePanelTabs, undefined, () => {
+    if (saved) {
+      return saved.state
+    }
     const tabs: SidePanelTab[] = browsers.getSnapshot()
       .filter((entry) => entry.ownerId === sessionId)
       .map((entry) => ({ id: entry.id, kind: 'preview' }))
@@ -31,11 +49,14 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     return () => observer.disconnect()
   }, [])
   const [open, setOpen] = useState(() => {
+    if (saved) {
+      return saved.open
+    }
     const stored = localStorage.getItem(PANEL_OPEN_KEY)
     return stored === 'open' ? true : stored === 'closed' ? false : !isMobileViewport()
   })
-  const [mode, setMode] = useState<SidePanelMode>('overview')
-  const [widthOverride, setWidthOverride] = useState<number>()
+  const [mode, setMode] = useState<SidePanelMode>(saved?.mode ?? 'overview')
+  const [widthOverride, setWidthOverride] = useState(saved?.widthOverride)
   const [resizing, setResizing] = useState(false)
   const tabs = useMemo(() => state.tabs.filter((tab) => tab.kind !== 'side-chat' || sideChatAvailable), [state.tabs, sideChatAvailable])
   const activeTab = tabs.find((tab) => tab.id === state.activeId) ?? tabs[0]
@@ -49,6 +70,10 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   const widthStyle = mode === 'tabs'
     ? `clamp(min(400px, max(240px, ${availableCSS})), ${preferredCSS}, max(240px, min(${PANEL_MAX_WIDTH}px, ${availableCSS})))`
     : `${width}px`
+
+  useLayoutEffect(() => {
+    panels.set(sessionId, { state, open, mode, widthOverride })
+  }, [panels, sessionId, state, open, mode, widthOverride])
 
   useEffect(() => {
     localStorage.setItem(PANEL_OPEN_KEY, open ? 'open' : 'closed')

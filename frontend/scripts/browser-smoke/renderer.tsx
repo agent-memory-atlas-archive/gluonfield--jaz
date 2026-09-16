@@ -52,7 +52,7 @@ function Fixture() {
       if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
         stage = 'side panel tabs and retained resources'
         await exerciseSidePanelTabs()
-        window.smoke.result({ ok: true, checks: ['compact tab/title bar and browser toolbar; file links, browser retention, terminal, side chat, keyboard and mobile layout'] })
+        window.smoke.result({ ok: true, checks: ['compact flush panel and icons; file links, browser retention, terminal, side chat, keyboard, mobile layout and per-chat tabs restored across routes'] })
         return
       }
       stage = 'browser layout, navigation collapse and resize grip'
