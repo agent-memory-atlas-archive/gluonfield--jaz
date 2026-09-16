@@ -69,6 +69,7 @@ const processHandle = Bun.spawn(['go', 'test', '-tags=browserintegration', './in
     JAZ_ELECTRON_BINARY: electron,
     JAZ_BROWSER_CODEX_BINARY: codex,
     JAZ_BROWSER_SMOKE_TIMEOUT_MS: codex ? '180000' : '75000',
+    JAZ_BROWSER_SMOKE_SUITE: process.argv.includes('--side-panel') ? 'side-panel' : '',
   },
   stdout: 'inherit',
   stderr: 'inherit',

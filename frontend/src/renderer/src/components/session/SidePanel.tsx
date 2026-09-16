@@ -10,7 +10,7 @@ import { FileReaderPanel } from '@/components/session/FileReaderPanel'
 import { OverviewPanel } from '@/components/session/OverviewPanel'
 import { SideChatPanel } from '@/components/session/SideChatPanel'
 import { TerminalPanel } from '@/components/session/TerminalPanel'
-import { SidePanelTabMenu, SidePanelTabs } from '@/components/session/SidePanelTabs'
+import { SidePanelTabMenu } from '@/components/session/SidePanelTabs'
 import type { useSidePanelState } from '@/components/session/SidePanelState'
 
 export function SidePanel({
@@ -49,14 +49,6 @@ export function SidePanel({
       ) : null}
       <div hidden={panel.mode !== 'tabs'} className="h-full p-2" data-thread-find-shortcuts="off">
         <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] bg-surface shadow-sm">
-          <SidePanelTabs
-            tabs={panel.tabs}
-            activeId={panel.activeTab?.id}
-            sideChatAvailable={sideChatAvailable}
-            onSelect={panel.selectTab}
-            onClose={panel.closeTab}
-            onAdd={panel.addTab}
-          />
           <div className="relative flex min-h-0 flex-1 flex-col">
             {!panel.tabs.length ? <SidePanelTabMenu empty sideChatAvailable={sideChatAvailable} onAdd={panel.addTab} /> : null}
             {panel.tabs.map((tab) => {

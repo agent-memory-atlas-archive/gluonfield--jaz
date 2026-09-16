@@ -16,15 +16,12 @@ import { GoalStatusBar } from '@/components/session/GoalStatusBar'
 import { PendingSteerBubble } from '@/components/session/PendingSteerBubble'
 import { PendingSessionHistory } from '@/components/session/PendingSessionHistory'
 import { SidePanel } from '@/components/session/SidePanel'
-import type { SidePanelMode } from '@/lib/sidePanelTabs'
+import { SessionTitlebar } from '@/components/session/SessionTitlebar'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
 import { useSidePanelState } from '@/components/session/SidePanelState'
-import { SidePanelControl } from '@/components/session/SidePanelControl'
-import { RuntimeBadge } from '@/components/sidebar/RuntimeBadge'
 import { ThinkingBlock } from '@/components/session/ThinkingBlock'
 import { ThreadFindBar } from '@/components/session/ThreadFindBar'
 import { ThreadOutline } from '@/components/session/ThreadOutline'
-import { TokenStats } from '@/components/session/TokenStats'
 import { ToolCalls } from '@/components/session/ToolCalls'
 import { Transcript } from '@/components/session/Transcript'
 import { deriveSessionView, isCodexACPSession, sessionEventErrorMessage } from '@/components/session/sessionView'
@@ -46,7 +43,7 @@ import {
   sessionRepoQuery,
   uploadSessionAttachment,
 } from '@/lib/api/sessions'
-import type { Session, SessionEvent, SessionOverview } from '@/lib/api/types'
+import type { SessionEvent, SessionOverview } from '@/lib/api/types'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -62,7 +59,6 @@ import {
   optimisticTranscriptMessages,
   pendingOptimisticUserMessage,
 } from '@/lib/optimisticUserMessage'
-import { useTitlebarActions, useTitlebarSlot } from '@/lib/titlebar'
 import type { InitialSessionPrompt } from './-newSessionSubmission'
 
 type SessionSearch = {
@@ -90,31 +86,6 @@ function SessionRoute() {
       initialPrompt={initialPrompt?.sessionId === sessionId ? initialPrompt : undefined}
     />
   )
-}
-
-function SessionTitlebar({ session, isMobile, sidePanelOpen, sidePanelMode, onToggleSidePanel }: {
-  session: Session
-  isMobile: boolean
-  sidePanelOpen: boolean
-  sidePanelMode: SidePanelMode
-  onToggleSidePanel: (mode: SidePanelMode) => void
-}) {
-  const slot = useMemo(
-    () => (
-      <>
-        <RuntimeBadge session={session} truncate={isMobile} />
-        <TokenStats session={session} />
-      </>
-    ),
-    [isMobile, session],
-  )
-  useTitlebarSlot(slot)
-  const actions = useMemo(
-    () => <SidePanelControl open={sidePanelOpen} mode={sidePanelMode} onToggle={onToggleSidePanel} />,
-    [sidePanelOpen, sidePanelMode, onToggleSidePanel],
-  )
-  useTitlebarActions(actions)
-  return null
 }
 
 function ScrollToBottomButton({ visible, onClick }: { visible: boolean; onClick: () => void }) {
@@ -461,9 +432,8 @@ function SessionPage({
           <SessionTitlebar
             session={session}
             isMobile={isMobile}
-            sidePanelOpen={sidePanel.open}
-            sidePanelMode={sidePanel.mode}
-            onToggleSidePanel={sidePanel.toggleMode}
+            panel={sidePanel}
+            sideChatAvailable={sideChatAvailable}
           />
           {/* Phone: the open panel covers the chat full-width, so the only
               non-panel area left is the title bar. This catches taps on its empty

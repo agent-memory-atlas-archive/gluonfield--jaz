@@ -277,10 +277,10 @@ export function PreviewPanel({
           event.preventDefault()
           openDraft()
         }}
-        className="flex h-12 shrink-0 items-center gap-1 border-b border-border px-2"
+        className="flex h-9 shrink-0 items-center gap-0.5 border-b border-border px-1.5 pointer-coarse:h-12"
       >
         <IconButton
-          className="size-10!"
+          size="sm" className="pointer-coarse:size-10"
           aria-label="Back"
           title="Back"
           disabled={!webviewReady || !canGoBack}
@@ -289,7 +289,7 @@ export function PreviewPanel({
           <ArrowLeft size={14} />
         </IconButton>
         <IconButton
-          className="size-10!"
+          size="sm" className="pointer-coarse:size-10"
           aria-label="Forward"
           title="Forward"
           disabled={!webviewReady || !canGoForward}
@@ -298,7 +298,7 @@ export function PreviewPanel({
           <ArrowRight size={14} />
         </IconButton>
         <IconButton
-          className="size-10!"
+          size="sm" className="pointer-coarse:size-10"
           aria-label="Reload preview"
           title="Reload"
           disabled={!resolvedSourceUrl || (canUseWebview && !webviewReady)}
@@ -306,7 +306,7 @@ export function PreviewPanel({
         >
           {loading ? <LoaderCircle size={14} className="animate-spin" /> : <RotateCw size={14} />}
         </IconButton>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-[8px] bg-bg/60 px-2.5 py-1.5 ring-1 ring-border/70">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 h-6 rounded-md bg-bg/60 px-2 pointer-coarse:h-8 ring-1 ring-border/70">
           <Globe size={13} className="shrink-0 text-ink-3" aria-hidden />
           <input
             value={draft}
@@ -321,25 +321,26 @@ export function PreviewPanel({
           title={annotating ? 'Stop annotation' : 'Annotate'}
           disabled={!resolvedSourceUrl || !webviewReady || !canAnnotate}
           onClick={() => (annotating ? void stopAnnotation() : void annotate())}
-          className={`size-10! ${annotating ? 'bg-primary/15 text-primary! hover:bg-primary/20' : 'text-ink-2'}`}
+          size="sm"
+          className={`pointer-coarse:size-10 ${annotating ? 'bg-primary/15 text-primary! hover:bg-primary/20' : 'text-ink-2'}`}
         >
-          {annotating ? <SquareStop size={18} /> : <MessageCirclePlus size={19} />}
+          {annotating ? <SquareStop size={14} /> : <MessageCirclePlus size={15} />}
         </IconButton>
         <IconButton
-          className="size-10!"
+          size="sm" className="pointer-coarse:size-10"
           aria-label="Open in Browser"
           title="Open in Browser"
           disabled={!resolvedSourceUrl}
           onClick={() => window.open(resolvedSourceUrl, '_blank', 'noopener')}
         >
-          <ExternalLink size={17} />
+          <ExternalLink size={14} />
         </IconButton>
         <BrowserMenu webContentsId={webviewReady && webview ? webview.getWebContentsId() : null} visible={visible} />
         {onClose ? <button
           type="button"
           aria-label="Hide side panel"
           onClick={onClose}
-          className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
+          className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full pointer-coarse:size-10 text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
         >
           <X size={15} />
         </button> : null}

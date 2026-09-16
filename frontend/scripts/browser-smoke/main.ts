@@ -199,7 +199,7 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     secureServer.close()
     app.exit(result.ok ? 0 : 1)
   })
-  await window.loadURL(`http://127.0.0.1:${address.port}?timeout=${timeout}`)
+  await window.loadURL(`http://127.0.0.1:${address.port}?timeout=${timeout}&suite=${encodeURIComponent(process.env.JAZ_BROWSER_SMOKE_SUITE || '')}`)
   window.webContents.debugger.attach('1.3')
   await window.webContents.debugger.sendCommand('Emulation.setFocusEmulationEnabled', { enabled: true })
 })

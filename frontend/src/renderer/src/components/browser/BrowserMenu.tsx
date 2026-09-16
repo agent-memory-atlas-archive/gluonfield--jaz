@@ -86,8 +86,9 @@ export function BrowserMenu({ webContentsId, visible }: { webContentsId: number 
       aria-haspopup="menu"
       aria-expanded={view !== null && visible}
       onClick={() => setView((current) => current ? null : 'menu')}
-      className={`size-10! ${pending ? 'text-primary' : ''}`}
-    ><MoreVertical size={19} /></IconButton>}
+      size="sm"
+      className={`pointer-coarse:size-10 ${pending ? 'text-primary' : ''}`}
+    ><MoreVertical size={15} /></IconButton>}
   >
     {view === 'menu' ? <div role="menu" aria-label="Browser options" className="w-64 max-w-[calc(100vw-32px)]">
       <button type="button" role="menuitem" aria-label="Passwords" disabled={webContentsId === null} onClick={() => setView('passwords')} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] text-ink hover:bg-surface-2 disabled:opacity-50">

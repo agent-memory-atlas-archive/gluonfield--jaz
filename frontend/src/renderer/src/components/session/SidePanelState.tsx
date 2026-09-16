@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useReducer, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useReducer, useState } from 'react'
 import { clientRuntime } from '@/lib/clientRuntime'
 import { modalDialogOpen } from '@/lib/dom/modal'
 import { isMobileViewport } from '@/lib/hooks/useIsMobile'
@@ -37,7 +37,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   const [mode, setMode] = useState<SidePanelMode>('overview')
   const [widthOverride, setWidthOverride] = useState<number>()
   const [resizing, setResizing] = useState(false)
-  const tabs = state.tabs.filter((tab) => tab.kind !== 'side-chat' || sideChatAvailable)
+  const tabs = useMemo(() => state.tabs.filter((tab) => tab.kind !== 'side-chat' || sideChatAvailable), [state.tabs, sideChatAvailable])
   const activeTab = tabs.find((tab) => tab.id === state.activeId) ?? tabs[0]
   const availableWidth = containerWidth - PANEL_MIN_THREAD_WIDTH
   const minWidth = Math.min(400, Math.max(240, availableWidth))

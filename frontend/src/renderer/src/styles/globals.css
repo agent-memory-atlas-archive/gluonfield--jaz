@@ -688,6 +688,24 @@ h3 {
   -webkit-app-region: no-drag;
 }
 
+@media (width < 40rem) {
+  .titlebar-drag:has([role='tablist']) {
+    height: auto;
+    flex-wrap: wrap;
+    padding-left: 12px !important;
+
+    #titlebar-slot {
+      height: 52px;
+      margin-left: 84px;
+    }
+
+    #titlebar-actions {
+      flex-basis: 100%;
+      padding-bottom: 4px;
+    }
+  }
+}
+
 /* One focus indicator for the whole app: a soft ring flush to the element's
  * shape (offset 0 so it follows the border-radius instead of floating off as a
  * detached pill). Interactive elements should NOT redeclare their own ring. */
