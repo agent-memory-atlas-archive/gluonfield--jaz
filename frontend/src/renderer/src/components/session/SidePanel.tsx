@@ -47,52 +47,48 @@ export function SidePanel({
           onQueueAction={onQueueAction}
         />
       ) : null}
-      <div hidden={panel.mode !== 'tabs'} className="h-full p-2" data-thread-find-shortcuts="off">
-        <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] bg-surface shadow-sm">
-          <div className="relative flex min-h-0 flex-1 flex-col">
-            {!panel.tabs.length ? <SidePanelTabMenu empty sideChatAvailable={sideChatAvailable} onAdd={panel.addTab} /> : null}
-            {panel.tabs.map((tab) => {
-              const active = panel.activeTab?.id === tab.id
-              const visible = panel.open && panel.mode === 'tabs' && active
-              return (
-                <div
-                  key={tab.id}
-                  id={`panel-body-${tab.id}`}
-                  role="tabpanel"
-                  aria-labelledby={`panel-tab-${tab.id}`}
-                  hidden={!active}
-                  inert={!visible}
-                  className="h-full min-h-0"
-                >
-                  {tab.kind === 'preview' ? (
-                    <BrowserPanelSlot
-                      sessionId={tab.id}
-                      visible={visible}
-                      embedded
-                      onAddBrowserAnnotation={onAddBrowserAnnotation}
-                      onUploadAttachment={onUploadAttachment}
-                    />
-                  ) : tab.kind === 'terminal' ? (
-                    <TerminalPanel session={session} visible={visible} />
-                  ) : tab.kind === 'file' ? (
-                    <FileReaderPanel sessionId={session.id} fileRef={tab.file} visible={visible} onOpenFile={panel.openFile} />
-                  ) : tab.kind === 'diff' ? (
-                    <CodeDiffPanel sessionId={session.id} visible={visible} />
-                  ) : (
-                    <SideChatPanel
-                      sessionId={session.id}
-                      events={sideChatEvents}
-                      visible={visible}
-                      fileRoot={session.runtime_ref?.cwd}
-                      onUploadAttachment={onUploadAttachment}
-                      onSend={onSendSideChat}
-                    />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
+      <div hidden={panel.mode !== 'tabs'} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-surface" data-thread-find-shortcuts="off">
+        {!panel.tabs.length ? <SidePanelTabMenu empty sideChatAvailable={sideChatAvailable} onAdd={panel.addTab} /> : null}
+        {panel.tabs.map((tab) => {
+          const active = panel.activeTab?.id === tab.id
+          const visible = panel.open && panel.mode === 'tabs' && active
+          return (
+            <div
+              key={tab.id}
+              id={`panel-body-${tab.id}`}
+              role="tabpanel"
+              aria-labelledby={`panel-tab-${tab.id}`}
+              hidden={!active}
+              inert={!visible}
+              className="h-full min-h-0"
+            >
+              {tab.kind === 'preview' ? (
+                <BrowserPanelSlot
+                  sessionId={tab.id}
+                  visible={visible}
+                  embedded
+                  onAddBrowserAnnotation={onAddBrowserAnnotation}
+                  onUploadAttachment={onUploadAttachment}
+                />
+              ) : tab.kind === 'terminal' ? (
+                <TerminalPanel session={session} visible={visible} />
+              ) : tab.kind === 'file' ? (
+                <FileReaderPanel sessionId={session.id} fileRef={tab.file} visible={visible} onOpenFile={panel.openFile} />
+              ) : tab.kind === 'diff' ? (
+                <CodeDiffPanel sessionId={session.id} visible={visible} />
+              ) : (
+                <SideChatPanel
+                  sessionId={session.id}
+                  events={sideChatEvents}
+                  visible={visible}
+                  fileRoot={session.runtime_ref?.cwd}
+                  onUploadAttachment={onUploadAttachment}
+                  onSend={onSendSideChat}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
     </>
   )

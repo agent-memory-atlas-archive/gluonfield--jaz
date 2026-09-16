@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { useSidePanelState } from '@/components/session/SidePanelState'
+import { SidePanelStateProvider, useSidePanelState } from '@/components/session/SidePanelState'
 import { SidePanelControl } from '@/components/session/SidePanelControl'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
 import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
@@ -48,7 +48,7 @@ export async function exerciseBrowserLayout(): Promise<void> {
     useLayoutEffect(() => {
       setNavigationWidth = setSidebarWidth
     }, [])
-    return <QueryClientProvider client={queryClient}><BrowserWorkspace><SidebarVisibility.Provider value={setSidebar}>
+    return <QueryClientProvider client={queryClient}><BrowserWorkspace><SidePanelStateProvider><SidebarVisibility.Provider value={setSidebar}>
       <div className="flex h-full">
         <motion.div className="shrink-0 overflow-hidden" initial={false} animate={drawerSlide({ isMobile: false, open: sidebar, side: 'left', width: sidebarWidth })} transition={{ type: 'spring', stiffness: 400, damping: 36 }}>
           <nav style={{ width: sidebarWidth }} className="h-full bg-surface p-6 text-ink" aria-hidden={!sidebar} aria-label="Main navigation">Jaz</nav>
@@ -56,7 +56,7 @@ export async function exerciseBrowserLayout(): Promise<void> {
         <button className="absolute left-3 top-3 text-ink" aria-label="Toggle navigation" onClick={() => setSidebar((value) => !value)}>☰</button>
         <Chat />
       </div>
-    </SidebarVisibility.Provider></BrowserWorkspace></QueryClientProvider>
+    </SidebarVisibility.Provider></SidePanelStateProvider></BrowserWorkspace></QueryClientProvider>
   }
   const until = async (check: () => boolean | Promise<boolean>) => {
     const end = Date.now() + 5000
@@ -131,12 +131,13 @@ export async function exerciseBrowserLayout(): Promise<void> {
     await until(() => !navigation() && browserWidth() === 864)
     const divider = element.querySelector<HTMLElement>('[role="separator"]')!
     const grip = divider.getBoundingClientRect()
-    if (getComputedStyle(divider.lastElementChild!).backgroundColor === 'rgba(0, 0, 0, 0)') {
-      throw new Error('The resize grip is invisible at rest')
+    if (getComputedStyle(divider.lastElementChild!).backgroundColor !== 'rgba(0, 0, 0, 0)') {
+      throw new Error('The resize border should be hidden at rest')
     }
     const x = Math.round(grip.x + grip.width / 2)
     const y = Math.round(grip.y + grip.height / 2)
     await window.smoke.pointer('mouseMove', x, y)
+    await until(() => getComputedStyle(divider.lastElementChild!).backgroundColor !== 'rgba(0, 0, 0, 0)')
     await window.smoke.pointer('mouseDown', x, y)
     await window.smoke.pointer('mouseMove', x - 100, y)
     await window.smoke.pointer('mouseUp', x - 100, y)

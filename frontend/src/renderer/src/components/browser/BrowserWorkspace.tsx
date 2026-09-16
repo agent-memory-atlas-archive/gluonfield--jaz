@@ -54,7 +54,6 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
         opacity: visible ? 1 : 0,
         pointerEvents: 'none',
         overflow: 'hidden',
-        borderRadius: entry.embedded ? 14 : undefined,
         '--side-panel-width': '100%',
       } as CSSProperties}
     >

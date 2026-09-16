@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanel } from '@/components/session/SidePanel'
 import { SessionTitlebar } from '@/components/session/SessionTitlebar'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
-import { useSidePanelState } from '@/components/session/SidePanelState'
+import { SidePanelStateProvider, useSidePanelState } from '@/components/session/SidePanelState'
 import { FileReaderLinkProvider, PreviewLinkProvider, RenderedMarkdown } from '@/components/session/MessageMarkdown'
 import { isPreviewWebviewPending, type PreviewWebviewElement } from '@/components/session/previewWebview'
 import type { Session } from '@/lib/api/types'
@@ -35,6 +36,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     runtime_ref: { type: 'acp', agent: 'codex', cwd: '/workspace' }, model: 'gpt-6-astra', reasoning_effort: 'xhigh',
   }
   let panel: ReturnType<typeof useSidePanelState>
+  let activeSessionId: string
   let chatRenders = 0
   let terminalConnections = 0
   let terminalCloses = 0
@@ -71,33 +73,50 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     },
   })
   const noop = async () => {}
-  function Chat() {
+  function Chat({ sessionId }: { sessionId: string }) {
     chatRenders += 1
-    const state = useSidePanelState('tabs', true)
+    const state = useSidePanelState(sessionId, true)
+    const currentSession = { ...session, id: sessionId }
     const isMobile = useIsMobile()
     useLayoutEffect(() => {
       panel = state
+      activeSessionId = sessionId
     })
     return <div ref={state.containerRef} className="flex h-full flex-col">
-      <SessionTitlebar session={session} panel={state} isMobile={isMobile} sideChatAvailable />
+      <SessionTitlebar session={currentSession} panel={state} isMobile={isMobile} sideChatAvailable />
       <header className="titlebar-drag flex h-[52px] shrink-0 items-center gap-2 px-3" style={{ paddingLeft: isMobile ? 96 : 168 }}>
         <div id="titlebar-slot" className="relative z-shell flex min-w-0 items-center gap-1.5"><TitlebarSlotOutlet /></div>
         <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5"><TitlebarActionsOutlet /></div>
       </header>
       <div className="relative flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 p-8 text-ink" data-tab-chat>
-          <FileReaderLinkProvider sessionId="tabs" onOpen={state.openFile}>
+          <FileReaderLinkProvider sessionId={sessionId} onOpen={state.openFile}>
             <PreviewLinkProvider onOpen={state.openPreview}>
               <RenderedMarkdown text={`# Product research\n\nReview the [analysis](/ANALYSIS.md) and compare it with the [supplier website](${location.origin}/target?tabs=one).`} />
             </PreviewLinkProvider>
           </FileReaderLinkProvider>
         </div>
         <SidePanelDrawer panel={state} isMobile={isMobile}>
-          <SidePanel session={session} panel={state} subagents={[]} spawnedThreads={[]} working={false} sideChatAvailable sideChatEvents={[]} onSend={noop} onQueuePrompt={noop} onQueueAction={noop} onSendSideChat={noop} />
+          <SidePanel session={currentSession} panel={state} subagents={[]} spawnedThreads={[]} working={false} sideChatAvailable sideChatEvents={[]} onSend={noop} onQueuePrompt={noop} onQueueAction={noop} onSendSideChat={noop} />
         </SidePanelDrawer>
       </div>
     </div>
   }
+  const rootRoute = createRootRoute({
+    component: () => <BrowserWorkspace><SidePanelStateProvider><TitlebarProvider><Outlet /></TitlebarProvider></SidePanelStateProvider></BrowserWorkspace>,
+  })
+  const chatRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/sessions/$sessionId',
+    component: () => {
+      const { sessionId } = chatRoute.useParams()
+      return <Chat key={sessionId} sessionId={sessionId} />
+    },
+  })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([chatRoute]),
+    history: createMemoryHistory({ initialEntries: ['/sessions/tabs'] }),
+  })
   const until = async (check: () => boolean | Promise<boolean>) => {
     const end = Date.now() + 5000
     while (!await check()) {
@@ -153,7 +172,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
   try {
     await window.smoke.resize(1440, 900)
     setThemePref('dark')
-    root.render(<QueryClientProvider client={queryClient}><BrowserWorkspace><TitlebarProvider><Chat /></TitlebarProvider></BrowserWorkspace></QueryClientProvider>)
+    root.render(<QueryClientProvider client={queryClient}><RouterProvider router={router} /></QueryClientProvider>)
     await until(() => Boolean(button('Side Panel')))
     await click(element.querySelector('[data-tab-chat] button'))
     await until(() => panel?.activeTab?.kind === 'file' && Boolean(element.querySelector('[role="tabpanel"] h1')))
@@ -199,6 +218,16 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       throw new Error('Switching tabs replaced or resized the retained browser')
     }
     const toolbar = document.querySelector('[data-browser-session="tabs"] form')!
+    const browserBounds = toolbar.getBoundingClientRect()
+    const headerBounds = element.querySelector('header')!.getBoundingClientRect()
+    const browserHost = document.querySelector<HTMLElement>('[data-browser-session="tabs"]')!
+    const resizeHandle = element.querySelector('[role="separator"]')!
+    if (Math.abs(browserBounds.top - headerBounds.bottom) > 1 || getComputedStyle(browserHost).borderTopLeftRadius !== '0px' || getComputedStyle(resizeHandle.firstElementChild!).backgroundColor !== 'rgba(0, 0, 0, 0)') {
+      throw new Error('Side panel retains a gap, rounded browser corner or visible resize border')
+    }
+    if (!button('Side Panel')!.querySelector('svg') || !button('Overview')!.querySelector('svg')) {
+      throw new Error('Panel controls are missing icons')
+    }
     const back = toolbar.querySelector('[aria-label="Back"]')!.getBoundingClientRect()
     const forward = toolbar.querySelector('[aria-label="Forward"]')!.getBoundingClientRect()
     if (toolbar.getBoundingClientRect().height !== 36 || back.width !== 28 || forward.x - back.x > 30) {
@@ -308,6 +337,66 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await until(() => panel.tabs.length === 1 && document.activeElement === tab(panel.activeTab!.id))
     await window.smoke.key('Delete')
     await until(() => panel.tabs.length === 0 && document.activeElement?.getAttribute('aria-label') === 'New tab')
+
+    await window.smoke.resize(1440, 900)
+    await until(() => window.innerWidth === 1440)
+    panel.openFile('/ANALYSIS.md:12')
+    panel.openFile('/NOTES.md')
+    for (const kind of ['terminal', 'side-chat', 'diff'] as const) {
+      panel.addTab(kind)
+    }
+    panel.openPreview(location.origin + '/target?tabs=retained-one')
+    panel.openPreview(location.origin + '/target?tabs=retained-two')
+    await until(() => panel.tabs.length === 7 && panel.activeTab?.kind === 'preview')
+    const retainedTabId = panel.activeTab!.id
+    await until(() => ready(retainedTabId))
+    const retainedView = webview(retainedTabId)
+    const retainedViewId = retainedView.getWebContentsId()
+    await evaluate(retainedView, 'window.chatNavigationValue = 73')
+    panel.resize(720)
+    await until(() => panel.width === 720)
+    const savedTabs = JSON.stringify(panel.tabs)
+    const navigate = async (sessionId: string) => {
+      await router.navigate({ to: '/sessions/$sessionId', params: { sessionId } })
+      await until(() => activeSessionId === sessionId)
+    }
+    await navigate('other-chat')
+    if (panel.tabs.length || panel.mode !== 'overview') {
+      throw new Error('A new chat inherited another chat\'s tabs or mode')
+    }
+    if (!document.querySelector<HTMLElement>(`[data-browser-session="${retainedTabId}"]`)!.inert) {
+      throw new Error('Navigating away left the previous chat browser active')
+    }
+    panel.addTab('file')
+    await until(() => panel.tabs.length === 1)
+    panel.close()
+    await until(() => !panel.open)
+    await navigate('tabs')
+    await until(() => !document.querySelector<HTMLElement>(`[data-browser-session="${retainedTabId}"]`)!.inert)
+    await until(() => panel.width === 720)
+    if (JSON.stringify(panel.tabs) !== savedTabs || panel.activeTab?.id !== retainedTabId || !panel.open || panel.mode !== 'tabs' || panel.width !== 720) {
+      throw new Error('Returning to a chat lost its tabs, selection, visibility, mode or width')
+    }
+    if (webview(retainedTabId).getWebContentsId() !== retainedViewId || await evaluate(retainedView, 'window.chatNavigationValue') !== 73) {
+      throw new Error('Returning to a chat replaced its retained browser page')
+    }
+    panel.closeTab('file:/NOTES.md')
+    panel.toggleMode('overview')
+    await until(() => panel.mode === 'overview' && panel.tabs.length === 6)
+    await navigate('other-chat')
+    if (panel.open || panel.mode !== 'tabs' || panel.tabs.length !== 1 || panel.activeTab?.id !== 'file') {
+      throw new Error('The other chat lost its independent closed panel and file picker')
+    }
+    await navigate('tabs')
+    if (!panel.open || panel.mode !== 'overview' || panel.tabs.some((entry) => entry.id === 'file:/NOTES.md')) {
+      throw new Error('Returning to a chat lost Overview or resurrected a closed tab')
+    }
+    panel.toggleMode('tabs')
+    await until(() => panel.mode === 'tabs')
+    panel.selectTab('file:/ANALYSIS.md')
+    await until(() => panel.activeTab?.kind === 'file' && Boolean(element.querySelector('[role="tabpanel"] h1')))
+    await until(() => Math.abs(element.querySelector('[role="separator"]')!.parentElement!.getBoundingClientRect().width - panel.width) < 1)
+    await window.smoke.capture('side-panel-restored-tabs')
   } catch (error) {
     await window.smoke.capture('side-panel-tabs-failure')
     throw error
