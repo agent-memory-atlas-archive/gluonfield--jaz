@@ -8,22 +8,26 @@ import type { BrowserCommand } from '@shared/browserControl'
 import { SideBrowser } from '@/lib/sideBrowser'
 import { BrowserRetention } from '@/lib/browserRetention'
 
-export function useSideBrowser({ sessionId, open, visible, url, idleMs }: {
+export function useSideBrowser({ sessionId, open, visible, url, idleMs, controlled = true }: {
   sessionId: string
   open: (url: string) => void
   visible: boolean
   url: string
   idleMs: number
+  controlled?: boolean
 }) {
   const settings = useQuery(browserSettingsQuery)
   const [resident, setResident] = useState(false)
-  const [browser] = useState(() => window.jaz?.browserCommand
+  const [browser] = useState(() => controlled && window.jaz?.browserCommand
     ? new SideBrowser((url) => {
       setResident(true)
       open(url)
     }, window.jaz.browserCommand, (action, signal) => post(`/v1/sessions/${encodeURIComponent(sessionId)}/browser`, action, signal))
     : undefined)
   const [retention] = useState(() => new BrowserRetention(async (signal) => {
+    if (!controlled) {
+      return true
+    }
     try {
       const session = await getSession(sessionId, AbortSignal.any([signal, AbortSignal.timeout(10_000)]))
       return ['idle', 'error', 'interrupted'].includes(session.status) && !session.queued_messages?.length && !session.pending_steer_message

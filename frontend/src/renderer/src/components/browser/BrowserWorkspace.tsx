@@ -14,7 +14,7 @@ export function BrowserWorkspace({ children, idleMs = BROWSER_IDLE_MS }: { child
     <BrowserSessionsContext.Provider value={sessions}>
       {children}
       {clientRuntime.capabilities.previewWebview && entries.map((entry) => (
-        <BrowserSessionPanel key={entry.id} entry={entry} idleMs={idleMs} />
+        <BrowserSessionPanel key={`${entry.id}:${entry.generation ?? 0}`} entry={entry} idleMs={idleMs} />
       ))}
     </BrowserSessionsContext.Provider>
   )
@@ -25,7 +25,7 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
   const open = useCallback((url: string) => sessions.open(entry.id, url), [sessions, entry.id])
   const update = useCallback((target: PreviewTarget) => sessions.update(entry.id, { target }), [sessions, entry.id])
   const visible = Boolean(entry.presentation)
-  const { browser, resident } = useSideBrowser({ sessionId: entry.id, open, visible, url: entry.target.sourceUrl, idleMs })
+  const { browser, resident } = useSideBrowser({ sessionId: entry.id, open, visible, url: entry.target.sourceUrl, idleMs, controlled: !entry.ownerId || entry.ownerId === entry.id })
   const host = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: PREVIEW_PANEL_WIDTH, height: Math.max(400, window.innerHeight - 52) })
   useLayoutEffect(() => {
@@ -54,6 +54,7 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
         opacity: visible ? 1 : 0,
         pointerEvents: 'none',
         overflow: 'hidden',
+        borderRadius: entry.embedded ? '0 0 14px 14px' : undefined,
         '--side-panel-width': '100%',
       } as CSSProperties}
     >
@@ -62,7 +63,8 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
         target={entry.target}
         onTargetChange={update}
         visible={visible}
-        onClose={entry.presentation?.onClose ?? (() => {})}
+        onClose={entry.presentation?.onClose}
+        embedded={entry.embedded}
         onAddBrowserAnnotation={entry.presentation?.onAddBrowserAnnotation}
         onUploadAttachment={entry.presentation?.onUploadAttachment}
       />}
@@ -72,10 +74,16 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
 
 export function BrowserPanelSlot({ sessionId, visible, ...presentation }: BrowserPresentation & { sessionId: string; visible: boolean }) {
   const sessions = useBrowserSessions()
-  const { onClose, onAddBrowserAnnotation, onUploadAttachment } = presentation
+  const { onClose, onAddBrowserAnnotation, onUploadAttachment, embedded } = presentation
+  const getEntry = useCallback(() => sessions.getSnapshot().find((entry) => entry.id === sessionId), [sessions, sessionId])
+  const entry = useSyncExternalStore(sessions.subscribe, getEntry)
+  const update = useCallback((target: PreviewTarget) => sessions.update(sessionId, { target }), [sessions, sessionId])
   useLayoutEffect(() => {
     if (!visible) return
-    return sessions.present(sessionId, { onClose, onAddBrowserAnnotation, onUploadAttachment })
-  }, [sessions, sessionId, visible, onClose, onAddBrowserAnnotation, onUploadAttachment])
+    return sessions.present(sessionId, { onClose, onAddBrowserAnnotation, onUploadAttachment, embedded })
+  }, [sessions, sessionId, visible, onClose, onAddBrowserAnnotation, onUploadAttachment, embedded])
+  if (!clientRuntime.capabilities.previewWebview) {
+    return entry ? <PreviewPanel {...presentation} visible={visible} target={entry.target} onTargetChange={update} /> : null
+  }
   return <div className="h-full max-sm:w-full!" style={{ anchorName: '--jaz-browser-panel', width: `var(--side-panel-width, ${PREVIEW_PANEL_WIDTH}px)` }} />
 }

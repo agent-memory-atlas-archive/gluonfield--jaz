@@ -6,12 +6,14 @@ export function SidePanelShell({
   className = '',
   onKeyDownCapture,
   children,
+  embedded = false,
 }: {
   width: number
   variant?: 'fill' | 'hug'
   className?: string
   onKeyDownCapture?: KeyboardEventHandler<HTMLElement>
   children: ReactNode
+  embedded?: boolean
 }) {
   const sizing = variant === 'fill' ? 'min-h-0 flex-1 overflow-hidden' : 'scrollbar-quiet max-h-full overflow-y-auto'
   return (
@@ -21,10 +23,10 @@ export function SidePanelShell({
       data-thread-find-shortcuts="off"
       style={{ width: `var(--side-panel-width, ${width}px)` }}
       onKeyDownCapture={onKeyDownCapture}
-      className="flex h-full shrink-0 flex-col bg-bg p-2 max-sm:w-full!"
+      className={`flex h-full shrink-0 flex-col bg-bg max-sm:w-full! ${embedded ? '' : 'p-2'}`}
     >
       <div
-        className={`flex flex-col rounded-[14px] bg-surface shadow-sm ${sizing} ${className}`}
+        className={`flex flex-col bg-surface ${embedded ? '' : 'rounded-[14px] shadow-sm'} ${sizing} ${className}`}
       >
         {children}
       </div>

@@ -45,6 +45,7 @@ export function PreviewPanel({
   onAddBrowserAnnotation,
   onUploadAttachment,
   onClose,
+  embedded = false,
 }: {
   visible?: boolean
   browserControl?: SideBrowser
@@ -52,7 +53,8 @@ export function PreviewPanel({
   onTargetChange: (target: PreviewTarget) => void
   onAddBrowserAnnotation?: (annotation: BrowserAnnotation, screenshot?: Attachment) => void
   onUploadAttachment?: (file: File) => Promise<Attachment>
-  onClose: () => void
+  onClose?: () => void
+  embedded?: boolean
 }) {
   const webviewRef = useRef<PreviewWebviewElement | null>(null)
   const cursorLayer = useRef<HTMLDivElement | null>(null)
@@ -153,8 +155,9 @@ export function PreviewPanel({
       if (next) {
         const display = previewDisplayUrl(next) ?? next
         setDraft(display)
-        if (display !== targetRef.current.displayUrl || next !== targetRef.current.sourceUrl) {
-          targetRef.current = { displayUrl: display, sourceUrl: next }
+        const title = readyRef.current === webview ? webview.getTitle() : undefined
+        if (display !== targetRef.current.displayUrl || next !== targetRef.current.sourceUrl || title !== targetRef.current.title) {
+          targetRef.current = { displayUrl: display, sourceUrl: next, title }
           onTargetChange(targetRef.current)
         }
       }
@@ -184,6 +187,7 @@ export function PreviewPanel({
     webview.addEventListener('did-navigate-in-page', sync as EventListener)
     webview.addEventListener('did-fail-load', fail as EventListener)
     webview.addEventListener('dom-ready', ready)
+    webview.addEventListener('page-title-updated', sync)
     if (readyRef.current === webview) {
       sync()
     }
@@ -194,6 +198,7 @@ export function PreviewPanel({
       webview.removeEventListener('did-navigate-in-page', sync as EventListener)
       webview.removeEventListener('did-fail-load', fail as EventListener)
       webview.removeEventListener('dom-ready', ready)
+      webview.removeEventListener('page-title-updated', sync)
     }
   }, [onTargetChange, webview])
 
@@ -266,7 +271,7 @@ export function PreviewPanel({
   const canAnnotate = canUseWebview && !!onAddBrowserAnnotation
 
   return (
-    <SidePanelShell width={PREVIEW_PANEL_WIDTH} className="pointer-events-auto" onKeyDownCapture={find.handleKeyDownCapture}>
+    <SidePanelShell width={PREVIEW_PANEL_WIDTH} embedded={embedded} className="pointer-events-auto" onKeyDownCapture={find.handleKeyDownCapture}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -330,14 +335,14 @@ export function PreviewPanel({
           <ExternalLink size={17} />
         </IconButton>
         <BrowserMenu webContentsId={webviewReady && webview ? webview.getWebContentsId() : null} visible={visible} />
-        <button
+        {onClose ? <button
           type="button"
           aria-label="Hide side panel"
           onClick={onClose}
           className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-full text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
         >
           <X size={15} />
-        </button>
+        </button> : null}
       </form>
       {error ? (
         <p className="shrink-0 border-b border-border px-3 py-2 text-[12px] text-danger">{error}</p>

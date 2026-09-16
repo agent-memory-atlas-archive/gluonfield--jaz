@@ -1,17 +1,12 @@
-import { ChevronDown } from 'lucide-react'
-import { motion } from 'motion/react'
-import { useCallback, useContext, useEffect, useRef, useState } from 'react'
-import { KeyboardShortcut } from '@/components/ui/KeyboardShortcut'
-import { MenuRow, Popover } from '@/components/ui/Popover'
+import { useCallback, useContext, useEffect, useReducer, useState } from 'react'
 import { clientRuntime } from '@/lib/clientRuntime'
 import { modalDialogOpen } from '@/lib/dom/modal'
-import { isMobileViewport, useIsMobile } from '@/lib/hooks/useIsMobile'
-import { useMetaHeld } from '@/lib/hooks/useMetaHeld'
+import { isMobileViewport } from '@/lib/hooks/useIsMobile'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
-import { parseFileReference, type FileReference } from '../../../../shared/fileReader'
-import { useSessionPreview } from '@/lib/browserSessions'
+import { parseFileReference, type FileReference } from '@shared/fileReader'
+import { useBrowserSessions, useSessionPreview } from '@/lib/browserSessions'
 import { SidebarVisibility } from '@/lib/sidebar'
-import { SIDE_PANEL_LAYOUT, type SidePanelView } from './SidePanel'
+import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type SidePanelMode, type SidePanelTab } from '@/lib/sidePanelTabs'
 
 const PANEL_OPEN_KEY = 'jaz.sessionPanel'
 const PANEL_MAX_WIDTH = 1180
@@ -19,6 +14,13 @@ const PANEL_MIN_THREAD_WIDTH = 360
 
 export function useSidePanelState(sessionId: string, sideChatAvailable = false) {
   const setSidebarOpen = useContext(SidebarVisibility)
+  const browsers = useBrowserSessions()
+  const [state, dispatch] = useReducer(sidePanelTabs, undefined, () => {
+    const tabs: SidePanelTab[] = browsers.getSnapshot()
+      .filter((entry) => entry.ownerId === sessionId)
+      .map((entry) => ({ id: entry.id, kind: 'preview' }))
+    return { tabs, activeId: tabs[0]?.id ?? null }
+  })
   const [containerWidth, setContainerWidth] = useState(0)
   const containerRef = useCallback((element: HTMLDivElement | null) => {
     if (!element) {
@@ -32,319 +34,123 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     const stored = localStorage.getItem(PANEL_OPEN_KEY)
     return stored === 'open' ? true : stored === 'closed' ? false : !isMobileViewport()
   })
-  const [view, setView] = useState<SidePanelView>('overview')
-  const [widthOverrides, setWidthOverrides] = useState<Partial<Record<SidePanelView, number>>>({})
+  const [mode, setMode] = useState<SidePanelMode>('overview')
+  const [widthOverride, setWidthOverride] = useState<number>()
   const [resizing, setResizing] = useState(false)
-  const [fileRef, setFileRef] = useState<FileReference | null>(null)
-  const activeView = view === 'side-chat' && !sideChatAvailable ? 'overview' : view
-  const layout = SIDE_PANEL_LAYOUT[activeView]
+  const tabs = state.tabs.filter((tab) => tab.kind !== 'side-chat' || sideChatAvailable)
+  const activeTab = tabs.find((tab) => tab.id === state.activeId) ?? tabs[0]
   const availableWidth = containerWidth - PANEL_MIN_THREAD_WIDTH
-  const minWidth = activeView === 'preview' ? Math.min(400, Math.max(240, availableWidth)) : layout.width
-  const defaultWidth = activeView === 'preview' ? Math.max(layout.width, Math.round(containerWidth * 0.6)) : layout.width
-  const maxWidth = Math.max(minWidth, activeView === 'preview' ? availableWidth : Math.min(PANEL_MAX_WIDTH, availableWidth))
-  const width = layout.resizable ? clampSidePanelWidth(widthOverrides[activeView] ?? defaultWidth, minWidth, maxWidth) : defaultWidth
+  const minWidth = Math.min(400, Math.max(240, availableWidth))
+  const defaultWidth = Math.max(640, Math.round(containerWidth * 0.6))
+  const maxWidth = Math.max(minWidth, Math.min(PANEL_MAX_WIDTH, availableWidth))
+  const width = mode === 'overview' ? OVERVIEW_PANEL_WIDTH : clampWidth(widthOverride ?? defaultWidth, minWidth, maxWidth)
   const availableCSS = `calc(100% - ${PANEL_MIN_THREAD_WIDTH}px)`
-  const preferredCSS = widthOverrides[activeView] === undefined ? `max(${layout.width}px, 60%)` : `${widthOverrides[activeView]}px`
-  const widthStyle = activeView === 'preview'
-    ? `clamp(min(400px, max(240px, ${availableCSS})), ${preferredCSS}, max(240px, ${availableCSS}))`
+  const preferredCSS = widthOverride === undefined ? 'max(640px, 60%)' : `${widthOverride}px`
+  const widthStyle = mode === 'tabs'
+    ? `clamp(min(400px, max(240px, ${availableCSS})), ${preferredCSS}, max(240px, min(${PANEL_MAX_WIDTH}px, ${availableCSS})))`
     : `${width}px`
 
   useEffect(() => {
     localStorage.setItem(PANEL_OPEN_KEY, open ? 'open' : 'closed')
   }, [open])
 
-  const toggle = useCallback(() => {
-    if (!open && activeView === 'preview') {
-      setSidebarOpen?.(false)
-    }
-    setOpen(!open)
-  }, [open, activeView, setSidebarOpen])
-  const resize = useCallback((next: number) => setWidthOverrides((current) => ({ ...current, [activeView]: clampSidePanelWidth(next, minWidth, maxWidth) })), [activeView, minWidth, maxWidth])
-
-  const selectView = useCallback((next: SidePanelView) => {
-    if (next === 'preview') {
-      setSidebarOpen?.(false)
-    }
-    setView(next)
+  const showTabs = useCallback(() => {
+    setSidebarOpen?.(false)
+    setMode('tabs')
     setOpen(true)
   }, [setSidebarOpen])
+  const toggleMode = useCallback((next: SidePanelMode) => {
+    if (open && mode === next) {
+      setOpen(false)
+    } else if (next === 'tabs') {
+      showTabs()
+    } else {
+      setMode(next)
+      setOpen(true)
+    }
+  }, [open, mode, showTabs])
+  const close = useCallback(() => setOpen(false), [])
+  const resize = useCallback((next: number) => setWidthOverride(clampWidth(next, minWidth, maxWidth)), [minWidth, maxWidth])
+  const selectTab = useCallback((id: string) => {
+    dispatch({ type: 'select', id })
+    showTabs()
+  }, [showTabs])
+  const openTab = useCallback((tab: SidePanelTab) => {
+    dispatch({ type: 'open', tab })
+    showTabs()
+  }, [showTabs])
+  const showPreview = useCallback(() => openTab({ id: sessionId, kind: 'preview' }), [openTab, sessionId])
+  useSessionPreview(sessionId, showPreview)
 
-  const showPreview = useCallback(() => selectView('preview'), [selectView])
-  const { target: previewTarget, setTarget: setPreviewTarget } = useSessionPreview(sessionId, showPreview)
-
+  const addTab = useCallback((kind: SidePanelTab['kind']) => {
+    if (kind === 'preview') {
+      openTab({ id: browsers.openTab(sessionId), kind })
+    } else if (kind === 'file') {
+      openTab({ id: 'file', kind, file: null })
+    } else {
+      openTab({ id: kind, kind })
+    }
+  }, [browsers, openTab, sessionId])
+  const closeTab = useCallback((id: string) => {
+    browsers.close(id)
+    dispatch({ type: 'close', id })
+  }, [browsers])
   const openPreview = useCallback((url: string) => {
-    setPreviewTarget({ displayUrl: url, sourceUrl: url })
-    selectView('preview')
-  }, [setPreviewTarget, selectView])
-
+    openTab({ id: browsers.openTab(sessionId, url), kind: 'preview' })
+  }, [browsers, openTab, sessionId])
   useEffect(() => clientRuntime.onOpenPreviewURL?.(openPreview), [openPreview])
 
   const openFile = useCallback((file: string | FileReference) => {
     const ref = typeof file === 'string' ? parseFileReference(file) : file
-    if (!ref) return false
-    setFileRef(ref)
-    setView('file')
-    setOpen(true)
+    if (!ref) {
+      return false
+    }
+    openTab({ id: `file:${ref.path}`, kind: 'file', file: ref })
     return true
-  }, [])
+  }, [openTab])
 
-  useWindowEvent('keydown', (e) => {
-    if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.defaultPrevented) return
-    if (e.key.toLowerCase() !== 's') return
-    e.preventDefault()
-    toggle()
-  })
-
-  useWindowEvent('keydown', (e) => {
-    if (!e.metaKey || e.shiftKey || e.altKey || e.ctrlKey || e.defaultPrevented) return
-    if (modalDialogOpen()) return
-    const key = e.key.toLowerCase()
-    const target = (Object.keys(SIDE_PANEL_SHORTCUT) as SidePanelView[]).find(
-      (option) => SIDE_PANEL_SHORTCUT[option]?.toLowerCase() === key,
-    )
-    if (!target || (target === 'side-chat' && !sideChatAvailable)) return
-    e.preventDefault()
-    if (open && activeView === target) toggle()
-    else selectView(target)
+  useWindowEvent('keydown', (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.defaultPrevented || event.altKey || modalDialogOpen()) {
+      return
+    }
+    const key = event.key.toLowerCase()
+    if (event.shiftKey) {
+      if (key === 's') {
+        event.preventDefault()
+        toggleMode('tabs')
+      }
+      return
+    }
+    if (!event.metaKey || event.ctrlKey) {
+      return
+    }
+    if (key === 'o') {
+      event.preventDefault()
+      toggleMode('overview')
+      return
+    }
+    const shortcuts = { j: 'side-chat', d: 'diff', p: 'preview', t: 'terminal' } as const
+    const kind = shortcuts[key as keyof typeof shortcuts]
+    if (!kind || (kind === 'side-chat' && !sideChatAvailable)) {
+      return
+    }
+    event.preventDefault()
+    const existing = tabs.find((tab) => tab.kind === kind)
+    if (existing) {
+      selectTab(existing.id)
+    } else {
+      addTab(kind)
+    }
   })
 
   return {
-    containerRef,
-    fileRef,
-    open,
-    previewTarget,
-    resize,
-    resizing,
-    selectView,
-    setPreviewTarget,
-    setResizing,
-    toggle,
-    view: activeView,
-    width,
-    widthStyle,
-    minWidth,
-    maxWidth,
-    resizable: layout.resizable,
-    openFile,
-    openPreview,
+    containerRef, open, mode, tabs, activeTab,
+    resize, resizing, setResizing, width, widthStyle, minWidth, maxWidth,
+    resizable: mode === 'tabs',
+    toggleMode, close, selectTab, addTab, closeTab, openFile, openPreview,
   }
 }
 
-function clampSidePanelWidth(width: number, minWidth: number, maxWidth: number): number {
+function clampWidth(width: number, minWidth: number, maxWidth: number): number {
   return Math.round(Math.min(Math.max(width, minWidth), maxWidth))
-}
-
-const SIDE_PANEL_VIEW_LABEL: Record<SidePanelView, string> = {
-  overview: 'Overview',
-  diff: 'Code Diff',
-  preview: 'Preview',
-  terminal: 'Terminal',
-  file: 'File Reader',
-  'side-chat': 'Side chat',
-}
-
-const SIDE_PANEL_SHORTCUT: Partial<Record<SidePanelView, string>> = {
-  'side-chat': 'J',
-  diff: 'D',
-  preview: 'P',
-  terminal: 'T',
-  overview: 'O',
-}
-
-// Overview sits last so it lands on the right edge of the row. It's the default
-// view, so when the panel is closed the collapsed pill is Overview pinned to
-// the right — the others fan in to its left and it never moves on hover.
-const BASE_VIEW_OPTIONS: SidePanelView[] = ['side-chat', 'diff', 'preview', 'terminal', 'overview']
-
-export function SidePanelControl({
-  open,
-  view,
-  sideChatAvailable,
-  fileAvailable,
-  onToggle,
-  onSelectView,
-}: {
-  open: boolean
-  view: SidePanelView
-  sideChatAvailable: boolean
-  fileAvailable: boolean
-  onToggle: () => void
-  onSelectView: (view: SidePanelView) => void
-}) {
-  const baseOptions = sideChatAvailable ? BASE_VIEW_OPTIONS : BASE_VIEW_OPTIONS.filter((option) => option !== 'side-chat')
-  const options = fileAvailable || view === 'file' ? [...baseOptions, 'file' as const] : baseOptions
-  const currentView = (view === 'file' && !fileAvailable) || (view === 'side-chat' && !sideChatAvailable) ? 'overview' : view
-  const isMobile = useIsMobile()
-  const metaHeld = useMetaHeld(!isMobile)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const controlRef = useRef<HTMLDivElement>(null)
-  const closeTimer = useRef<number | null>(null)
-  const [hovered, setHovered] = useState(false)
-  const expanded = open || hovered || metaHeld
-
-  // Hover intent: collapse on a short delay, cancelled the moment the pointer
-  // (or focus) comes back. Without it a transient pointerleave during the
-  // expand reflow tears the row down mid-reach, so a tab you're moving toward
-  // disappears before you can click it.
-  const cancelClose = () => {
-    if (closeTimer.current !== null) {
-      window.clearTimeout(closeTimer.current)
-      closeTimer.current = null
-    }
-  }
-  const expand = () => {
-    cancelClose()
-    setHovered(true)
-  }
-  const collapseSoon = () => {
-    cancelClose()
-    closeTimer.current = window.setTimeout(() => {
-      closeTimer.current = null
-      if (!controlRef.current?.contains(document.activeElement)) setHovered(false)
-    }, 160)
-  }
-  useEffect(() => () => {
-    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
-  }, [])
-
-  const toggleView = (next: SidePanelView) => {
-    if (open && view === next) {
-      onToggle()
-      return
-    }
-    onSelectView(next)
-  }
-
-  const renderButton = (option: SidePanelView) => {
-    const active = open && view === option
-    const shortcut = SIDE_PANEL_SHORTCUT[option]
-    return (
-      <motion.button
-        key={option}
-        type="button"
-        aria-pressed={active}
-        title={`${active ? `Hide ${SIDE_PANEL_VIEW_LABEL[option]} panel` : `Open ${SIDE_PANEL_VIEW_LABEL[option]}`}${shortcut ? ` (⌘${shortcut})` : ''}`}
-        onClick={() => toggleView(option)}
-        whileTap={{ scale: 0.96 }}
-        className={`relative flex h-7 cursor-pointer items-center rounded-full px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors duration-150 ${
-          active ? 'text-ink' : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
-        }`}
-      >
-        {active ? (
-          <motion.span
-            layoutId="side-panel-active-pill"
-            transition={{ type: 'spring', duration: 0.32, bounce: 0 }}
-            className="absolute inset-0 rounded-full bg-bg shadow-sm ring-1 ring-border/50"
-          />
-        ) : null}
-        <span className="relative flex items-center">
-          {SIDE_PANEL_VIEW_LABEL[option]}
-          {shortcut ? (
-            <span
-              aria-hidden={!metaHeld}
-              className="grid transition-[grid-template-columns,opacity] duration-200 ease-out"
-              style={{ gridTemplateColumns: metaHeld ? '1fr' : '0fr', opacity: metaHeld ? 1 : 0 }}
-            >
-              <span className="overflow-hidden">
-                <span className="block pl-1.5">
-                  <KeyboardShortcut value={shortcut} />
-                </span>
-              </span>
-            </span>
-          ) : null}
-        </span>
-      </motion.button>
-    )
-  }
-
-  // Phone: the segmented row clips in the cramped title bar, so collapse it to a
-  // single dropdown — current view as the trigger, all views (plus Hide) inside.
-  if (isMobile) {
-    return (
-      <Popover
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        placement="below"
-        align="end"
-        trigger={
-          <button
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((value) => !value)}
-            className={`flex h-8 items-center gap-1 rounded-full px-3 text-[13px] font-medium transition-colors duration-150 ${
-              open ? 'bg-bg text-ink shadow-sm ring-1 ring-border/50' : 'bg-surface text-ink-2'
-            }`}
-          >
-            <span>{SIDE_PANEL_VIEW_LABEL[currentView]}</span>
-            <ChevronDown
-              size={13}
-              className={`text-ink-3 transition-transform duration-150 ${menuOpen ? 'rotate-180' : ''}`}
-            />
-          </button>
-        }
-      >
-        {options.map((option) => (
-          <MenuRow
-            key={option}
-            selected={open && currentView === option}
-            onClick={() => {
-              onSelectView(option)
-              setMenuOpen(false)
-            }}
-          >
-            {SIDE_PANEL_VIEW_LABEL[option]}
-          </MenuRow>
-        ))}
-        {open ? (
-          <>
-            <div className="my-1 border-t border-border" />
-            <MenuRow
-              onClick={() => {
-                onToggle()
-                setMenuOpen(false)
-              }}
-            >
-              Hide panel
-            </MenuRow>
-          </>
-        ) : null}
-      </Popover>
-    )
-  }
-
-  return (
-    <div
-      ref={controlRef}
-      onPointerEnter={expand}
-      onPointerLeave={collapseSoon}
-      onFocus={expand}
-      onBlur={(event) => {
-        if (!controlRef.current?.contains(event.relatedTarget as Node | null)) collapseSoon()
-      }}
-      className="flex h-8 items-center rounded-full bg-surface p-0.5"
-    >
-      {options.map((option) => {
-        // The current view is a plain flex child (the rigid anchor); the others
-        // sit in a grid track that animates 1fr↔0fr. Collapsing the fr unit
-        // shrinks real width with no dead zone, so the pill and its label fade
-        // out together in one motion instead of text-then-whitespace.
-        if (option === currentView) return renderButton(option)
-        return (
-          <div
-            key={option}
-            aria-hidden={!expanded}
-            className="grid min-w-0 transition-[grid-template-columns,opacity] duration-200 ease-out"
-            style={{
-              gridTemplateColumns: expanded ? '1fr' : '0fr',
-              opacity: expanded ? 1 : 0,
-              pointerEvents: expanded ? undefined : 'none',
-            }}
-          >
-            <div className="overflow-hidden">{renderButton(option)}</div>
-          </div>
-        )
-      })}
-    </div>
-  )
 }

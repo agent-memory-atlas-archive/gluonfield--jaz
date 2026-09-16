@@ -1,33 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
-import { FileText, LoaderCircle, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { FileText, LoaderCircle } from 'lucide-react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { HighlightedCodeLine, useSyntaxHighlightedLines } from '@/components/session/HighlightedCode'
 import { FileReaderLinkProvider, RenderedMarkdown } from '@/components/session/MessageMarkdown'
 import { ApiError } from '@/lib/api/client'
 import { healthQuery, sessionFileQuery, sessionFileRawUrl } from '@/lib/api/sessions'
-import type { HealthResponse, Session } from '@/lib/api/types'
-import { parseFileReference, type FileReference } from '../../../../shared/fileReader'
-import { SidePanelShell } from './SidePanelShell'
+import type { HealthResponse } from '@/lib/api/types'
+import { parseFileReference, type FileReference } from '@shared/fileReader'
 
-export const FILE_READER_PANEL_WIDTH = 640
 const FILE_LINE_SUFFIX = /^(.*?):(\d+)(?::\d+)?$/
 
-export function FileReaderPanel({
-  session,
+export const FileReaderPanel = memo(function FileReaderPanel({
+  sessionId,
   fileRef,
   visible,
   onOpenFile,
-  onClose,
 }: {
-  session: Session
+  sessionId: string
   fileRef: FileReference | null
   visible: boolean
   onOpenFile: (file: FileReference) => void
-  onClose: () => void
 }) {
   const filePath = fileRef?.path ?? ''
   const pdf = isPDFPath(filePath)
-  const file = useQuery({ ...sessionFileQuery(session.id, filePath), enabled: visible && Boolean(filePath) })
+  const file = useQuery({ ...sessionFileQuery(sessionId, filePath), enabled: visible && Boolean(filePath) })
   const health = useQuery({ ...healthQuery, enabled: visible && Boolean(filePath) })
   const [draft, setDraft] = useState(filePath)
   const [inputError, setInputError] = useState('')
@@ -48,7 +44,7 @@ export function FileReaderPanel({
   }
 
   return (
-    <SidePanelShell width={FILE_READER_PANEL_WIDTH}>
+    <div className="flex h-full min-h-0 flex-col">
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -64,14 +60,6 @@ export function FileReaderPanel({
           spellCheck={false}
           className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-ink outline-none placeholder:text-ink-3"
         />
-        <button
-          type="button"
-          aria-label="Hide side panel"
-          onClick={onClose}
-          className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-[8px] text-ink-3 transition-[background-color,color,transform] duration-150 hover:bg-surface-2 hover:text-ink active:scale-[0.96]"
-        >
-          <X size={15} />
-        </button>
       </form>
       {inputError ? (
         <p className="shrink-0 border-b border-border px-3 py-2 text-[12px] text-danger">
@@ -104,12 +92,12 @@ export function FileReaderPanel({
             </p>
           )
         ) : pdf ? (
-          <PDFFileView url={sessionFileRawUrl(session.id, filePath)} />
+          <PDFFileView url={sessionFileRawUrl(sessionId, filePath)} />
         ) : file.data.binary ? (
           <p className="px-3 py-4 text-[12px] text-ink-3">Binary file — no text preview.</p>
         ) : (
           <FilePreview
-            sessionId={session.id}
+            sessionId={sessionId}
             path={file.data.path}
             content={file.data.content ?? ''}
             highlightLine={fileRef?.line}
@@ -117,9 +105,9 @@ export function FileReaderPanel({
           />
         )}
       </div>
-    </SidePanelShell>
+    </div>
   )
-}
+})
 
 function FilePreview({
   sessionId,

@@ -1,13 +1,10 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal as XTerm } from '@xterm/xterm'
-import { Copy, Eraser, LoaderCircle, Power, RotateCw, Terminal, X } from 'lucide-react'
+import { Copy, Eraser, LoaderCircle, Power, RotateCw, Terminal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { IconButton } from '@/components/ui/IconButton'
 import { apiAuthenticatedWebSocketUrl } from '@/lib/api/client'
 import type { Session } from '@/lib/api/types'
-import { SidePanelShell } from './SidePanelShell'
-
-export const TERMINAL_PANEL_WIDTH = 640
 
 type TerminalStatus = 'idle' | 'connecting' | 'connected' | 'stopping' | 'closed' | 'exited' | 'error'
 
@@ -22,11 +19,9 @@ interface ServerMessage {
 export function TerminalPanel({
   session,
   visible,
-  onClose,
 }: {
   session: Session
   visible: boolean
-  onClose: () => void
 }) {
   const cwd = session.runtime_ref?.cwd ?? ''
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -46,7 +41,7 @@ export function TerminalPanel({
   }, [cwd, session.id])
 
   useEffect(() => {
-    if (!visible || !cwd || !hostRef.current) return
+    if (!cwd || !hostRef.current) return
     let disposed = false
     const host = hostRef.current
     const term = new XTerm({
@@ -79,7 +74,7 @@ export function TerminalPanel({
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message))
     }
     const fitNow = () => {
-      if (disposed) return
+      if (disposed || !host.clientWidth || !host.clientHeight) return
       try {
         fit.fit()
         send({ type: 'resize', cols: term.cols, rows: term.rows })
@@ -143,7 +138,13 @@ export function TerminalPanel({
       if (socketRef.current === socket) socketRef.current = null
       if (termRef.current === term) termRef.current = null
     }
-  }, [connectNonce, cwd, session.id, visible])
+  }, [connectNonce, cwd, session.id])
+
+  useEffect(() => {
+    if (visible) {
+      termRef.current?.focus()
+    }
+  }, [visible])
 
   const sendControl = (type: 'terminate' | 'restart') => {
     const socket = socketRef.current
@@ -180,7 +181,7 @@ export function TerminalPanel({
   }
 
   return (
-    <SidePanelShell width={TERMINAL_PANEL_WIDTH}>
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-border px-2.5">
         <Terminal size={15} className="shrink-0 text-ink-3" aria-hidden />
         <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-ink-2" title={remoteCwd || cwd}>
@@ -199,9 +200,6 @@ export function TerminalPanel({
         <IconButton size="sm" variant="danger" aria-label="Terminate terminal" title="Terminate terminal" onClick={terminate} disabled={!cwd || status === 'exited'}>
           <Power size={14} />
         </IconButton>
-        <IconButton size="sm" aria-label="Hide side panel" title="Hide side panel" onClick={onClose}>
-          <X size={15} />
-        </IconButton>
       </div>
       {error ? <p className="shrink-0 border-b border-border px-3 py-2 text-[12px] text-danger">{error}</p> : null}
       <div className="min-h-0 flex-1 bg-[#111318]">
@@ -213,7 +211,7 @@ export function TerminalPanel({
           </div>
         )}
       </div>
-    </SidePanelShell>
+    </div>
   )
 }
 

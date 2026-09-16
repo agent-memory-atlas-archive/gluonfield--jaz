@@ -4,8 +4,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
 import { setApiBaseUrl } from '@/lib/api/client'
-import { useSessionPreview } from '@/lib/browserSessions'
-import type { PreviewWebviewElement } from '@/components/session/previewWebview'
+import { useBrowserSessions, useSessionPreview, type BrowserSessions } from '@/lib/browserSessions'
+import { isPreviewWebviewPending, type PreviewWebviewElement } from '@/components/session/previewWebview'
 import type { BrowserActionResult } from '@/lib/browserApi'
 
 export async function exerciseBrowserLifecycle(backend: string, onStage: (stage: string) => void): Promise<void> {
@@ -18,8 +18,12 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
   const root = createRoot(element)
   let selectChat: (id: string) => void
   let showPanel: (visible: boolean) => void
+  let selectBrowser: (id: string) => void
+  let browserSessions: BrowserSessions
   function Chat({ id }: { id: string }) {
     const [visible, setVisible] = useState(true)
+    const [browserId, setBrowserId] = useState(id)
+    const sessions = useBrowserSessions()
     const [width, setWidth] = useState(640)
     const show = useCallback(() => setVisible(true), [])
     const close = useCallback(() => setVisible(false), [])
@@ -29,10 +33,12 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
     useSessionPreview(id, show)
     useLayoutEffect(() => {
       showPanel = setVisible
+      selectBrowser = setBrowserId
+      browserSessions = sessions
     }, [])
     return <div style={{ position: 'absolute', top: 40, right: 0, width, bottom: 0, '--side-panel-width': `${width}px` } as CSSProperties}>
       <SidePanelResizeHandle width={width} minWidth={640} maxWidth={800} disabled={!visible} onResize={setWidth} onResizeStart={() => {}} onResizeEnd={() => {}} />
-      {visible ? <BrowserPanelSlot sessionId={id} visible onClose={close} onAddBrowserAnnotation={annotate} /> : <div>Another panel</div>}
+      {visible ? <BrowserPanelSlot sessionId={browserId} visible onClose={close} onAddBrowserAnnotation={annotate} /> : <div>Another panel</div>}
     </div>
   }
   function Fixture() {
@@ -109,6 +115,35 @@ nodeRepl.write(retained)`)
     await waitFor(() => !panel('browser-fixture').inert)
     if (webview('browser-fixture').getWebContentsId() !== firstID || !await evaluate(firstView, 'window.clicks === 1')) {
       throw new Error('Returning to a chat replaced or reloaded its browser')
+    }
+    onStage('independent tabs alongside the agent browser')
+    browserSessions!.update('extra-tab', { ownerId: 'browser-fixture', target: { displayUrl: location.origin + '/target?extra', sourceUrl: location.origin + '/target?extra' } })
+    selectBrowser!('extra-tab')
+    await waitFor(() => Boolean(panel('extra-tab')))
+    await waitFor(async () => {
+      if (!webview('extra-tab')) {
+        return false
+      }
+      try {
+        return await evaluate(webview('extra-tab'), 'document.readyState === "complete"') === true
+      } catch (error) {
+        if (!isPreviewWebviewPending(error)) {
+          throw error
+        }
+        return false
+      }
+    })
+    const extraID = webview('extra-tab').getWebContentsId()
+    const agentWhileBrowsing = await script('browser-fixture', 'await tab.cdp.send("Runtime.evaluate", { expression: "window.agentTabProbe = 41" })\nnodeRepl.write(retained)')
+    if (agentWhileBrowsing.text !== '41' || !await evaluate(firstView, 'window.agentTabProbe === 41') || !await evaluate(webview('extra-tab'), 'window.agentTabProbe === undefined') || !panel('browser-fixture').inert) {
+      throw new Error('An additional browser took over the conversation’s agent browser')
+    }
+    selectBrowser!('browser-fixture')
+    await waitFor(() => !panel('browser-fixture').inert)
+    browserSessions!.close('extra-tab')
+    await waitFor(async () => !await window.smoke.browserExists(extraID))
+    if (!await window.smoke.browserExists(firstID)) {
+      throw new Error('Closing an additional browser destroyed the agent browser')
     }
     onStage('script-only browser cleanup')
     await script('browser-background', 'const idleScratch = 41')
@@ -204,6 +239,19 @@ await tab.getAXState()`)
     await waitFor(() => Boolean(webview('browser-fixture')))
     await script('browser-fixture', 'await tab.getAXState()')
     if (webview('browser-fixture').getWebContentsId() === restoredID) throw new Error('Opening Preview did not recreate the unloaded page')
+    onStage('agent browser reopening after tab closure')
+    const closedID = webview('browser-fixture').getWebContentsId()
+    showPanel!(false)
+    await waitFor(() => panel('browser-fixture').inert)
+    browserSessions!.close('browser-fixture')
+    await waitFor(async () => !await window.smoke.browserExists(closedID))
+    await connected('browser-fixture')
+    await script('browser-fixture', `await tab.goto(${JSON.stringify(location.origin + '/target?reopened')})
+await tab.getAXState()`)
+    await waitFor(() => !panel('browser-fixture').inert)
+    if (webview('browser-fixture').getWebContentsId() === closedID) {
+      throw new Error('A closed agent browser was not recreated on its next command')
+    }
   } finally {
     window.fetch = fetchRequest
     root.unmount()

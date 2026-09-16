@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { useLayoutEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { SidePanelControl, useSidePanelState } from '@/components/session/SidePanelState'
+import { useSidePanelState } from '@/components/session/SidePanelState'
+import { SidePanelControl } from '@/components/session/SidePanelControl'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
 import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { useBrowserSessions } from '@/lib/browserSessions'
@@ -27,15 +28,15 @@ export async function exerciseBrowserLayout(): Promise<void> {
     }, [sessions])
     return <div ref={panel.containerRef} className="flex min-w-0 flex-1 flex-col">
       <header className="flex h-[52px] shrink-0 items-center justify-end px-4">
-        <SidePanelControl open={panel.open} view={panel.view} sideChatAvailable={false} fileAvailable={false} onToggle={panel.toggle} onSelectView={panel.selectView} />
+        <SidePanelControl open={panel.open} mode={panel.mode} onToggle={panel.toggleMode} />
       </header>
       <div className="flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 p-6 text-ink" data-layout-chat>
           <p className="text-[15px]">Open the browser to review the page alongside this conversation.</p>
         </div>
         <SidePanelDrawer panel={panel} isMobile={false}>
-          {panel.view === 'preview'
-            ? <BrowserPanelSlot sessionId="layout" visible={panel.open} onClose={panel.toggle} />
+          {panel.mode === 'tabs'
+            ? <BrowserPanelSlot sessionId="layout" visible={panel.open} onClose={panel.close} />
             : <div className="h-full bg-bg p-6" style={{ width: panel.width }}>Overview</div>}
         </SidePanelDrawer>
       </div>
@@ -115,17 +116,17 @@ export async function exerciseBrowserLayout(): Promise<void> {
     await window.smoke.resize(1440, 900)
     await until(() => window.innerWidth === 1440)
     root.render(<Fixture />)
-    await until(() => Boolean(element.querySelector('[title="Open Preview (⌘P)"]')))
-    await animatePanel('[title="Open Preview (⌘P)"]', 864)
+    await until(() => Boolean(element.querySelector('[title="Open Side Panel (⌘⇧S)"]')))
+    await animatePanel('[title="Open Side Panel (⌘⇧S)"]', 864)
     await window.smoke.capture('browser-preview-opening')
     await until(() => !navigation() && browserWidth() === 864)
-    await animatePanel('[title="Hide Preview panel (⌘P)"]', 0)
-    await animatePanel('[title="Open Preview (⌘P)"]', 864)
+    await animatePanel('[title="Hide Side Panel (⌘⇧S)"]', 0)
+    await animatePanel('[title="Open Side Panel (⌘⇧S)"]', 864)
     await window.smoke.capture('browser-preview-reopening')
     await animatePanel('[title="Open Overview (⌘O)"]', 300)
-    await animatePanel('[title="Open Preview (⌘P)"]', 864)
+    await animatePanel('[title="Open Side Panel (⌘⇧S)"]', 864)
     await click('[aria-label="Toggle navigation"]')
-    await until(() => Boolean(navigation()) && browserWidth() === 800 && chatWidth() >= 360)
+    await until(() => Boolean(navigation()) && Math.abs(browserWidth() - 705.6) < 1 && chatWidth() >= 360)
     await click('[aria-label="Toggle navigation"]')
     await until(() => !navigation() && browserWidth() === 864)
     const divider = element.querySelector<HTMLElement>('[role="separator"]')!
@@ -179,11 +180,11 @@ export async function exerciseBrowserLayout(): Promise<void> {
     setThemePref('light')
     await new Promise((resolve) => setTimeout(resolve, 250))
     await window.smoke.capture('browser-layout-light')
-    await click('[title="Hide Preview panel (⌘P)"]')
+    await click('[title="Hide Side Panel (⌘⇧S)"]')
     await until(() => browserWidth() === 0)
     await click('[aria-label="Toggle navigation"]')
     await until(() => Boolean(navigation()))
-    await click('[title="Open Preview (⌘P)"]')
+    await click('[title="Open Side Panel (⌘⇧S)"]')
     await until(() => !navigation() && browserWidth() === 940 && element.querySelector('nav')!.parentElement!.getBoundingClientRect().width === 0)
     await window.smoke.resize(1050, 850)
     await until(() => browserWidth() === 690)
