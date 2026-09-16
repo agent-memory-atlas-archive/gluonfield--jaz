@@ -49,6 +49,12 @@ function Fixture() {
     let stage = 'opening, profile import and cursor checks'
     const timeout = setTimeout(() => window.smoke.result({ ok: false, error: 'Browser smoke timed out', stage, pending: [...pending.values()] }), Number(new URLSearchParams(location.search).get('timeout') || 30000))
     const run = async () => {
+      if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
+        stage = 'side panel tabs and retained resources'
+        await exerciseSidePanelTabs()
+        window.smoke.result({ ok: true, checks: ['compact tab/title bar and browser toolbar; file links, browser retention, terminal, side chat, keyboard and mobile layout'] })
+        return
+      }
       stage = 'browser layout, navigation collapse and resize grip'
       await exerciseBrowserLayout()
       stage = 'side panel tabs and retained resources'

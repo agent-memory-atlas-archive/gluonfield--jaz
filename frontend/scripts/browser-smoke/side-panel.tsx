@@ -3,7 +3,7 @@ import { useLayoutEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanel } from '@/components/session/SidePanel'
-import { SidePanelControl } from '@/components/session/SidePanelControl'
+import { SessionTitlebar } from '@/components/session/SessionTitlebar'
 import { SidePanelDrawer } from '@/components/session/SidePanelDrawer'
 import { useSidePanelState } from '@/components/session/SidePanelState'
 import { FileReaderLinkProvider, PreviewLinkProvider, RenderedMarkdown } from '@/components/session/MessageMarkdown'
@@ -12,6 +12,7 @@ import type { Session } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { setThemePref } from '@/lib/theme'
+import { TitlebarActionsOutlet, TitlebarProvider, TitlebarSlotOutlet } from '@/lib/titlebar'
 
 export async function exerciseSidePanelTabs(): Promise<void> {
   const element = document.createElement('div')
@@ -31,7 +32,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
   const session: Session = {
     id: 'tabs', slug: 'tabs', title: 'Manufacturing research', runtime: 'acp', status: 'idle',
     created_at: '', updated_at: '', last_attention_at: '',
-    runtime_ref: { type: 'acp', agent: 'codex', cwd: '/workspace' },
+    runtime_ref: { type: 'acp', agent: 'codex', cwd: '/workspace' }, model: 'gpt-6-astra', reasoning_effort: 'xhigh',
   }
   let panel: ReturnType<typeof useSidePanelState>
   let chatRenders = 0
@@ -78,9 +79,10 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       panel = state
     })
     return <div ref={state.containerRef} className="flex h-full flex-col">
-      <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-border px-4">
-        <span className="truncate text-[13px] text-ink-2">Manufacturing research</span>
-        <SidePanelControl open={state.open} mode={state.mode} onToggle={state.toggleMode} />
+      <SessionTitlebar session={session} panel={state} isMobile={isMobile} sideChatAvailable />
+      <header className="titlebar-drag flex h-[52px] shrink-0 items-center gap-2 px-3" style={{ paddingLeft: isMobile ? 96 : 168 }}>
+        <div id="titlebar-slot" className="relative z-shell flex min-w-0 items-center gap-1.5"><TitlebarSlotOutlet /></div>
+        <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5"><TitlebarActionsOutlet /></div>
       </header>
       <div className="relative flex min-h-0 flex-1">
         <div className="min-w-0 flex-1 p-8 text-ink" data-tab-chat>
@@ -114,6 +116,9 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     const bounds = target.getBoundingClientRect()
     const x = Math.round(bounds.x + bounds.width / 2)
     const y = Math.round(bounds.y + bounds.height / 2)
+    if (!target.contains(document.elementFromPoint(x, y))) {
+      throw new Error('Side panel control is obscured: ' + target.outerHTML)
+    }
     await window.smoke.pointer('mouseMove', x, y)
     await window.smoke.pointer('mouseDown', x, y)
     await window.smoke.pointer('mouseUp', x, y)
@@ -133,7 +138,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     try {
       return await evaluate(view, 'document.readyState === "complete"') === true
     } catch (error) {
-      if (!isPreviewWebviewPending(error)) {
+      if (!isPreviewWebviewPending(error) && !(error instanceof Error && error.message.includes('Cannot find default execution context'))) {
         throw error
       }
       return false
@@ -148,14 +153,20 @@ export async function exerciseSidePanelTabs(): Promise<void> {
   try {
     await window.smoke.resize(1440, 900)
     setThemePref('dark')
-    root.render(<QueryClientProvider client={queryClient}><BrowserWorkspace><Chat /></BrowserWorkspace></QueryClientProvider>)
+    root.render(<QueryClientProvider client={queryClient}><BrowserWorkspace><TitlebarProvider><Chat /></TitlebarProvider></BrowserWorkspace></QueryClientProvider>)
     await until(() => Boolean(button('Side Panel')))
     await click(element.querySelector('[data-tab-chat] button'))
     await until(() => panel?.activeTab?.kind === 'file' && Boolean(element.querySelector('[role="tabpanel"] h1')))
     if (button('Overview')?.getAttribute('aria-pressed') !== 'false' || button('Side Panel')?.getAttribute('aria-pressed') !== 'true') {
       throw new Error('File links did not select the tabbed panel exclusively')
     }
-    await until(() => element.querySelector('[role="tablist"]')!.getBoundingClientRect().width > 750)
+    await until(() => element.querySelector('[role="tablist"]')!.getBoundingClientRect().width > 100)
+    await until(() => Math.abs(element.querySelector('[role="separator"]')!.parentElement!.getBoundingClientRect().width - panel.width) < 1)
+    const tabsBounds = element.querySelector('[role="tablist"]')!.getBoundingClientRect()
+    const controlsBounds = button('Side Panel')!.getBoundingClientRect()
+    if (tabsBounds.height > 28 || Math.abs(tabsBounds.y - controlsBounds.y) > 1 || tabsBounds.right > controlsBounds.left) {
+      throw new Error('Tabs and panel controls do not share a compact top row')
+    }
     await click(element.querySelector('[role="tabpanel"] .chat-prose-link-button'))
     await until(() => panel.tabs.length === 2 && panel.activeTab?.id === 'file:/NOTES.md')
     await click(tab('file:/ANALYSIS.md'))
@@ -187,6 +198,13 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     if (webview('tabs').getWebContentsId() !== firstID || await evaluate(first, 'window.retainedTabValue') !== 41 || await evaluate(first, '[innerWidth,innerHeight].join(",")') !== firstSize) {
       throw new Error('Switching tabs replaced or resized the retained browser')
     }
+    const toolbar = document.querySelector('[data-browser-session="tabs"] form')!
+    const back = toolbar.querySelector('[aria-label="Back"]')!.getBoundingClientRect()
+    const forward = toolbar.querySelector('[aria-label="Forward"]')!.getBoundingClientRect()
+    if (toolbar.getBoundingClientRect().height !== 36 || back.width !== 28 || forward.x - back.x > 30) {
+      throw new Error('Browser navigation controls are not compact')
+    }
+    await window.smoke.capture('side-panel-browser-compact')
     await add('Terminal')
     await until(() => terminalConnections === 1 && element.textContent?.includes('retained terminal output') === true)
     await window.smoke.key('D', ['control'])
@@ -196,7 +214,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     const terminal = element.querySelector('.xterm')
     await click(button('Overview')!)
     await until(() => button('Overview')!.getAttribute('aria-pressed') === 'true')
-    if (element.querySelector('[role="tablist"]')!.getBoundingClientRect().height || !document.querySelector<HTMLElement>('[data-browser-session="tabs"]')!.inert) {
+    if (element.querySelector('[role="tablist"]') || !document.querySelector<HTMLElement>('[data-browser-session="tabs"]')!.inert) {
       throw new Error('Overview left tabs or browser visible')
     }
     await click(button('Side Panel')!)
@@ -205,8 +223,8 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       throw new Error('Switching Overview restarted the terminal')
     }
     await add('Side chat')
-    await until(() => Boolean(element.querySelector('textarea')))
-    const composer = element.querySelector<HTMLTextAreaElement>('textarea')!
+    await until(() => Boolean(element.querySelector('[role="tabpanel"]:not([hidden]) textarea')))
+    const composer = element.querySelector<HTMLTextAreaElement>('[role="tabpanel"]:not([hidden]) textarea')!
     await click(composer)
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(composer, 'Draft for the side chat')
     composer.dispatchEvent(new Event('input', { bubbles: true }))
@@ -258,7 +276,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await until(() => panel.mode === 'tabs')
     await new Promise((resolve) => setTimeout(resolve, 200))
     await window.smoke.capture('side-panel-tabs-mobile')
-    if (element.scrollWidth > window.innerWidth || !element.querySelector('[aria-label="New tab"]')!.getBoundingClientRect().width) {
+    if (element.scrollWidth > window.innerWidth || !element.querySelector('[aria-label="New tab"]')!.getBoundingClientRect().width || tab(panel.activeTab!.id)!.getBoundingClientRect().width < 80) {
       throw new Error('Mobile tabs overflow or hide their add control')
     }
     panel.closeTab('terminal')

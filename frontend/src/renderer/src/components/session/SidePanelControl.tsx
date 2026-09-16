@@ -11,7 +11,7 @@ export function SidePanelControl({ open, mode, onToggle }: {
   const isMobile = useIsMobile()
   const metaHeld = useMetaHeld(!isMobile)
   return (
-    <div className="flex shrink-0 items-center gap-1">
+    <div className="flex shrink-0 items-center gap-0.5">
       {(['tabs', 'overview'] as const).map((option) => {
         const active = open && mode === option
         const label = option === 'tabs' ? 'Side Panel' : 'Overview'
@@ -22,7 +22,7 @@ export function SidePanelControl({ open, mode, onToggle }: {
             aria-pressed={active}
             title={`${active ? 'Hide' : 'Open'} ${label} (${option === 'tabs' ? '⌘⇧S' : '⌘O'})`}
             onClick={() => onToggle(option)}
-            className={`flex h-10 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[13px] font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface hover:text-ink'}`}
+            className={`flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2.5 text-xs pointer-coarse:h-10 font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface hover:text-ink'}`}
           >
             {label}
             {metaHeld ? <KeyboardShortcut value={option === 'tabs' ? '⇧S' : 'O'} /> : null}

@@ -296,7 +296,7 @@ function RootLayout() {
               <div id="titlebar-slot" className="relative z-shell flex min-w-0 items-center gap-1.5">
                 <TitlebarSlotOutlet />
               </div>
-              <div id="titlebar-actions" className="relative z-shell ml-auto flex items-center gap-1.5">
+              <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
                 <TitlebarActionsOutlet />
               </div>
             </div>
