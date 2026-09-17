@@ -13,7 +13,7 @@ export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable }:
   panel: ReturnType<typeof useSidePanelState>
   sideChatAvailable: boolean
 }) {
-  const { open, mode, tabs, activeTab, width, selectTab, closeTab, addTab, toggleMode } = panel
+  const { open, mode, tabs, activeTab, width, selectTab, reorderTabs, closeTab, addTab, toggleMode } = panel
   const activeId = activeTab?.id
   const slot = useMemo(() => <>
     <RuntimeBadge session={session} truncate />
@@ -27,12 +27,13 @@ export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable }:
         activeId={activeId}
         sideChatAvailable={sideChatAvailable}
         onSelect={selectTab}
+        onReorder={reorderTabs}
         onClose={closeTab}
         onAdd={addTab}
       /> : null}
       <SidePanelControl open={open} mode={mode} onToggle={toggleMode} />
     </div>
-  ), [open, mode, isMobile, width, tabs, activeId, sideChatAvailable, selectTab, closeTab, addTab, toggleMode])
+  ), [open, mode, isMobile, width, tabs, activeId, sideChatAvailable, selectTab, reorderTabs, closeTab, addTab, toggleMode])
   useTitlebarActions(actions)
   return null
 }

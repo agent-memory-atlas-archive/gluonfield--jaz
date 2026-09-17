@@ -37,3 +37,15 @@ test('closing an inactive tab keeps selection and stale actions cannot select a 
   expect(sidePanelTabs(state, { type: 'select', id: 'terminal' })).toBe(state)
   expect(sidePanelTabs(state, { type: 'close', id: 'terminal' })).toBe(state)
 })
+
+test('reordering retains selection, file locations, and hidden tabs', () => {
+  let state = open(empty, { id: 'file', kind: 'file', file: { path: '/notes.md', line: 12 } })
+  state = open(state, { id: 'side-chat', kind: 'side-chat' })
+  state = open(state, { id: 'browser', kind: 'preview' })
+  const reordered = sidePanelTabs(state, { type: 'reorder', ids: ['browser', 'file'] })
+  expect(reordered.tabs.map((tab) => tab.id)).toEqual(['browser', 'file', 'side-chat'])
+  expect(reordered.activeId).toBe('browser')
+  expect(reordered.tabs[1]).toBe(state.tabs[0])
+  expect(state.tabs.map((tab) => tab.id)).toEqual(['file', 'side-chat', 'browser'])
+  expect(sidePanelTabs(reordered, { type: 'close', id: 'browser' }).activeId).toBe('file')
+})

@@ -20,6 +20,7 @@ export type PreviewNavigationEvent = Event & {
   url?: string
   validatedURL?: string
   isMainFrame?: boolean
+  isInPlace?: boolean
   errorDescription?: string
   errorCode?: number
 }

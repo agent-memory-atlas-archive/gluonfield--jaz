@@ -10,8 +10,16 @@ export type SidePanelTabs = { tabs: SidePanelTab[]; activeId: string | null }
 export type SidePanelTabAction =
   | { type: 'open'; tab: SidePanelTab }
   | { type: 'select' | 'close'; id: string }
+  | { type: 'reorder'; ids: string[] }
 
 export function sidePanelTabs(state: SidePanelTabs, action: SidePanelTabAction): SidePanelTabs {
+  if (action.type === 'reorder') {
+    const order = new Map(action.ids.map((id, index) => [id, index]))
+    return {
+      ...state,
+      tabs: state.tabs.toSorted((a, b) => (order.get(a.id) ?? state.tabs.length) - (order.get(b.id) ?? state.tabs.length)),
+    }
+  }
   if (action.type === 'open') {
     const tabs = action.tab.kind === 'file' && action.tab.file
       ? state.tabs.filter((tab) => tab.kind !== 'file' || tab.file)

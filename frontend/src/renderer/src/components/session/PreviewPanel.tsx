@@ -157,7 +157,7 @@ export function PreviewPanel({
         setDraft(display)
         const title = readyRef.current === webview ? webview.getTitle() : undefined
         if (display !== targetRef.current.displayUrl || next !== targetRef.current.sourceUrl || title !== targetRef.current.title) {
-          targetRef.current = { displayUrl: display, sourceUrl: next, title }
+          targetRef.current = { ...targetRef.current, displayUrl: display, sourceUrl: next, title }
           onTargetChange(targetRef.current)
         }
       }
@@ -171,6 +171,17 @@ export function PreviewPanel({
       setLoading(true)
       setError('')
     }
+    const favicon = (event: Event) => {
+      const icons = (event as Event & { favicons: string[] }).favicons
+      targetRef.current = { ...targetRef.current, favicon: icons.find((url) => /^(https?:\/\/|data:image\/)/i.test(url)) }
+      onTargetChange(targetRef.current)
+    }
+    const navigate = (event: PreviewNavigationEvent) => {
+      if (event.isMainFrame && !event.isInPlace && targetRef.current.favicon) {
+        targetRef.current = { ...targetRef.current, favicon: undefined }
+        onTargetChange(targetRef.current)
+      }
+    }
     const stop = () => {
       setLoading(false)
       sync()
@@ -182,6 +193,8 @@ export function PreviewPanel({
       sync(event)
     }
     webview.addEventListener('did-start-loading', start)
+    webview.addEventListener('did-start-navigation', navigate as EventListener)
+    webview.addEventListener('page-favicon-updated', favicon)
     webview.addEventListener('did-stop-loading', stop)
     webview.addEventListener('did-navigate', sync as EventListener)
     webview.addEventListener('did-navigate-in-page', sync as EventListener)
@@ -193,6 +206,8 @@ export function PreviewPanel({
     }
     return () => {
       webview.removeEventListener('did-start-loading', start)
+      webview.removeEventListener('did-start-navigation', navigate as EventListener)
+      webview.removeEventListener('page-favicon-updated', favicon)
       webview.removeEventListener('did-stop-loading', stop)
       webview.removeEventListener('did-navigate', sync as EventListener)
       webview.removeEventListener('did-navigate-in-page', sync as EventListener)

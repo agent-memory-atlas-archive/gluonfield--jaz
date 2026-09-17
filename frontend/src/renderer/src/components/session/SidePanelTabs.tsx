@@ -1,7 +1,10 @@
-import { FileText, FolderGit2, Globe, MessageCirclePlus, Plus, Terminal, X } from 'lucide-react'
+import { FileSpreadsheet, FileText, FolderGit2, Globe, MessageCirclePlus, Plus, Terminal, X } from 'lucide-react'
+import { motion, Reorder } from 'motion/react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { IconButton } from '@/components/ui/IconButton'
 import { Popover } from '@/components/ui/Popover'
+import { Favicon } from '@/components/ui/Favicon'
+import { isSpreadsheetPath } from '@shared/fileReader'
 import { useBrowserSessions } from '@/lib/browserSessions'
 import type { SidePanelTab } from '@/lib/sidePanelTabs'
 
@@ -46,11 +49,12 @@ export function SidePanelTabMenu({ sideChatAvailable, onAdd, empty = false }: {
   )
 }
 
-export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onClose, onAdd }: {
+export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onReorder, onClose, onAdd }: {
   tabs: SidePanelTab[]
   activeId?: string
   sideChatAvailable: boolean
   onSelect: (id: string) => void
+  onReorder: (ids: string[]) => void
   onClose: (id: string) => void
   onAdd: (kind: SidePanelTab['kind']) => void
 }) {
@@ -74,24 +78,36 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onC
   }
   return (
     <div className="flex h-9 min-w-0 flex-1 items-center gap-1 px-1 pointer-coarse:h-11">
-      <div ref={list} role="tablist" aria-label="Side panel tabs" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-app-region:no-drag]">
+      <Reorder.Group as="div" axis="x" values={tabs.map((tab) => tab.id)} onReorder={onReorder} layoutScroll ref={list} role="tablist" aria-label="Side panel tabs" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-app-region:no-drag]">
         {tabs.map((tab, index) => {
           const { label, icon: Icon } = TAB_TYPES[tab.kind]
           const target = browsers.find((browser) => browser.id === tab.id)?.target
           const title = tab.kind === 'file' ? tab.file?.path.split('/').pop() || label : target?.title || target?.displayUrl || label
           const active = activeId === tab.id
           return (
-            <div key={tab.id} className={`group flex h-7 min-w-0 max-w-full shrink-0 items-center rounded-lg pointer-coarse:h-10 ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface-2'}`}>
-              <button
+            <Reorder.Item as="div" value={tab.id} key={tab.id} layout="position" transition={{ layout: { duration: 0 } }} dragMomentum={false} className={`group relative flex h-7 min-w-0 max-w-full shrink-0 select-none items-center rounded-lg pointer-coarse:h-10 ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface-2'}`}>
+              <motion.button
                 id={`panel-tab-${tab.id}`}
                 type="button"
                 role="tab"
                 aria-selected={active}
                 aria-controls={`panel-body-${tab.id}`}
+                aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
                 tabIndex={active ? 0 : -1}
                 title={tab.kind === 'file' ? tab.file?.path || title : target?.displayUrl || title}
-                onClick={() => onSelect(tab.id)}
+                onTap={() => onSelect(tab.id)}
                 onKeyDown={(event) => {
+                  if (event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+                    event.preventDefault()
+                    const destination = index + (event.key === 'ArrowLeft' ? -1 : 1)
+                    if (destination >= 0 && destination < tabs.length) {
+                      const ids = tabs.map((tab) => tab.id)
+                      ids.splice(destination, 0, ids.splice(index, 1)[0])
+                      onReorder(ids)
+                      requestAnimationFrame(() => document.getElementById(`panel-tab-${tab.id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }))
+                    }
+                    return
+                  }
                   const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length
                     : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length
                       : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1
@@ -101,20 +117,25 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onC
                   } else if (event.key === 'Delete') {
                     event.preventDefault()
                     closeTab(tab.id)
+                  } else if (event.key === ' ') {
+                    event.preventDefault()
+                    onSelect(tab.id)
                   }
                 }}
-                className="flex h-7 min-w-0 max-w-44 cursor-pointer items-center gap-1.5 rounded-lg pl-2 pr-1 text-xs pointer-coarse:h-10"
+                className="flex h-7 min-w-0 max-w-44 touch-none cursor-grab items-center gap-1.5 rounded-lg pl-2 pr-1 text-xs active:cursor-grabbing pointer-coarse:h-10"
               >
-                <Icon size={14} className="shrink-0 text-ink-3" />
+                {tab.kind === 'preview' ? <Favicon url={target?.displayUrl || ''} iconUrl={target?.favicon} />
+                  : tab.kind === 'file' && tab.file && isSpreadsheetPath(tab.file.path) ? <FileSpreadsheet size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                    : <Icon size={14} className="shrink-0 text-ink-3" aria-hidden />}
                 <span className="truncate">{title}</span>
-              </button>
-              <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onClick={() => closeTab(tab.id)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
+              </motion.button>
+              <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onPointerDownCapture={(event) => event.stopPropagation()} onClick={() => closeTab(tab.id)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
                 <X size={12} />
               </button>
-            </div>
+            </Reorder.Item>
           )
         })}
-      </div>
+      </Reorder.Group>
       <SidePanelTabMenu sideChatAvailable={sideChatAvailable} onAdd={onAdd} />
     </div>
   )

@@ -101,6 +101,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     dispatch({ type: 'select', id })
     showTabs()
   }, [showTabs])
+  const reorderTabs = useCallback((ids: string[]) => dispatch({ type: 'reorder', ids }), [])
   const openTab = useCallback((tab: SidePanelTab) => {
     dispatch({ type: 'open', tab })
     showTabs()
@@ -180,7 +181,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     containerRef, open, mode, tabs, activeTab,
     resize, resizing, setResizing, width, widthStyle, minWidth, maxWidth,
     resizable: mode === 'tabs',
-    toggleMode, close, selectTab, addTab, closeTab, openFile, openPreview,
+    toggleMode, close, selectTab, reorderTabs, addTab, closeTab, openFile, openPreview,
   }
 }
 

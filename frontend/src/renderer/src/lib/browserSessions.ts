@@ -2,7 +2,7 @@ import { createContext, useContext, useLayoutEffect } from 'react'
 import type { Attachment } from '@/lib/api/types'
 import type { BrowserAnnotation } from '@/lib/messageContext'
 
-export type PreviewTarget = { displayUrl: string; sourceUrl: string; title?: string }
+export type PreviewTarget = { displayUrl: string; sourceUrl: string; title?: string; favicon?: string }
 export type BrowserPresentation = {
   onClose?: () => void
   embedded?: boolean

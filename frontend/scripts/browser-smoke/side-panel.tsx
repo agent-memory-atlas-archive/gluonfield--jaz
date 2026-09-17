@@ -133,6 +133,15 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     }
     target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     await new Promise(requestAnimationFrame)
+    let previous = ''
+    let stable = 0
+    await until(() => {
+      const bounds = target.getBoundingClientRect()
+      const position = [bounds.x, bounds.y, bounds.width].map(Math.round).join(',')
+      stable = position === previous ? stable + 1 : 0
+      previous = position
+      return stable >= 3 && target.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2))
+    })
     const bounds = target.getBoundingClientRect()
     const x = Math.round(bounds.x + bounds.width / 2)
     const y = Math.round(bounds.y + bounds.height / 2)
@@ -143,7 +152,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await window.smoke.pointer('mouseDown', x, y)
     await window.smoke.pointer('mouseUp', x, y)
   }
-  const button = (label: string) => [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === label && item.getBoundingClientRect().height)
+  const button = (label: string) => [...document.querySelectorAll('button')].find((item) => (item.getAttribute('aria-label') === label || item.textContent?.trim() === label) && item.getBoundingClientRect().height)
   const tab = (id: string) => document.getElementById(`panel-tab-${id}`)
   const webview = (id: string) => document.querySelector(`[data-browser-session="${id}"] webview`) as PreviewWebviewElement
   const evaluate = async (view: PreviewWebviewElement, expression: string) => {
@@ -192,6 +201,24 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await click(tab('file:/ANALYSIS.md'))
     await window.smoke.key('Right')
     await until(() => document.activeElement === tab('file:/NOTES.md'))
+    const drag = tab('file:/ANALYSIS.md')!.getBoundingClientRect()
+    const drop = tab('file:/NOTES.md')!.parentElement!.getBoundingClientRect()
+    const dragX = Math.round(drag.x + drag.width / 2)
+    const dragY = Math.round(drag.y + drag.height / 2)
+    await window.smoke.pointer('mouseMove', dragX, dragY)
+    await window.smoke.pointer('mouseDown', dragX, dragY)
+    for (let step = 1; step <= 8; step += 1) {
+      await window.smoke.pointer('mouseMove', Math.round(dragX + (drop.right - dragX) * step / 8), dragY)
+    }
+    await window.smoke.pointer('mouseUp', Math.round(drop.right), dragY)
+    await until(() => panel.tabs[0].id === 'file:/NOTES.md')
+    if (panel.activeTab?.id !== 'file:/NOTES.md') {
+      throw new Error('Dragging an inactive tab changed the selection')
+    }
+    await window.smoke.capture('side-panel-tabs-reordered')
+    await click(tab('file:/NOTES.md'))
+    await window.smoke.key('Right', ['alt'])
+    await until(() => panel.tabs[1].id === 'file:/NOTES.md' && document.activeElement === tab('file:/NOTES.md'))
     await click(element.querySelector('[role="tabpanel"]:not([hidden]) input'))
     await window.smoke.key('P', ['control'])
     if (panel.activeTab?.id !== 'file:/NOTES.md') {
@@ -203,6 +230,17 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await until(async () => await evaluate(report, 'document.querySelector("output")?.textContent') === 'Relative script loaded')
     if (await evaluate(report, 'getComputedStyle(document.querySelector("h1")).color') !== 'rgb(12, 90, 50)') {
       throw new Error('Local HTML lost its relative stylesheet')
+    }
+    await until(() => {
+      const icon = tab('tabs')?.querySelector('img')
+      return Boolean(icon?.src.endsWith('/report-icon.svg') && icon.complete && icon.naturalWidth)
+    })
+    await evaluate(report, 'document.querySelector("link[rel=icon]").href = "report-icon.svg?updated"')
+    await until(() => tab('tabs')?.querySelector('img')?.src.endsWith('/report-icon.svg?updated') === true)
+    await evaluate(report, 'document.title = "Actuator research"')
+    await until(() => tab('tabs')?.textContent === 'Actuator research')
+    if (!tab('tabs')?.querySelector('img')?.src.endsWith('/report-icon.svg?updated')) {
+      throw new Error('A title update discarded the page favicon')
     }
     await window.smoke.capture('side-panel-local-html')
     for (const [label, expected] of [['BOM CSV', 'Motor, large'], ['Excel workbook', '12.5'], ['Legacy Excel', '12.5'], ['Calculator', 'Cost calculator'], ['External source', '']] as const) {
@@ -228,6 +266,9 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       } else if (label !== 'External source') {
         await until(() => document.getElementById(`panel-body-${opened.id}`)?.textContent?.includes(expected) === true)
         const body = document.getElementById(`panel-body-${opened.id}`)!
+        if (!tab(opened.id)?.querySelector('.lucide-file-spreadsheet')) {
+          throw new Error('Spreadsheet tab is missing its icon')
+        }
         if (label === 'BOM CSV' && !body.textContent?.includes('00123')) {
           throw new Error('CSV preview changed the leading zeroes')
         }
@@ -249,6 +290,9 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       panel.closeTab(opened.id)
       await until(() => panel.tabs.length === count)
     }
+    await evaluate(report, 'location.href = "./calculator:one.html"')
+    await until(async () => await evaluate(report, 'document.querySelector("h1")?.textContent') === 'Cost calculator')
+    await until(() => !tab('tabs')?.querySelector('img'))
     panel.closeTab('tabs')
     await until(() => panel.tabs.length === 2)
     panel.openPreview(location.origin + '/target?tabs=one')
@@ -408,6 +452,9 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     const retainedView = webview(retainedTabId)
     const retainedViewId = retainedView.getWebContentsId()
     await evaluate(retainedView, 'window.chatNavigationValue = 73')
+    await click(tab(retainedTabId))
+    await window.smoke.key('Left', ['alt'])
+    await until(() => panel.tabs[5].id === retainedTabId && document.activeElement === tab(retainedTabId))
     panel.resize(720)
     await until(() => panel.width === 720)
     const savedTabs = JSON.stringify(panel.tabs)
