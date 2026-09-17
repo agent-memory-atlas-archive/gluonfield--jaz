@@ -8,6 +8,18 @@ import (
 	"github.com/wins/jaz/backend/internal/sourcequeue"
 )
 
+func writeSources(file string, sources []sourcequeue.Source) error {
+	paths := make([]string, 0, len(sources))
+	for _, source := range sources {
+		paths = append(paths, source.Path)
+	}
+	data, err := json.MarshalIndent(paths, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(file, data, 0o600)
+}
+
 func readReceipt(file string, sources []sourcequeue.Source) ([]sourcequeue.Source, []sourcequeue.Source, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {

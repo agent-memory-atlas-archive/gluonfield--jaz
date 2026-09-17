@@ -69,7 +69,7 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (report 
 		date = time.Now()
 	}
 	date = date.Local()
-	suffix := fmt.Sprintf("%s-%d", runSuffix(date), time.Now().UnixNano())
+	suffix := fmt.Sprintf("%s-%d", date.Format("2006-01-02-1504"), time.Now().UnixNano())
 	runSlug := "dreams/runs/" + suffix
 	reviewSlug := "dreams/review/dream-" + suffix
 	receipt := filepath.Join(req.Root, ".state", "consolidation", suffix+".json")
@@ -77,7 +77,12 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (report 
 		return jazmem.DreamReport{}, err
 	}
 	defer os.Remove(receipt)
-	prompt, err := agentPrompt(req, runSlug, reviewSlug, receipt, sources)
+	manifest := filepath.Join(filepath.Dir(receipt), suffix+".sources.json")
+	if err := writeSources(manifest, sources); err != nil {
+		return jazmem.DreamReport{}, err
+	}
+	defer os.Remove(manifest)
+	prompt, err := agentPrompt(req, runSlug, reviewSlug, receipt, manifest)
 	if err != nil {
 		return jazmem.DreamReport{}, err
 	}
@@ -85,7 +90,7 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (report 
 	spawned, err := r.Manager.Spawn(ctx, acp.SpawnRequest{
 		ACPAgent:        agent,
 		Slug:            fmt.Sprintf("memory-dream-%s-%s", agent, suffix),
-		Title:           "Memory Dream " + runLabel(date),
+		Title:           "Memory Dream " + date.Format("2006-01-02 15:04"),
 		Directory:       req.Root,
 		Model:           settings.WorkerModel(agentDefaults),
 		ReasoningEffort: settings.WorkerReasoningEffort(agentDefaults),
@@ -152,32 +157,14 @@ func (r *Runner) RunDream(ctx context.Context, req jazmem.DreamRequest) (report 
 	}, nil
 }
 
-func agentPrompt(req jazmem.DreamRequest, runSlug, reviewSlug, receipt string, sources []sourcequeue.Source) (string, error) {
-	paths := make([]string, 0, len(sources))
-	for _, source := range sources {
-		paths = append(paths, source.Path)
-	}
+func agentPrompt(req jazmem.DreamRequest, runSlug, reviewSlug, receipt, manifest string) (string, error) {
 	return memorydreamprompt.Render(memorydreamprompt.Data{
 		Root:            req.Root,
 		RunSlug:         runSlug,
 		ReviewSlug:      reviewSlug,
 		ReceiptPath:     receipt,
-		Sources:         paths,
+		SourcesPath:     manifest,
 		LongTermPolicy:  jazmem.LongTermDreamGuidance(),
 		ShortTermPolicy: jazmem.ShortTermDreamGuidance(),
 	})
-}
-
-func runSuffix(t time.Time) string {
-	if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
-		return t.Format("2006-01-02")
-	}
-	return t.Format("2006-01-02-1504")
-}
-
-func runLabel(t time.Time) string {
-	if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
-		return t.Format("2006-01-02")
-	}
-	return t.Format("2006-01-02 15:04")
 }

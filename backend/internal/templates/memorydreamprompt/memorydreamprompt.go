@@ -16,7 +16,7 @@ type Data struct {
 	RunSlug         string
 	ReviewSlug      string
 	ReceiptPath     string
-	Sources         []string
+	SourcesPath     string
 	LongTermPolicy  string
 	ShortTermPolicy string
 }
