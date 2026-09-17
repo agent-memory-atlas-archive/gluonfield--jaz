@@ -20,6 +20,9 @@ const testCapabilityID = "0123456789abcdef0123456789abcdef"
 func TestCreateProxyUsesConfiguredPreviewOrigin(t *testing.T) {
 	handler := newHandler(t, "https://app-{id}.preview.example.test")
 	got := createProxy(t, handler, "jaz.example.test:5299", "http://localhost:3000/dashboard?tab=1")
+	if got.BaseURL != "http://localhost:3000/" {
+		t.Fatalf("base URL = %q", got.BaseURL)
+	}
 	parsed := mustParseURL(t, got.URL)
 	id := strings.TrimSuffix(strings.TrimPrefix(parsed.Hostname(), "app-"), ".preview.example.test")
 	if len(id) != 32 || !publicHost(handler, parsed.Host) {
@@ -220,7 +223,7 @@ func TestExpiredCapabilityIsRemoved(t *testing.T) {
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
 	}
-	if handler.proxiesByOrigin[origin.String()].id != "" || handler.proxiesByHost[testCapabilityID+".preview.example.test"].id != "" {
+	if handler.byBase[origin.String()].id != "" || handler.byHost[testCapabilityID+".preview.example.test"].id != "" {
 		t.Fatal("expired capability was not pruned")
 	}
 }
@@ -275,9 +278,14 @@ func newHandler(t *testing.T, template string) *Handler {
 
 func addProxy(handler *Handler, id, host string, origin *url.URL, expiresAt time.Time) {
 	host = canonicalHost(host)
-	proxy := proxyEntry{id: id, origin: origin, host: host, expiresAt: expiresAt}
-	handler.proxiesByOrigin[origin.String()] = proxy
-	handler.proxiesByHost[host] = proxy
+	proxy := previewEntry{
+		id: id, baseURL: origin.String(), host: host, expiresAt: expiresAt,
+		serve: func(w http.ResponseWriter, r *http.Request) {
+			serveProxy(w, r, origin)
+		},
+	}
+	handler.byBase[origin.String()] = proxy
+	handler.byHost[host] = proxy
 }
 
 func publicHost(handler *Handler, host string) bool {
@@ -286,13 +294,13 @@ func publicHost(handler *Handler, host string) bool {
 	return handler.IsPublicHostRequest(req)
 }
 
-func createProxy(t *testing.T, handler *Handler, requestHost, rawURL string) createProxyResponse {
+func createProxy(t *testing.T, handler *Handler, requestHost, rawURL string) createPreviewResponse {
 	t.Helper()
 	res := registerProxy(handler, requestHost, rawURL)
 	if res.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
 	}
-	var got createProxyResponse
+	var got createPreviewResponse
 	if err := json.Unmarshal(res.Body.Bytes(), &got); err != nil {
 		t.Fatal(err)
 	}

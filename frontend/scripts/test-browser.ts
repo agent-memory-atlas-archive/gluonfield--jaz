@@ -5,8 +5,20 @@ import { build } from 'vite'
 import { createRequire } from 'node:module'
 import { execFileSync } from 'node:child_process'
 import tailwindcss from '@tailwindcss/vite'
+import { utils, write } from 'xlsx'
 
 const output = await mkdtemp(join(tmpdir(), 'jaz-browser-smoke-'))
+const workbook = utils.book_new()
+utils.book_append_sheet(workbook, utils.aoa_to_sheet([['Part', 'Cost'], ['Motor', 12.5]]), 'BOM')
+utils.book_append_sheet(workbook, utils.aoa_to_sheet([['Volume'], [500]]), 'Scenarios')
+for (const bookType of ['xlsx', 'xls'] as const) {
+  await writeFile(join(output, 'workbook.' + bookType), write(workbook, { type: 'buffer', bookType }))
+}
+await writeFile(join(output, 'bom.csv'), 'Part,Code,Note\r\n"Motor, large",00123,"line one\nline two"')
+await writeFile(join(output, 'report.html'), `<!doctype html><title>Local report</title><link rel="stylesheet" href="report.css"><script src="report.js" defer></script><h1>Actuator report</h1><a target="_blank" href="bom.csv">BOM CSV</a><a target="_blank" href="workbook.xlsx">Excel workbook</a><a target="_blank" href="workbook.xls">Legacy Excel</a><a target="_blank" href="./calculator:one.html?volume=500#costs">Calculator</a><a target="_blank" href="https://example.com/">External source</a><output></output>`)
+await writeFile(join(output, 'report.css'), 'body{font:16px system-ui;padding:24px}a{display:block;margin:20px 0}h1{color:rgb(12, 90, 50)}')
+await writeFile(join(output, 'report.js'), 'document.querySelector("output").textContent = "Relative script loaded"')
+await writeFile(join(output, 'calculator:one.html'), '<!doctype html><title>Calculator</title><h1>Cost calculator</h1>')
 execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', join(output, 'key.pem'), '-out', join(output, 'cert.pem'), '-days', '1', '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost'], { stdio: 'ignore' })
 const codex = process.argv.includes('--codex') ? Bun.which('codex') : ''
 if (codex === null) {

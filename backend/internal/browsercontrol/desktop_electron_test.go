@@ -18,7 +18,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/browsercontrol"
 	browserapi "github.com/wins/jaz/backend/internal/httpapi/browser"
+	previewapi "github.com/wins/jaz/backend/internal/httpapi/preview"
 	"github.com/wins/jaz/backend/internal/mcpsession"
+	serverapi "github.com/wins/jaz/backend/internal/server"
+	"github.com/wins/jaz/backend/internal/serverconfig"
 	"github.com/wins/jaz/backend/internal/settings"
 	"github.com/wins/jaz/backend/internal/storage"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
@@ -46,6 +49,15 @@ func TestDesktopElectron(t *testing.T) {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "browsercontrol", Version: "test"}, nil)
 	browsercontrol.AddMCPTools(mcpServer, backend)
 	mux := http.NewServeMux()
+	previews, err := previewapi.NewHandler(serverconfig.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux.Handle("POST /v1/preview/files", previews)
+	if _, err := store.CreateSession(storage.CreateSession{Slug: "tabs", RuntimeRef: &storage.RuntimeRef{Type: storage.RuntimeACP, Cwd: os.Getenv("JAZ_BROWSER_SMOKE_DIR")}}); err != nil {
+		t.Fatal(err)
+	}
+	mux.Handle("GET /v1/sessions/{session}/file", (&serverapi.Server{Store: store}).Handler())
 	mux.HandleFunc("GET /v1/sessions/{session}", func(w http.ResponseWriter, r *http.Request) {
 		session, err := store.LoadSession(r.PathValue("session"))
 		if err != nil {
@@ -318,6 +330,10 @@ nodeRepl.write('Accessibility checks completed')`, r.URL.Query().Get("url"), r.U
 		w.WriteHeader(http.StatusNoContent)
 	})
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if previews.IsPublicHostRequest(r) {
+			previews.ServeHTTP(w, r)
+			return
+		}
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")

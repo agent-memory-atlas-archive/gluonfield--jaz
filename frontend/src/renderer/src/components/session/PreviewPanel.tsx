@@ -15,7 +15,7 @@ import { previewDisplayUrl, resolvePreviewSource } from '@/lib/api/preview'
 import type { Attachment } from '@/lib/api/types'
 import { clientRuntime } from '@/lib/clientRuntime'
 import type { BrowserAnnotation } from '@/lib/messageContext'
-import { normalizePreviewURL, shouldProxyPreview } from '../../../../shared/preview'
+import { isPreviewURL, normalizePreviewURL, shouldProxyPreview } from '@shared/preview'
 import {
   captureBrowserAnnotation,
   clearBrowserAnnotationCapture,
@@ -63,7 +63,7 @@ export function PreviewPanel({
   const canUseWebview = clientRuntime.capabilities.previewWebview
   const [webview, setWebview] = useState<PreviewWebviewElement | null>(null)
   const [draft, setDraft] = useState(target.displayUrl)
-  const [resolvedSourceUrl, setResolvedSourceUrl] = useState(target.sourceUrl)
+  const [resolvedSourceUrl, setResolvedSourceUrl] = useState(isPreviewURL(target.sourceUrl) ? target.sourceUrl : '')
   const [readyWebview, setReadyWebview] = useState<PreviewWebviewElement | null>(null)
   const webviewReady = webview !== null && readyWebview === webview
   const [iframeKey, setIframeKey] = useState(0)
@@ -109,7 +109,7 @@ export function PreviewPanel({
       setResolvedSourceUrl(target.sourceUrl)
       return
     }
-    setResolvedSourceUrl(shouldProxyPreview(target.sourceUrl) ? '' : target.sourceUrl)
+    setResolvedSourceUrl(isPreviewURL(target.sourceUrl) && !shouldProxyPreview(target.sourceUrl) ? target.sourceUrl : '')
     if (!target.sourceUrl) return
     void resolvePreviewSource(target.sourceUrl)
       .then((source) => {
@@ -215,7 +215,7 @@ export function PreviewPanel({
   const openDraft = () => {
     const next = normalizePreviewURL(draft)
     if (!next) {
-      setError('Enter an http or https URL.')
+      setError('Enter a website URL or an absolute file path.')
       return
     }
     setError('')
@@ -311,7 +311,7 @@ export function PreviewPanel({
           <input
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="https://localhost:3000"
+            placeholder="Website URL or file path"
             spellCheck={false}
             className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-ink outline-none placeholder:text-ink-3"
           />

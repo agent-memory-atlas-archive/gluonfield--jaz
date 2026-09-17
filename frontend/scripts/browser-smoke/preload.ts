@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld('jaz', {
     import: (id, selection) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, id, selection),
   } satisfies BrowserProfileAPI,
   windowKind: 'main',
+  onOpenPreviewURL: (handler: (url: string) => void) => {
+    const listener = (_event: unknown, url: string) => handler(url)
+    ipcRenderer.on('jaz:open-preview-url', listener)
+    return () => ipcRenderer.removeListener('jaz:open-preview-url', listener)
+  },
   get apiBaseUrl() {
     return location.origin
   },
@@ -20,6 +25,7 @@ contextBridge.exposeInMainWorld('smoke', {
   browserExists: (id: number) => ipcRenderer.invoke('smoke:browser-exists', id),
   openedURLs: () => ipcRenderer.invoke('smoke:opened-urls'),
   popupURLs: () => ipcRenderer.invoke('smoke:popup-urls'),
+  tabURLs: () => ipcRenderer.invoke('smoke:tab-urls'),
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
   pointer: (type: string, x: number, y: number) => ipcRenderer.invoke('smoke:pointer', type, x, y),
   key: (key: string, modifiers?: string[]) => ipcRenderer.invoke('smoke:key', key, modifiers),

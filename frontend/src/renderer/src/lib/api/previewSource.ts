@@ -2,6 +2,7 @@ import { isPreviewProxyTargetHostname } from '../../../../shared/preview'
 
 export type PreviewProxyResponse = {
   url: string
+  base_url: string
 }
 
 type PreviewFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>

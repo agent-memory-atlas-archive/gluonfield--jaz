@@ -3,12 +3,13 @@ import { preparePreviewProxySource } from './previewSource'
 
 const proxy = {
   url: 'https://capability.preview.example/app',
+  base_url: 'http://localhost:3000/',
 }
 
 describe('preparePreviewProxySource', () => {
   test('keeps local Electron previews without a probe', async () => {
     let fetched = false
-    const local = { url: 'http://jaz-preview-capability.localhost:5299/app' }
+    const local = { url: 'http://jaz-preview-capability.localhost:5299/app', base_url: 'http://localhost:3000/' }
     const source = await preparePreviewProxySource(local, async () => {
       fetched = true
       throw new Error('unexpected fetch')
@@ -37,7 +38,7 @@ describe('preparePreviewProxySource', () => {
     await expect(
       preparePreviewProxySource(proxy, async () => ({ status: 404, headers: { get: () => null } })),
     ).rejects.toThrow('Check the server preview URL template and its DNS, TLS, and reverse-proxy routing.')
-    await expect(preparePreviewProxySource({ url: 'file:///tmp/preview' })).rejects.toThrow(
+    await expect(preparePreviewProxySource({ url: 'file:///tmp/preview', base_url: 'file:///tmp/' })).rejects.toThrow(
       'Remote preview is unreachable',
     )
   })

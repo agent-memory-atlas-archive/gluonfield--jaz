@@ -18,7 +18,7 @@ import { Favicon } from '@/components/ui/Favicon'
 import { MarkdownImage, MarkdownImageLinkContext } from '@/components/session/MarkdownImage'
 import { skillsQuery, type SkillInfo } from '@/lib/api/skills'
 import { markdownImageSource } from '@/lib/markdownImages'
-import { findFileReferences, parseFileReference, type FileReference } from '../../../../shared/fileReader'
+import { findFileReferences, parseFileReference, resolveFileLink, type FileReference } from '@shared/fileReader'
 import { CodeBlock } from './CodeBlock'
 import { encodeMention } from './mentionCodec'
 import { MentionPill } from './mentions'
@@ -87,9 +87,9 @@ function textFromChildren(children: unknown): string {
   return ''
 }
 
-function localFileFromLink(href: unknown, children: unknown): FileReference | null {
+function localFileFromLink(href: unknown, children: unknown, documentPath?: string): FileReference | null {
   if (typeof href === 'string') {
-    const fromHref = parseFileReference(decodeMentionHref(href))
+    const fromHref = resolveFileLink(decodeMentionHref(href), documentPath)
     if (fromHref) return fromHref
   }
   return parseFileReference(textFromChildren(children).trim())
@@ -232,7 +232,7 @@ function BaseMarkdown({
         components={components}
         urlTransform={(url, key, node) => key === 'src' && node.tagName === 'img'
           ? markdownImageSource(url, files?.sessionId, files?.documentPath)
-          : defaultUrlTransform(url)}
+          : parseFileReference(url) ? url : defaultUrlTransform(url)}
       >
         {prepared}
       </Markdown>
@@ -251,7 +251,8 @@ const MessageMarkdownLink: AnchorComponent = ({ children, href, ...props }) => {
 
 const PlainMarkdownLink: AnchorComponent = ({ node: _node, children, href, ...props }) => {
   const openFile = useContext(FileReaderLinkContext)
-  const localFile = localFileFromLink(href, children)
+  const files = useContext(MarkdownFileContext)
+  const localFile = localFileFromLink(href, children, files?.documentPath)
   const linkedChildren = <MarkdownImageLinkContext value={true}>{children}</MarkdownImageLinkContext>
   if (localFile) {
     return (

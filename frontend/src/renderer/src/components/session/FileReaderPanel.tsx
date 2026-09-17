@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { FileText, LoaderCircle } from 'lucide-react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react'
 import { HighlightedCodeLine, useSyntaxHighlightedLines } from '@/components/session/HighlightedCode'
 import { FileReaderLinkProvider, RenderedMarkdown } from '@/components/session/MessageMarkdown'
 import { ApiError } from '@/lib/api/client'
 import { healthQuery, sessionFileQuery, sessionFileRawUrl } from '@/lib/api/sessions'
 import type { HealthResponse } from '@/lib/api/types'
-import { parseFileReference, type FileReference } from '@shared/fileReader'
+import { isSpreadsheetPath, parseFileReference, type FileReference } from '@shared/fileReader'
+
+const SpreadsheetFileView = lazy(() => import('@/components/session/SpreadsheetFileView'))
 
 const FILE_LINE_SUFFIX = /^(.*?):(\d+)(?::\d+)?$/
 
@@ -23,7 +25,8 @@ export const FileReaderPanel = memo(function FileReaderPanel({
 }) {
   const filePath = fileRef?.path ?? ''
   const pdf = isPDFPath(filePath)
-  const file = useQuery({ ...sessionFileQuery(sessionId, filePath), enabled: visible && Boolean(filePath) })
+  const spreadsheet = isSpreadsheetPath(filePath)
+  const file = useQuery({ ...sessionFileQuery(sessionId, filePath), enabled: visible && Boolean(filePath) && !spreadsheet })
   const health = useQuery({ ...healthQuery, enabled: visible && Boolean(filePath) })
   const [draft, setDraft] = useState(filePath)
   const [inputError, setInputError] = useState('')
@@ -66,11 +69,15 @@ export const FileReaderPanel = memo(function FileReaderPanel({
           {inputError}
         </p>
       ) : null}
-      <div className={`min-h-0 flex-1 bg-bg ${pdf ? 'overflow-hidden' : 'scrollbar-quiet overflow-auto'}`}>
+      <div className={`min-h-0 flex-1 bg-bg ${pdf || spreadsheet ? 'overflow-hidden' : 'scrollbar-quiet overflow-auto'}`}>
         {!filePath ? (
           <div className="flex h-full items-center justify-center px-8 text-center text-[13px] text-ink-3">
             No file selected.
           </div>
+        ) : spreadsheet ? (
+          <Suspense fallback={<p className="p-3 text-[12px] text-ink-3">Loading spreadsheet…</p>}>
+            <SpreadsheetFileView key={filePath} sessionId={sessionId} path={filePath} visible={visible} />
+          </Suspense>
         ) : file.isPending ? (
           <div className="flex items-center gap-2 px-3 py-4 text-[12px] text-ink-3">
             <LoaderCircle size={13} className="animate-spin" aria-hidden />

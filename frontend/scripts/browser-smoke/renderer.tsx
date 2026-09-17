@@ -18,6 +18,7 @@ declare global {
     smoke: {
       openedURLs(): Promise<string[]>
       popupURLs(): Promise<string[]>
+      tabURLs(): Promise<string[]>
       backend(): Promise<string>
       browserExists(id: number): Promise<boolean>
       passwordStore(): Promise<{ count: number; plaintext: boolean }>

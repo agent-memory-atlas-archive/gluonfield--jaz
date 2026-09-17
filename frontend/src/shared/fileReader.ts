@@ -9,6 +9,28 @@ export interface FileReferenceMatch {
   reference: FileReference
 }
 
+export function isHTMLPath(path: string): boolean {
+  return /\.html?(?:[?#].*)?$/i.test(path)
+}
+
+export function isSpreadsheetPath(path: string): boolean {
+  return /\.(csv|tsv|xlsx|xls|xlsm|xlsb|ods)(?:[?#].*)?$/i.test(path)
+}
+
+export function resolveFileLink(value: string, documentPath?: string): FileReference | null {
+  const absolute = parseFileReference(value)
+  if (absolute) {
+    return absolute
+  }
+  const line = FILE_LINE_SUFFIX.exec(value)
+  const path = line ? line[1] : value
+  if (/^[a-z][a-z\d+.-]*:|^#/i.test(path) || !/\.[a-z\d]+$/i.test(path)) {
+    return null
+  }
+  const directory = documentPath?.slice(0, Math.max(documentPath.lastIndexOf('/'), documentPath.lastIndexOf('\\')) + 1) ?? ''
+  return { path: directory + path, line: line ? Number(line[2]) : undefined }
+}
+
 const FILE_LINE_SUFFIX = /^(.*?):(\d+)(?::\d+)?$/
 const FILE_EXT = String.raw`\.[A-Za-z0-9][A-Za-z0-9]*`
 const PATH_SEGMENT = String.raw`[^/\\\s<>(){}]+`

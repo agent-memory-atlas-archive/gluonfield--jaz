@@ -1,3 +1,5 @@
+import { parseFileReference } from './fileReader'
+
 export const PREVIEW_PARTITION = 'persist:jaz-preview'
 export const BROWSER_PRELOAD_ARGUMENT = '--jaz-side-browser'
 
@@ -86,6 +88,10 @@ export function findPreviewURLs(text: string, patterns: readonly string[]): stri
 export function normalizePreviewURL(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) return ''
+  const file = parseFileReference(trimmed)
+  if (file) {
+    return file.path
+  }
   const withScheme = SCHEME_PATTERN.test(trimmed)
     ? trimmed
     : isLoopbackInput(trimmed)

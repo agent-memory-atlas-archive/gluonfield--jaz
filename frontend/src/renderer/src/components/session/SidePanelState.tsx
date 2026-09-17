@@ -4,7 +4,8 @@ import { useBackendChange } from '@/lib/connection'
 import { modalDialogOpen } from '@/lib/dom/modal'
 import { isMobileViewport } from '@/lib/hooks/useIsMobile'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
-import { parseFileReference, type FileReference } from '@shared/fileReader'
+import { isHTMLPath, parseFileReference, type FileReference } from '@shared/fileReader'
+import { previewDisplayUrl } from '@/lib/api/preview'
 import { useBrowserSessions, useSessionPreview } from '@/lib/browserSessions'
 import { SidebarVisibility } from '@/lib/sidebar'
 import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type SidePanelMode, type SidePanelTab, type SidePanelTabs } from '@/lib/sidePanelTabs'
@@ -120,19 +121,26 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     browsers.close(id)
     dispatch({ type: 'close', id })
   }, [browsers])
-  const openPreview = useCallback((url: string) => {
-    openTab({ id: browsers.openTab(sessionId, url), kind: 'preview' })
-  }, [browsers, openTab, sessionId])
-  useEffect(() => clientRuntime.onOpenPreviewURL?.(openPreview), [openPreview])
-
   const openFile = useCallback((file: string | FileReference) => {
     const ref = typeof file === 'string' ? parseFileReference(file) : file
     if (!ref) {
       return false
     }
-    openTab({ id: `file:${ref.path}`, kind: 'file', file: ref })
+    if (isHTMLPath(ref.path)) {
+      openTab({ id: browsers.openTab(sessionId, ref.path), kind: 'preview' })
+    } else {
+      openTab({ id: `file:${ref.path}`, kind: 'file', file: ref })
+    }
     return true
-  }, [openTab])
+  }, [browsers, openTab, sessionId])
+  const openPreview = useCallback((url: string) => {
+    const display = previewDisplayUrl(url) ?? url
+    if (openFile(display)) {
+      return
+    }
+    openTab({ id: browsers.openTab(sessionId, url), kind: 'preview' })
+  }, [browsers, openFile, openTab, sessionId])
+  useEffect(() => clientRuntime.onOpenPreviewURL?.(openPreview), [openPreview])
 
   useWindowEvent('keydown', (event) => {
     if (!(event.metaKey || event.ctrlKey) || event.defaultPrevented || event.altKey || modalDialogOpen()) {

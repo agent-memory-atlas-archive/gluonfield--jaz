@@ -16,6 +16,7 @@ import { setThemePref } from '@/lib/theme'
 import { TitlebarActionsOutlet, TitlebarProvider, TitlebarSlotOutlet } from '@/lib/titlebar'
 
 export async function exerciseSidePanelTabs(): Promise<void> {
+  const fixture = await fetch('/file-fixture').then((response) => response.json()) as { path: string }
   const element = document.createElement('div')
   element.style.cssText = 'position:fixed;inset:0;background:var(--color-bg);z-index:1'
   document.body.append(element)
@@ -92,7 +93,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
         <div className="min-w-0 flex-1 p-8 text-ink" data-tab-chat>
           <FileReaderLinkProvider sessionId={sessionId} onOpen={state.openFile}>
             <PreviewLinkProvider onOpen={state.openPreview}>
-              <RenderedMarkdown text={`# Product research\n\nReview the [analysis](/ANALYSIS.md) and compare it with the [supplier website](${location.origin}/target?tabs=one).`} />
+              <RenderedMarkdown text={`# Product research\n\nReview the [analysis](/ANALYSIS.md) and compare it with the [supplier website](${location.origin}/target?tabs=one).\n\n[Local report](${fixture.path})`} />
             </PreviewLinkProvider>
           </FileReaderLinkProvider>
         </div>
@@ -196,6 +197,60 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     if (panel.activeTab?.id !== 'file:/NOTES.md') {
       throw new Error('Control+P in a file input was intercepted by the browser tab shortcut')
     }
+    await click(button('Local report')!)
+    await until(() => ready('tabs'))
+    const report = webview('tabs')
+    await until(async () => await evaluate(report, 'document.querySelector("output")?.textContent') === 'Relative script loaded')
+    if (await evaluate(report, 'getComputedStyle(document.querySelector("h1")).color') !== 'rgb(12, 90, 50)') {
+      throw new Error('Local HTML lost its relative stylesheet')
+    }
+    await window.smoke.capture('side-panel-local-html')
+    for (const [label, expected] of [['BOM CSV', 'Motor, large'], ['Excel workbook', '12.5'], ['Legacy Excel', '12.5'], ['Calculator', 'Cost calculator'], ['External source', '']] as const) {
+      await click(tab('tabs'))
+      await until(() => !document.querySelector<HTMLElement>('[data-browser-session="tabs"]')!.inert)
+      const count = panel.tabs.length
+      const point = await evaluate(report, `(() => {
+        const link = Array.from(document.querySelectorAll('a')).find(link => link.textContent === ${JSON.stringify(label)})
+        const rect = link.getBoundingClientRect()
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }
+      })()`) as { x: number; y: number }
+      for (const type of ['mousePressed', 'mouseReleased']) {
+        await window.jaz!.browserCommand({ webContentsId: report.getWebContentsId(), method: 'Input.dispatchMouseEvent', params: { type, ...point, button: 'left', clickCount: 1 } })
+      }
+      await until(() => panel.tabs.length === count + 1 && panel.activeTab?.id !== 'tabs')
+      const opened = panel.activeTab!
+      if (label === 'Calculator') {
+        await until(() => ready(opened.id))
+        await until(async () => await evaluate(webview(opened.id), 'document.querySelector("h1")?.textContent') === expected)
+        if (await evaluate(webview(opened.id), 'location.search + location.hash') !== '?volume=500#costs') {
+          throw new Error('Local HTML link lost its query or fragment')
+        }
+      } else if (label !== 'External source') {
+        await until(() => document.getElementById(`panel-body-${opened.id}`)?.textContent?.includes(expected) === true)
+        const body = document.getElementById(`panel-body-${opened.id}`)!
+        if (label === 'BOM CSV' && !body.textContent?.includes('00123')) {
+          throw new Error('CSV preview changed the leading zeroes')
+        }
+        const select = body.querySelector<HTMLSelectElement>('select[aria-label="Worksheet"]')
+        if (label !== 'BOM CSV') {
+          if (!select) {
+            throw new Error('Excel sheets are missing')
+          }
+          select.value = 'Scenarios'
+          select.dispatchEvent(new Event('change', { bubbles: true }))
+          await until(() => body.querySelector('table')?.textContent?.includes('500') === true)
+        }
+        await new Promise(requestAnimationFrame)
+        await window.smoke.capture(label === 'BOM CSV' ? 'side-panel-csv' : 'side-panel-excel')
+      }
+      if ((await window.smoke.popupURLs()).length || (await window.smoke.openedURLs()).includes('https://example.com/')) {
+        throw new Error('A local report link escaped its sidebar tab')
+      }
+      panel.closeTab(opened.id)
+      await until(() => panel.tabs.length === count)
+    }
+    panel.closeTab('tabs')
+    await until(() => panel.tabs.length === 2)
     panel.openPreview(location.origin + '/target?tabs=one')
     await until(() => ready('tabs'))
     const first = webview('tabs')

@@ -6,7 +6,11 @@ function canNavigate(url: string): boolean {
   return url === 'about:blank' || isPreviewURL(url)
 }
 
-export function attachWindowOpenHandler(contents: WebContents, openExternal = shell.openExternal): void {
+export function attachWindowOpenHandler(
+  contents: WebContents,
+  openExternal = shell.openExternal,
+  openTab?: (url: string) => boolean,
+): void {
   if (contents.session !== session.fromPartition(PREVIEW_PARTITION)) {
     contents.setWindowOpenHandler(({ url }) => {
       void openExternal(url)
@@ -21,8 +25,14 @@ export function attachWindowOpenHandler(contents: WebContents, openExternal = sh
   }
   contents.on('will-navigate', guard)
   contents.on('will-redirect', guard)
-  contents.setWindowOpenHandler(({ url }) => {
+  contents.setWindowOpenHandler(({ url, disposition, postBody }) => {
     if (!canNavigate(url)) {
+      return { action: 'deny' }
+    }
+    if (isPreviewURL(url) && !postBody && (disposition === 'foreground-tab' || disposition === 'background-tab')) {
+      if (!openTab?.(url)) {
+        void openExternal(url)
+      }
       return { action: 'deny' }
     }
     return {

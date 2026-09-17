@@ -199,14 +199,15 @@ function canOpenPreviewURL(contents: WebContents): boolean {
   return !target.isDestroyed() && previewURLTargets.has(target.id)
 }
 
-function openPreviewURL(url: string, contents: WebContents): void {
-  if (!canOpenPreviewURL(contents)) return
+function openPreviewURL(url: string, contents: WebContents): boolean {
+  if (!canOpenPreviewURL(contents)) return false
   const target = previewURLTarget(contents)
   const win = BrowserWindow.fromWebContents(target)
-  if (!win || win.isDestroyed()) return
+  if (!win || win.isDestroyed()) return false
   win.show()
   win.focus()
   target.send('jaz:open-preview-url', url)
+  return true
 }
 
 // Covers every window — main, preview webviews, and per-board windows.
@@ -215,7 +216,7 @@ app.on('web-contents-created', (_event, contents) => {
   attachBrowserNavigationShortcuts(contents)
   attachPreviewFindShortcuts(contents)
   attachContextMenu(contents)
-  attachWindowOpenHandler(contents)
+  attachWindowOpenHandler(contents, shell.openExternal, (url) => openPreviewURL(url, contents))
 })
 
 function createWindow(): void {

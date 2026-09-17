@@ -19,8 +19,16 @@ app.setPath('userData', join(process.env.JAZ_BROWSER_SMOKE_DIR!, `profile-${proc
 const timeout = Number(process.env.JAZ_BROWSER_SMOKE_TIMEOUT_MS || 30000)
 const openedURLs: string[] = []
 const popupURLs: string[] = []
+const tabURLs: string[] = []
 app.on('web-contents-created', (_event, contents) => attachWindowOpenHandler(contents, async (url) => {
   openedURLs.push(url)
+}, (url) => {
+  if (!contents.hostWebContents) {
+    return false
+  }
+  tabURLs.push(url)
+  contents.hostWebContents.send('jaz:open-preview-url', url)
+  return true
 }))
 installBrowserControl()
 installBrowserPasswords()
@@ -32,12 +40,31 @@ ipcMain.handle('smoke:backend', () => process.env.JAZ_BROWSER_SMOKE_BACKEND)
 ipcMain.handle('smoke:browser-exists', (_event, id: number) => Boolean(webContents.fromId(id)))
 ipcMain.handle('smoke:opened-urls', () => openedURLs)
 ipcMain.handle('smoke:popup-urls', () => popupURLs)
+ipcMain.handle('smoke:tab-urls', () => tabURLs)
 
 let pendingProxy: { response: ServerResponse; url: string } | undefined
 let proxyWaiter: ServerResponse | undefined
 let firstNavigation: IncomingHttpHeaders | undefined
 let passwordOrigin = ''
 const server = createServer(async (request, response) => {
+  if (request.url === '/file-fixture') {
+    response.setHeader('Content-Type', 'application/json')
+    response.end(JSON.stringify({ path: join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'report.html') }))
+    return
+  }
+  if (request.url === '/v1/preview/files' || request.url?.startsWith('/v1/sessions/tabs/file?')) {
+    const body: Buffer[] = []
+    for await (const chunk of request) {
+      body.push(chunk)
+    }
+    const upstream = await fetch(process.env.JAZ_BROWSER_SMOKE_BACKEND + request.url, {
+      method: request.method,
+      body: request.method === 'POST' ? Buffer.concat(body) : undefined,
+    })
+    response.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('Content-Type') || 'application/octet-stream' })
+    response.end(Buffer.from(await upstream.arrayBuffer()))
+    return
+  }
   if (request.url === '/password-origin') {
     response.end(passwordOrigin)
     return
@@ -70,7 +97,7 @@ const server = createServer(async (request, response) => {
     return
   }
   if (request.url === '/release-proxy') {
-    pendingProxy!.response.end(JSON.stringify({ url: pendingProxy!.url }))
+    pendingProxy!.response.end(JSON.stringify({ url: pendingProxy!.url, base_url: new URL('/', pendingProxy!.url).href }))
     pendingProxy = undefined
     response.end()
     return
@@ -92,7 +119,7 @@ const server = createServer(async (request, response) => {
     if (source.searchParams.get('preview') === 'direct') {
       source.hostname = 'jaz-preview-fixture.localhost'
     }
-    response.end(JSON.stringify({ url: source.href }))
+    response.end(JSON.stringify({ url: source.href, base_url: new URL('/', url).href }))
     return
   }
   const pathname = new URL(request.url!, 'http://localhost').pathname

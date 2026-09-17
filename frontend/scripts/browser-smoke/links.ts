@@ -75,7 +75,10 @@ export async function exercisePreviewLinks(browser: SideBrowser, evaluate: (expr
       })()`) as { x: number; y: number }
       await browser.call({ method: 'Input.dispatchMouseEvent', params: { type: 'mousePressed', ...point, button: 'left', clickCount: 1 } })
       await browser.call({ method: 'Input.dispatchMouseEvent', params: { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 } })
-      await until(async () => (await window.smoke.popupURLs()).includes(url))
+      await until(async () => (await window.smoke.tabURLs()).includes(url))
+      if ((await window.smoke.popupURLs()).includes(url)) {
+        throw new Error('A new-tab link opened a popup window')
+      }
       if ((await window.smoke.openedURLs()).includes(url)) {
         throw new Error('A browser popup escaped to the external browser')
       }
