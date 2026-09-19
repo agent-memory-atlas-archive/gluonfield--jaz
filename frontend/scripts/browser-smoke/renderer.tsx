@@ -12,6 +12,7 @@ import { exercisePasswords } from './passwords'
 import { exerciseBrowserLayout } from './layout'
 import { exerciseAnnotations } from './annotations'
 import { exerciseSidePanelTabs } from './side-panel'
+import { exerciseMermaid } from './mermaid'
 
 declare global {
   interface Window {
@@ -50,6 +51,8 @@ function Fixture() {
     let stage = 'opening, profile import and cursor checks'
     const timeout = setTimeout(() => window.smoke.result({ ok: false, error: 'Browser smoke timed out', stage, pending: [...pending.values()] }), Number(new URLSearchParams(location.search).get('timeout') || 30000))
     const run = async () => {
+      stage = 'Mermaid rendering, streaming, themes and source fallback'
+      await exerciseMermaid()
       if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
         stage = 'side panel tabs and retained resources'
         await exerciseSidePanelTabs()

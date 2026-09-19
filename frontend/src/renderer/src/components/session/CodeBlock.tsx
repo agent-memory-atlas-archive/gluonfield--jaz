@@ -3,6 +3,7 @@ import { Fragment, type ComponentProps } from 'react'
 import type { ExtraProps } from 'react-markdown'
 import { CopyToggleIcon } from '@/components/ui/CopyToggleIcon'
 import { useCopyAction } from '@/lib/useCopyAction'
+import { MermaidDiagram } from '@/components/session/MermaidDiagram'
 import { HighlightedCodeLine, type HighlightedCodeTokens, useHighlightedCode } from './HighlightedCode'
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -103,27 +104,31 @@ export function CodeBlock({ node, children }: ComponentProps<'pre'> & ExtraProps
   const code = codeChild(node)
   const language = languageFromClass(code?.properties?.className)
   const text = nodeText(code).replace(/\n$/, '')
-  const highlighted = useHighlightedCode(language, text)
+  const isMermaid = language.toLowerCase() === 'mermaid'
+  const highlighted = useHighlightedCode(isMermaid ? '' : language, text)
 
   if (!code) return <pre>{children}</pre>
 
   const lines = text.split('\n')
+  const source = (
+    <pre className="overflow-x-auto px-3.5 py-3 leading-relaxed">
+      <code>
+        {lines.map((line, index) => (
+          <Fragment key={index}>
+            {index > 0 ? '\n' : null}
+            <HighlightedCodeLine text={line} tokens={freshTokens(highlighted?.[index], line)} />
+          </Fragment>
+        ))}
+      </code>
+    </pre>
+  )
   return (
     <div className="my-3 overflow-hidden rounded-card bg-surface ring-1 ring-border/60">
       <div className="flex items-center justify-between gap-2 bg-surface-2/60 py-1 pl-3.5 pr-1.5">
         <span className="select-none text-[11px] font-medium text-ink-3">{displayLanguage(language)}</span>
         <CodeCopyButton text={text} />
       </div>
-      <pre className="overflow-x-auto px-3.5 py-3 leading-relaxed">
-        <code>
-          {lines.map((line, index) => (
-            <Fragment key={index}>
-              {index > 0 ? '\n' : null}
-              <HighlightedCodeLine text={line} tokens={freshTokens(highlighted?.[index], line)} />
-            </Fragment>
-          ))}
-        </code>
-      </pre>
+      {isMermaid ? <MermaidDiagram text={text}>{source}</MermaidDiagram> : source}
     </div>
   )
 }
