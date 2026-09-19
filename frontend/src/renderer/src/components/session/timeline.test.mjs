@@ -36,8 +36,61 @@ test('speech forms normal turns while typed handoff context stays off the readin
   expect(result.turns[1].opener.message.content).toBe('A typed follow-up')
   const classified = classifyTurnItems(result.turns[0].items, new Set(), new Map())
   expect(classified.resultItems.map((item) => item.event)).toEqual([spoken, answer])
+  expect(result.turns[0].items[0].collapseVoice).toBe(true)
   expect(stableEventKey(user)).toBe(stableEventKey({ ...user, seq: 999 }))
   expect(buildTimeline(messages, [answer], 'thread', true).turns[0].opener.message.content).toBe('List the files')
+})
+
+test('spoken copies are expandable beside written replies without changing either transcript', () => {
+  const written = { ...acpEvent('thread', 'acp_message', 2), content: 'Dogtooth, Shadow Robot and Dexory stand out because published supplier cases confirm they buy parts externally.' }
+  const spoken = {
+    session_id: 'thread', type: 'voice_message', at: new Date(3000).toISOString(),
+    voice: { id: 'reply', call_id: 'call', role: 'assistant', text: 'Dogtooth, Shadow Robot, and Dexory stand out because published supplier cases confirm they buy parts externally.', at: new Date(3000).toISOString() },
+  }
+  const before = globalThis.structuredClone([written, spoken])
+  for (const groupTurns of [true, false]) {
+    const result = buildTimeline([], [written, spoken], 'thread', groupTurns)
+    expect(result.chronological.map((item) => item.event)).toEqual(before)
+    expect(result.chronological[1].collapseVoice).toBe(true)
+  }
+  expect([written, spoken]).toEqual(before)
+  expect(buildTimeline([], [spoken], 'thread', true).chronological[0].collapseVoice).toBeUndefined()
+})
+
+test('voice-only turns stay visible after earlier written answers and child output', () => {
+  const at = (second) => new Date(second * 1000).toISOString()
+  const speech = (role, second) => ({
+    session_id: 'thread', type: 'voice_message', at: at(second),
+    voice: { id: String(second), call_id: 'call', role, text: role === 'user' ? 'Thanks.' : 'You’re welcome.', at: at(second) },
+  })
+  const events = [
+    { ...acpEvent('thread', 'acp_message', 1), content: 'Earlier written answer' },
+    speech('user', 2),
+    { ...acpEvent('child', 'acp_message', 3), content: 'Child output' },
+    speech('assistant', 4),
+  ]
+  const result = buildTimeline([], events, 'thread', true)
+  expect(result.turns[1].opener.collapseVoice).toBeUndefined()
+  expect(result.turns[1].items.at(-1).collapseVoice).toBeUndefined()
+  const messages = [{ seq: 1, role: 'assistant', content: 'Written response', created_at: at(3) }]
+  expect(buildTimeline(messages, [events[1], events[3]], 'thread', true).turns[0].items.at(-1).collapseVoice).toBe(true)
+})
+
+test('only readable assistant text can collapse a spoken answer', () => {
+  const at = new Date(1000).toISOString()
+  const spoken = {
+    session_id: 'thread', type: 'voice_message', at,
+    voice: { id: 'reply', call_id: 'call', role: 'assistant', text: 'Your disk has 42 GB free.', at },
+  }
+  const tool = { type: 'tool', id: 'disk', name: 'exec_command', result: '42 GB' }
+  const thought = { type: 'reasoning', text: 'Check disk space.' }
+  const message = { seq: 1, role: 'assistant', content: '', blocks: [thought, tool], created_at: at }
+  for (const blocks of [[], [thought], [tool], [thought, tool]]) {
+    const timeline = buildTimeline([{ ...message, blocks }], [spoken], 'thread', true)
+    expect(timeline.chronological.at(-1).collapseVoice).toBeUndefined()
+  }
+  const answer = { ...message, blocks: [...message.blocks, { type: 'text', text: '42 GB free.' }] }
+  expect(buildTimeline([answer], [spoken], 'thread', true).chronological.at(-1).collapseVoice).toBe(true)
 })
 
 describe('ACP activity timeline', () => {

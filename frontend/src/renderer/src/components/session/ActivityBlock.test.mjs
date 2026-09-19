@@ -64,6 +64,28 @@ const { Transcript } = await import('./Transcript')
 const thought = (text, key = 'thought') => ({ kind: 'thought', text, key })
 const tool = (call, key = `tool-${call.id}`) => ({ kind: 'tool', call, key })
 
+test('the transcript shows one written answer while spoken wording remains available to find', () => {
+  const written = 'Dogtooth, Shadow Robot and Dexory buy parts externally.'
+  const spoken = 'Dogtooth, Shadow Robot, and Dexory buy parts externally.'
+  const events = [
+    { session_id: 'thread', type: 'acp_message', at: new Date(1000).toISOString(), content: written, acp: { id: 'thread', agent: 'codex' } },
+    { session_id: 'thread', type: 'voice_message', seq: 2, at: new Date(2000).toISOString(), voice: { id: 'reply', call_id: 'call', role: 'assistant', text: spoken, at: new Date(2000).toISOString() } },
+  ]
+  for (const groupTurns of [true, false]) {
+    for (const working of [true, false]) {
+      const props = { messages: [], events, sessionId: 'thread', scrollRef: { current: null }, groupTurns, working }
+      const html = renderToStaticMarkup(createElement(Transcript, props))
+      expect(html).toContain(written)
+      expect(html).not.toContain(spoken)
+      expect(html).toContain('Spoken reply')
+      expect(renderToStaticMarkup(createElement(Transcript, { ...props, findActive: true }))).toContain(spoken)
+      const voiceOnly = renderToStaticMarkup(createElement(Transcript, { ...props, events: events.slice(1) }))
+      expect(voiceOnly).toContain(spoken)
+      expect(voiceOnly).not.toContain('Spoken reply')
+    }
+  }
+})
+
 test('an agent action spinner follows its own status within an active turn', () => {
   const [call] = codexAgentCalls
   for (const status of ['completed', 'failed', 'in_progress']) {

@@ -10,6 +10,7 @@ import {
   type TimelineItem,
 } from './timeline'
 import { useHistoryScroll } from '@/components/session/useHistoryScroll'
+import { SpokenReply } from '@/components/session/SpokenReply'
 import { ActivityBlock } from './ActivityBlock'
 import { Bubble } from './Bubble'
 import { LiveEvent } from './LiveEvent'
@@ -210,6 +211,9 @@ export const Transcript = memo(function Transcript({
           />
         )
       case 'event': {
+        if (item.collapseVoice && item.event.voice) {
+          return <SpokenReply key={itemKey(item)} voice={item.event.voice} findActive={findActive} showCopy={showAssistantCopy} />
+        }
         const taskSurface = taskSurfaceFromEvent(item.event)
         return (
           <LiveEvent

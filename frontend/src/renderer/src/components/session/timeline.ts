@@ -4,12 +4,13 @@
 // call per data change.
 import type { ACPEvent, ACPPermission, ACPToolCall, ChatMessage, SessionEvent } from '@/lib/api/types'
 import { taskSurfaceFromEvent } from '@/lib/taskSurface'
+import { messageText } from '@/lib/messageText'
 import { isParentChildACPEvent, sessionEventCoalesceKey } from '@/lib/sessionEvents'
 import { hasPermissionSurface, normalized } from './TranscriptUtils'
 
 export type TimelineItem =
   | { kind: 'message'; message: ChatMessage; at: number }
-  | { kind: 'event'; event: SessionEvent; eventIndex: number; at: number; showHeader: boolean }
+  | { kind: 'event'; event: SessionEvent; eventIndex: number; at: number; showHeader: boolean; collapseVoice?: boolean }
   | {
       kind: 'activity'
       entries: ActivityEntry[]
@@ -459,10 +460,28 @@ export function buildTimeline(
   const anchored = [...(pendingCards.length ? [] : workingStatusItems), ...pendingCards]
   markEventHeaders([...chronologicalItems, ...anchored], sessionId)
   const chronological = groupActivities(chronologicalItems)
+  const turns = splitTurns(chronological)
+  for (const turn of turns) {
+    const hasWrittenReply = turn.items.some((item) => {
+      if (item.kind === 'message') {
+        return item.message.role === 'assistant' && Boolean(messageText(item.message).trim())
+      }
+      return item.kind === 'event' && (item.event.type === 'acp_message' || item.event.type === 'acp') &&
+        textContent(item) !== undefined && item.event.acp?.id === (sessionId ?? item.event.session_id)
+    })
+    if (!hasWrittenReply) {
+      continue
+    }
+    for (const item of turn.items) {
+      if (item.kind === 'event' && item.event.voice?.role === 'assistant') {
+        item.collapseVoice = true
+      }
+    }
+  }
   return {
     chronological,
     anchored,
-    turns: groupTurns ? splitTurns(chronological) : [],
+    turns: groupTurns ? turns : [],
     permissionResolutions,
     latestTaskSurfaceEvent,
     pendingPermissionIds,
