@@ -1,3 +1,4 @@
+import { exerciseFrameNavigation } from './links'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { useLayoutEffect } from 'react'
@@ -295,9 +296,10 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await until(() => !tab('tabs')?.querySelector('img'))
     panel.closeTab('tabs')
     await until(() => panel.tabs.length === 2)
-    panel.openPreview(location.origin + '/target?tabs=one')
+    await click(element.querySelector('[data-tab-chat] a'))
     await until(() => ready('tabs'))
     const first = webview('tabs')
+    await exerciseFrameNavigation(first)
     const firstID = first.getWebContentsId()
     await evaluate(first, 'window.retainedTabValue = 41')
     const firstSize = await evaluate(first, '[innerWidth,innerHeight].join(",")')

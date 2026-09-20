@@ -13,7 +13,9 @@ export function attachWindowOpenHandler(
 ): void {
   if (contents.session !== session.fromPartition(PREVIEW_PARTITION)) {
     contents.setWindowOpenHandler(({ url }) => {
-      void openExternal(url)
+      if (!isPreviewURL(url) || !openTab?.(url)) {
+        void openExternal(url)
+      }
       return { action: 'deny' }
     })
     return

@@ -4,7 +4,7 @@ import { BrowserRepl } from '@/lib/browserRepl'
 import type { BrowserAction, BrowserActionResult } from '@/lib/browserApi'
 import { previewDisplayUrl, resolvePreviewSource } from '@/lib/api/preview'
 
-export type BrowserViewport = {
+export type BrowserViewport = HTMLElement & {
   getWebContentsId(): number
   getURL(): string
   getTitle(): string
@@ -19,7 +19,7 @@ export class SideBrowser {
 
   constructor(
     private readonly open: (url: string) => void,
-    private readonly command: (request: BrowserCommandRequest) => Promise<unknown>,
+    private readonly execute: (request: BrowserCommandRequest) => Promise<unknown>,
     action: (input: BrowserAction, signal: AbortSignal) => Promise<BrowserActionResult>,
   ) {
     this.repl = new BrowserRepl((input, signal) => input.action === 'cdp'
@@ -112,6 +112,18 @@ export class SideBrowser {
     }
     const data = await this.command({ ...command, webContentsId: this.viewport.getWebContentsId() })
     return { status: 'ok', data }
+  }
+
+  private async command(request: BrowserCommandRequest): Promise<unknown> {
+    const focused = document.activeElement
+    const viewport = this.viewport
+    try {
+      return await this.execute(request)
+    } finally {
+      if (focused instanceof HTMLElement && focused !== viewport && document.activeElement === viewport) {
+        focused.focus({ preventScroll: true })
+      }
+    }
   }
 
   dispose(): void {

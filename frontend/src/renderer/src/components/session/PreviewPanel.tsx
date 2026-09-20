@@ -138,6 +138,9 @@ export function PreviewPanel({
   useEffect(() => {
     if (!webview) return
     const sync = (event?: PreviewNavigationEvent) => {
+      if (event?.isMainFrame === false) {
+        return
+      }
       let next = event?.url || event?.validatedURL || webview.src
       if (readyRef.current === webview) {
         try {
@@ -286,7 +289,7 @@ export function PreviewPanel({
   const canAnnotate = canUseWebview && !!onAddBrowserAnnotation
 
   return (
-    <SidePanelShell width={PREVIEW_PANEL_WIDTH} embedded={embedded} className="pointer-events-auto" onKeyDownCapture={find.handleKeyDownCapture}>
+    <SidePanelShell width={PREVIEW_PANEL_WIDTH} embedded={embedded} className={visible ? 'pointer-events-auto' : 'pointer-events-none'} onKeyDownCapture={find.handleKeyDownCapture}>
       <form
         onSubmit={(event) => {
           event.preventDefault()
@@ -346,7 +349,9 @@ export function PreviewPanel({
           aria-label="Open in Browser"
           title="Open in Browser"
           disabled={!resolvedSourceUrl}
-          onClick={() => window.open(resolvedSourceUrl, '_blank', 'noopener')}
+          onClick={() => clientRuntime.openExternalURL
+            ? clientRuntime.openExternalURL(resolvedSourceUrl)
+            : window.open(resolvedSourceUrl, '_blank', 'noopener')}
         >
           <ExternalLink size={14} />
         </IconButton>
@@ -364,7 +369,7 @@ export function PreviewPanel({
         <p className="shrink-0 border-b border-border px-3 py-2 text-[12px] text-danger">{error}</p>
       ) : null}
       <div className="relative min-h-0 flex-1 bg-bg">
-        <div ref={cursorLayer} aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 overflow-hidden" />
+        <div ref={cursorLayer} hidden={!visible} aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 overflow-hidden" />
         <PreviewFindBar find={find} />
         {resolvedSourceUrl && canUseWebview ? (
           <webview

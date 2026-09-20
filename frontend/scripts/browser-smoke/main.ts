@@ -20,16 +20,26 @@ const timeout = Number(process.env.JAZ_BROWSER_SMOKE_TIMEOUT_MS || 30000)
 const openedURLs: string[] = []
 const popupURLs: string[] = []
 const tabURLs: string[] = []
+const previewTargets = new Set<number>()
 app.on('web-contents-created', (_event, contents) => attachWindowOpenHandler(contents, async (url) => {
   openedURLs.push(url)
 }, (url) => {
-  if (!contents.hostWebContents) {
+  const target = contents.hostWebContents ?? contents
+  if (!previewTargets.has(target.id)) {
     return false
   }
   tabURLs.push(url)
-  contents.hostWebContents.send('jaz:open-preview-url', url)
+  target.send('jaz:open-preview-url', url)
   return true
 }))
+ipcMain.on('jaz:set-preview-url-target-active', (event, active) => {
+  if (active) {
+    previewTargets.add(event.sender.id)
+  } else {
+    previewTargets.delete(event.sender.id)
+  }
+})
+ipcMain.on('jaz:open-external-url', (_event, url: string) => openedURLs.push(url))
 installBrowserControl()
 installBrowserPasswords()
 process.on('unhandledRejection', (error) => {
@@ -47,6 +57,11 @@ let proxyWaiter: ServerResponse | undefined
 let firstNavigation: IncomingHttpHeaders | undefined
 let passwordOrigin = ''
 const server = createServer(async (request, response) => {
+  if (request.url === '/navigation-frame') {
+    response.setHeader('Content-Type', 'text/html')
+    response.end('<script>addEventListener("message", () => { location.hash = "check" })</script>')
+    return
+  }
   if (request.url === '/file-fixture') {
     response.setHeader('Content-Type', 'application/json')
     response.end(JSON.stringify({ path: join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'report.html') }))
@@ -199,6 +214,9 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
   })
   ipcMain.handle('smoke:key', async (_event, keyCode: string, modifiers: string[] = []) => {
     window.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+    if (keyCode.length === 1 && modifiers.length === 0) {
+      window.webContents.sendInputEvent({ type: 'char', keyCode })
+    }
     window.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
     await new Promise((resolve) => setTimeout(resolve, 20))
   })

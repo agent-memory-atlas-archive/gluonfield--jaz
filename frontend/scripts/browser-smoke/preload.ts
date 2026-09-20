@@ -10,10 +10,15 @@ contextBridge.exposeInMainWorld('jaz', {
     import: (id, selection) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, id, selection),
   } satisfies BrowserProfileAPI,
   windowKind: 'main',
+  openExternalURL: (url: string) => ipcRenderer.send('jaz:open-external-url', url),
   onOpenPreviewURL: (handler: (url: string) => void) => {
     const listener = (_event: unknown, url: string) => handler(url)
     ipcRenderer.on('jaz:open-preview-url', listener)
-    return () => ipcRenderer.removeListener('jaz:open-preview-url', listener)
+    ipcRenderer.send('jaz:set-preview-url-target-active', true)
+    return () => {
+      ipcRenderer.removeListener('jaz:open-preview-url', listener)
+      ipcRenderer.send('jaz:set-preview-url-target-active', false)
+    }
   },
   get apiBaseUrl() {
     return location.origin

@@ -15,6 +15,9 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
   const element = document.createElement('div')
   element.style.cssText = 'position:absolute;inset:0;background:white'
   document.body.append(element)
+  const chatInput = document.createElement('input')
+  chatInput.style.cssText = 'position:absolute;top:120px;left:40px;width:200px'
+  document.body.append(chatInput)
   const root = createRoot(element)
   let selectChat: (id: string) => void
   let showPanel: (visible: boolean) => void
@@ -100,10 +103,27 @@ nodeRepl.write(retained)`)
     selectChat!('browser-background')
     await connected('browser-background')
     await waitFor(() => panel('browser-fixture').inert)
+    const inputBounds = chatInput.getBoundingClientRect()
+    const inputX = Math.round(inputBounds.x + inputBounds.width / 2)
+    const inputY = Math.round(inputBounds.y + inputBounds.height / 2)
+    await window.smoke.pointer('mouseDown', inputX, inputY)
+    await window.smoke.pointer('mouseUp', inputX, inputY)
+    await window.smoke.key('a')
+    if (document.activeElement !== chatInput || chatInput.value !== 'a') {
+      throw new Error(`Chat typing failed before background input: ${document.activeElement?.tagName}, ${chatInput.value}`)
+    }
     await evaluate(firstView, 'window.finishBackground()')
     const finished = await inFlight
     if (!finished.text?.includes('41') || !await evaluate(firstView, 'window.clicks === 1 && window.trusted')) {
       throw new Error('An in-flight script did not continue with trusted input after switching chats')
+    }
+    const cursor = panel('browser-fixture').querySelector<HTMLElement>('[data-browser-agent-cursor]')!
+    if (cursor.checkVisibility() || getComputedStyle(firstView.parentElement!.parentElement!).pointerEvents !== 'none') {
+      throw new Error('A hidden browser exposes its cursor or accepts pointer input')
+    }
+    await window.smoke.key('x')
+    if (document.activeElement !== chatInput || String(chatInput.value) !== 'ax') {
+      throw new Error(`Background browser input interfered with typing in chat: ${document.activeElement?.tagName}, ${chatInput.value}`)
     }
     const hiddenSize = await evaluate(firstView, '[innerWidth,innerHeight].join(",")')
     if (hiddenSize !== firstSize) {
@@ -257,6 +277,7 @@ await tab.getAXState()`)
     root.unmount()
     queryClient.clear()
     element.remove()
+    chatInput.remove()
     setApiBaseUrl(location.origin)
   }
 }
