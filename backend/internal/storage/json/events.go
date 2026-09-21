@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/wins/jaz/backend/internal/goal"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
@@ -80,12 +81,32 @@ func (s *Store) loadSessionEvents(id string) ([]sessionevents.Event, error) {
 }
 
 func (s *Store) AppendSessionEvents(id string, events ...sessionevents.Event) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.appendSessionEvents(id, events...)
+}
+
+func (s *Store) UpdateSessionGoal(id string, previous, next *goal.State) (sessionevents.Event, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	session, err := s.loadSessionByID(id)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	event, err := storage.GoalMutationEvent(session, previous, next)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	events := []sessionevents.Event{event}
+	err = s.appendSessionEvents(id, events...)
+	return events[0], err
+}
+
+func (s *Store) appendSessionEvents(id string, events ...sessionevents.Event) error {
 	if len(events) == 0 {
 		return nil
 	}
 	expanded, last := sessionevents.SplitTextEvents(events, storage.MaxTextEventBytes)
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if err := s.EnsureSession(id); err != nil {
 		return err
 	}
@@ -164,6 +185,9 @@ func (s *Store) AppendSessionEvents(id string, events ...sessionevents.Event) er
 			return err
 		}
 		session.Goal = goalProjection.State
+		if session.Goal == nil && session.Turn != nil {
+			session.Turn.GoalRequested = false
+		}
 		return s.saveSession(session)
 	}
 	s.touchSession(id)

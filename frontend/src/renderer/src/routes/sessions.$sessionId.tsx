@@ -38,6 +38,7 @@ import { markThreadSeen } from '@/lib/api/feed'
 import {
   answerSessionInteractiveResponse,
   cancelSession,
+  clearSessionGoal,
   sendSessionSideChat,
   sessionOverviewQuery,
   sessionRepoQuery,
@@ -231,8 +232,6 @@ function SessionPage({
     })
   }, [pauseFollowing, scrollRef])
 
-  // Cancelling clears any active goal server-side, so this doubles as the goal
-  // off-switch: it stops a running turn and the auto-continuation loop.
   const stopSession = useCallback(() => {
     // The turn runs detached server-side; clear local optimistic state now.
     abortLiveMessage()
@@ -244,6 +243,12 @@ function SessionPage({
         queryClient.invalidateQueries({ queryKey: keys.usage })
       })
   }, [abortLiveMessage, queryClient, sessionId])
+
+  const clearGoal = useCallback(() => {
+    void clearSessionGoal(sessionId)
+      .then(() => queryClient.invalidateQueries({ queryKey: keys.sessionMessages(sessionId) }))
+      .catch((error) => toast(error instanceof Error ? error.message : 'Could not turn Goal mode off', 'danger'))
+  }, [queryClient, sessionId, toast])
 
   const sendACPFallback = useCallback(async (
     targetSessionID: string,
@@ -597,7 +602,7 @@ function SessionPage({
                     onSend={handleSend}
                     onQueuePrompt={queue.onQueuePrompt}
                     onStop={stopSession}
-                    onClearGoal={stopSession}
+                    onClearGoal={clearGoal}
                     onVoice={voice.phase === 'off' ? voice.start : undefined}
                     voiceControls={voice.phase === 'off' ? undefined : <VoiceControls voice={voice} />}
                     onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}

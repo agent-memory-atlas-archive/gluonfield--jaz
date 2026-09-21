@@ -43,6 +43,7 @@ const (
 )
 
 type Store interface {
+	storage.SessionGoalStore
 	CreateSession(storage.CreateSession) (storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	SaveSession(storage.Session) error

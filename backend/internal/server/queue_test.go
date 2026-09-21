@@ -13,6 +13,7 @@ import (
 
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/goal"
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 	jsonstore "github.com/wins/jaz/backend/internal/storage/json"
 )
@@ -672,7 +673,7 @@ func TestQueuedACPDrainClaimsOnlyOnePrompt(t *testing.T) {
 	}
 }
 
-func goalSession(t *testing.T, store storage.SessionStore, slug string, status goal.Status) storage.Session {
+func goalSession(t *testing.T, store storage.Store, slug string, status goal.Status) storage.Session {
 	t.Helper()
 	session, err := store.CreateSession(storage.CreateSession{
 		Slug:    slug,
@@ -689,7 +690,7 @@ func goalSession(t *testing.T, store storage.SessionStore, slug string, status g
 	session.Goal = &goal.State{
 		Identity: goal.Identity{ID: "goal-1", ThreadID: session.ID, Objective: "ship the thing", Status: status},
 	}
-	if err := store.SaveSession(session); err != nil {
+	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{Type: sessionevents.TypeGoalUpdate, Goal: session.Goal}); err != nil {
 		t.Fatal(err)
 	}
 	return session

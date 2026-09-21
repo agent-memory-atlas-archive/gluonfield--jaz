@@ -6,14 +6,14 @@ import (
 )
 
 type sessionExportMirror interface {
-	SaveSession(storage.Session) error
+	SaveSessionSnapshot(storage.Session) error
 	SaveMessages(string, []provider.Message) error
 	AppendMessages(string, ...provider.Message) error
 }
 
 func (s *Store) mirrorSession(session storage.Session) {
 	if s.exportMirror != nil {
-		_ = s.exportMirror.SaveSession(session)
+		_ = s.exportMirror.SaveSessionSnapshot(session)
 	}
 }
 

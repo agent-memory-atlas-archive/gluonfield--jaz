@@ -11,16 +11,75 @@ import (
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
 )
 
+type pausedGoalUsageStore struct {
+	*sqlitestore.Store
+	loaded  chan struct{}
+	proceed chan struct{}
+}
+
+func (s pausedGoalUsageStore) UsageEvents(since, until time.Time) ([]storage.UsageEvent, error) {
+	close(s.loaded)
+	<-s.proceed
+	return s.Store.UsageEvents(since, until)
+}
+
+func TestClearWinsOverInFlightGoalWrites(t *testing.T) {
+	for _, operation := range []string{"create", "update", "usage"} {
+		t.Run(operation, func(t *testing.T) {
+			store, session := newGoalTestSession(t)
+			if operation != "create" {
+				if _, err := New(store, nil).Create(t.Context(), session.ID, CreateInput{Objective: "Finish the work"}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.AddUsage(session.ID, storage.Usage{InputTokens: 50}); err != nil {
+				t.Fatal(err)
+			}
+			paused := pausedGoalUsageStore{Store: store, loaded: make(chan struct{}), proceed: make(chan struct{})}
+			service := New(paused, nil)
+			result := make(chan error, 1)
+			go func() {
+				var err error
+				switch operation {
+				case "create":
+					_, err = service.Create(t.Context(), session.ID, CreateInput{Objective: "Late goal"})
+				case "update":
+					_, err = service.Update(t.Context(), session.ID, UpdateInput{Status: "active"})
+				case "usage":
+					_, err = service.RefreshActive(t.Context(), session.ID)
+				}
+				result <- err
+			}()
+			select {
+			case <-paused.loaded:
+			case err := <-result:
+				t.Fatalf("operation returned before reading usage: %v", err)
+			}
+			_, clearErr := store.UpdateSessionGoal(session.ID, nil, nil)
+			close(paused.proceed)
+			if clearErr != nil {
+				t.Fatal(clearErr)
+			}
+			err := <-result
+			if !errors.Is(err, storage.ErrGoalChanged) && !errors.Is(err, storage.ErrGoalNotRequested) {
+				t.Fatalf("late %s = %v", operation, err)
+			}
+			loaded, err := store.LoadSession(session.ID)
+			if err != nil || loaded.Goal != nil || loaded.Turn == nil || loaded.Turn.GoalRequested || loaded.Status != storage.StatusRunning {
+				t.Fatalf("session after late write = %+v, %v", loaded, err)
+			}
+			if err := store.StartSessionTurn(session.ID, storage.Turn{GoalRequested: true}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := New(store, nil).Create(t.Context(), session.ID, CreateInput{Objective: "Explicitly requested again"}); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestRefreshActiveExcludesCachedInputFromGoalTokens(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	budget := int64(10_000)
 	service := New(store, sessionevents.New())
 	state, err := service.Create(context.Background(), session.ID, CreateInput{
@@ -66,15 +125,7 @@ func TestGoalTokensInfersMissingInputFromTotal(t *testing.T) {
 }
 
 func TestCreateKeepsExistingActiveGoal(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	service := New(store, sessionevents.New())
 	first, err := service.Create(context.Background(), session.ID, CreateInput{Objective: "first objective"})
 	if err != nil {
@@ -90,15 +141,7 @@ func TestCreateKeepsExistingActiveGoal(t *testing.T) {
 }
 
 func TestGetWithoutActiveGoalReturnsEmptyGoal(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	state, err := New(store, sessionevents.New()).Get(context.Background(), session.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -109,15 +152,7 @@ func TestGetWithoutActiveGoalReturnsEmptyGoal(t *testing.T) {
 }
 
 func TestCompletedGoalCannotBeReopened(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	service := New(store, sessionevents.New())
 	if _, err := service.Create(context.Background(), session.ID, CreateInput{Objective: "finish"}); err != nil {
 		t.Fatal(err)
@@ -131,15 +166,7 @@ func TestCompletedGoalCannotBeReopened(t *testing.T) {
 }
 
 func TestCompletedGoalCanReceiveFinalTurnUsageButIsNotActive(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	base := time.Now().Add(-time.Minute).UTC()
 	service := New(store, sessionevents.New())
 	service.Now = func() time.Time { return base }
@@ -178,15 +205,7 @@ func TestCompletedGoalCanReceiveFinalTurnUsageButIsNotActive(t *testing.T) {
 }
 
 func TestCompletedGoalBeforeTurnDoesNotReceiveCurrentTurnUsage(t *testing.T) {
-	store, err := sqlitestore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
+	store, session := newGoalTestSession(t)
 	base := time.Now().Add(-time.Minute).UTC()
 	service := New(store, sessionevents.New())
 	service.Now = func() time.Time { return base }
@@ -207,4 +226,23 @@ func TestCompletedGoalBeforeTurnDoesNotReceiveCurrentTurnUsage(t *testing.T) {
 	if refreshed != nil {
 		t.Fatalf("refreshed old completed goal = %#v, want nil", refreshed)
 	}
+}
+
+func newGoalTestSession(t *testing.T) (*sqlitestore.Store, storage.Session) {
+	t.Helper()
+	store, err := sqlitestore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		store.Close()
+	})
+	session, err := store.CreateSession(storage.CreateSession{Slug: "goal", Runtime: storage.RuntimeACP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.StartSessionTurn(session.ID, storage.Turn{GoalRequested: true}); err != nil {
+		t.Fatal(err)
+	}
+	return store, session
 }

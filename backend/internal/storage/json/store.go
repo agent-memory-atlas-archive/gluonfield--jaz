@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	stdjson "encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -148,6 +149,19 @@ func (s *Store) LoadSession(ref string) (storage.Session, error) {
 }
 
 func (s *Store) SaveSession(session storage.Session) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, err := s.loadSessionByID(session.ID)
+	if err == nil {
+		session.Goal = current.Goal
+		session.Turn = current.Turn
+	} else if !errors.Is(err, storage.ErrSessionNotFound) {
+		return err
+	}
+	return s.saveSession(session)
+}
+
+func (s *Store) SaveSessionSnapshot(session storage.Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.saveSession(session)
@@ -603,7 +617,7 @@ func (s *Store) metaPath(id string) string {
 func (s *Store) loadSessionByID(id string) (storage.Session, error) {
 	data, err := os.ReadFile(s.metaPath(id))
 	if os.IsNotExist(err) {
-		return storage.Session{}, fmt.Errorf("session metadata not found: %s", id)
+		return storage.Session{}, fmt.Errorf("%w: %s", storage.ErrSessionNotFound, id)
 	}
 	if err != nil {
 		return storage.Session{}, err

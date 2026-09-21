@@ -2,12 +2,45 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/wins/jaz/backend/internal/goal"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 )
+
+type SessionGoalStore interface {
+	UpdateSessionGoal(id string, previous, next *goal.State) (sessionevents.Event, error)
+}
+
+var ErrGoalChanged = errors.New("goal changed while updating")
+var ErrGoalNotRequested = errors.New("goal mode is off")
+
+func GoalMutationEvent(session Session, previous, next *goal.State) (sessionevents.Event, error) {
+	event := sessionevents.Event{SessionID: session.ID, Type: sessionevents.TypeGoalClear, At: time.Now().UTC()}
+	if next == nil {
+		return event, nil
+	}
+	currentRaw, err := MarshalGoalState(session.Goal)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	previousRaw, err := MarshalGoalState(previous)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	if currentRaw != previousRaw {
+		return sessionevents.Event{}, ErrGoalChanged
+	}
+	if (session.Goal == nil || next.ID != session.Goal.ID) && (session.Turn == nil || !session.Turn.GoalRequested) {
+		return sessionevents.Event{}, ErrGoalNotRequested
+	}
+	event.Type = sessionevents.TypeGoalUpdate
+	event.Goal = next
+	return event, nil
+}
 
 type GoalProjection struct {
 	Seen  bool

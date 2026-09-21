@@ -8,6 +8,8 @@ import (
 	"time"
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
+	"github.com/wins/jaz/backend/internal/goal"
+	"github.com/wins/jaz/backend/internal/sessiongoal"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
@@ -47,6 +49,7 @@ type sendOptions struct {
 	activeOperation       string
 	transcript            sendTranscriptMode
 	requireCompactSupport bool
+	requireActiveGoal     bool
 }
 
 type InternalTurnRequest struct {
@@ -65,7 +68,7 @@ func (m *Manager) ContinueGoal(ctx context.Context, session string) (Job, error)
 		Message:       jazGoalContinuationMessage,
 		Completion:    CompletionAsync,
 		GoalRequested: true,
-	}, sendOptions{transcript: sendTranscriptHidden})
+	}, sendOptions{transcript: sendTranscriptHidden, requireActiveGoal: true})
 }
 
 func (m *Manager) StartInternalTurn(ctx context.Context, req InternalTurnRequest) (Job, error) {
@@ -140,6 +143,15 @@ func (m *Manager) sendOnce(ctx context.Context, req SendRequest, opts sendOption
 	defer job.sendMu.Unlock()
 	if err := job.sendConflict(); err != nil {
 		return Job{}, fmt.Errorf("%s: %w", job.Slug, err)
+	}
+	if opts.requireActiveGoal {
+		session, err := m.store.LoadSession(job.ID)
+		if err != nil {
+			return Job{}, err
+		}
+		if !goal.Continuable(session.Goal) {
+			return Job{}, sessiongoal.ErrNoActiveGoal
+		}
 	}
 	if err := m.refreshMCPBeforeTurn(ctx, job); err != nil {
 		return Job{}, err
