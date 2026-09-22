@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useCallback, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
 import { setApiBaseUrl } from '@/lib/api/client'
@@ -28,7 +29,12 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
     const [browserId, setBrowserId] = useState(id)
     const sessions = useBrowserSessions()
     const [width, setWidth] = useState(640)
-    const show = useCallback(() => setVisible(true), [])
+    const show = useCallback(() => {
+      flushSync(() => {
+        setBrowserId(id)
+        setVisible(true)
+      })
+    }, [id])
     const close = useCallback(() => setVisible(false), [])
     const annotate = useCallback(() => {
       throw new Error('An abandoned annotation was submitted')
@@ -155,8 +161,8 @@ nodeRepl.write(retained)`)
     })
     const extraID = webview('extra-tab').getWebContentsId()
     const agentWhileBrowsing = await script('browser-fixture', 'await tab.cdp.send("Runtime.evaluate", { expression: "window.agentTabProbe = 41" })\nnodeRepl.write(retained)')
-    if (agentWhileBrowsing.text !== '41' || !await evaluate(firstView, 'window.agentTabProbe === 41') || !await evaluate(webview('extra-tab'), 'window.agentTabProbe === undefined') || !panel('browser-fixture').inert) {
-      throw new Error('An additional browser took over the conversation’s agent browser')
+    if (agentWhileBrowsing.text !== '41' || !await evaluate(firstView, 'window.agentTabProbe === 41') || !await evaluate(webview('extra-tab'), 'window.agentTabProbe === undefined') || panel('browser-fixture').inert) {
+      throw new Error('Browser activity did not reveal its own tab while preserving the additional browser')
     }
     selectBrowser!('browser-fixture')
     await waitFor(() => !panel('browser-fixture').inert)
@@ -188,8 +194,9 @@ await tab.getAXState()`)
     await waitFor(() => panel('browser-fixture').inert)
     await script('browser-fixture', 'await tab.click(target)\nawait tab.getAXState()')
     if (!await evaluate(firstView, 'window.clicks === 2')) throw new Error('Switching panels stopped the browser')
-    showPanel!(true)
-    await waitFor(() => !panel('browser-fixture').inert)
+    if (panel('browser-fixture').inert) {
+      throw new Error('Browser input did not reopen its hidden panel')
+    }
     const first = await script('browser-fixture', 'nodeRepl.write(retained)')
     const second = await script('browser-background', 'nodeRepl.write(retained)')
     if (first.text !== '41' || second.text !== '92') throw new Error('Browser script bindings crossed conversations')

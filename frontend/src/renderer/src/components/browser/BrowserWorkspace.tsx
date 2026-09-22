@@ -23,9 +23,10 @@ export function BrowserWorkspace({ children, idleMs = BROWSER_IDLE_MS }: { child
 function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs: number }) {
   const sessions = useBrowserSessions()
   const open = useCallback((url: string) => sessions.open(entry.id, url), [sessions, entry.id])
+  const show = useCallback(() => sessions.show(entry.id), [sessions, entry.id])
   const update = useCallback((target: PreviewTarget) => sessions.update(entry.id, { target }), [sessions, entry.id])
   const visible = Boolean(entry.presentation)
-  const { browser, resident } = useSideBrowser({ sessionId: entry.id, open, visible, url: entry.target.sourceUrl, idleMs, controlled: !entry.ownerId || entry.ownerId === entry.id })
+  const { browser, resident } = useSideBrowser({ sessionId: entry.id, open, show, visible, url: entry.target.sourceUrl, idleMs, controlled: !entry.ownerId || entry.ownerId === entry.id })
   const host = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: PREVIEW_PANEL_WIDTH, height: Math.max(400, window.innerHeight - 52) })
   useLayoutEffect(() => {

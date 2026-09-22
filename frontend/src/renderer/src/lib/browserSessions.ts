@@ -23,7 +23,7 @@ const EMPTY_TARGET: PreviewTarget = { displayUrl: '', sourceUrl: '' }
 export class BrowserSessions {
   private sessions: BrowserSession[] = []
   private listeners = new Set<() => void>()
-  private viewers = new Map<string, () => void>()
+  private viewers = new Map<string, () => void | Promise<void>>()
 
   getSnapshot = (): BrowserSession[] => this.sessions
 
@@ -32,7 +32,7 @@ export class BrowserSessions {
     return () => this.listeners.delete(listener)
   }
 
-  bind(id: string, show: () => void): () => void {
+  bind(id: string, show: () => void | Promise<void>): () => void {
     this.update(id, {})
     this.viewers.set(id, show)
     return () => {
@@ -42,7 +42,13 @@ export class BrowserSessions {
 
   open(id: string, url: string): void {
     this.update(id, { ownerId: id, target: { displayUrl: url, sourceUrl: url } })
-    this.viewers.get(id)?.()
+    this.show(id)
+  }
+
+  show(id: string): void | Promise<void> {
+    if (!this.sessions.find((session) => session.id === id)?.presentation) {
+      return this.viewers.get(id)?.()
+    }
   }
 
   openTab(ownerId: string, url = ''): string {
@@ -102,7 +108,7 @@ export function useBrowserSessions(): BrowserSessions {
   return sessions
 }
 
-export function useSessionPreview(sessionId: string, show: () => void) {
+export function useSessionPreview(sessionId: string, show: () => void | Promise<void>) {
   const sessions = useBrowserSessions()
   useLayoutEffect(() => sessions.bind(sessionId, show), [sessions, sessionId, show])
 }

@@ -8,9 +8,10 @@ import type { BrowserCommand } from '@shared/browserControl'
 import { SideBrowser } from '@/lib/sideBrowser'
 import { BrowserRetention } from '@/lib/browserRetention'
 
-export function useSideBrowser({ sessionId, open, visible, url, idleMs, controlled = true }: {
+export function useSideBrowser({ sessionId, open, show, visible, url, idleMs, controlled = true }: {
   sessionId: string
   open: (url: string) => void
+  show: () => void | Promise<void>
   visible: boolean
   url: string
   idleMs: number
@@ -22,7 +23,7 @@ export function useSideBrowser({ sessionId, open, visible, url, idleMs, controll
     ? new SideBrowser((url) => {
       setResident(true)
       open(url)
-    }, window.jaz.browserCommand, (action, signal) => post(`/v1/sessions/${encodeURIComponent(sessionId)}/browser`, action, signal))
+    }, window.jaz.browserCommand, (action, signal) => post(`/v1/sessions/${encodeURIComponent(sessionId)}/browser`, action, signal), show)
     : undefined)
   const [retention] = useState(() => new BrowserRetention(async (signal) => {
     if (!controlled) {

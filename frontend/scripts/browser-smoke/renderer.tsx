@@ -45,12 +45,37 @@ function Fixture() {
       }
       return response.json()
     },
+    () => {},
   ))
   useEffect(() => {
     const pending = new Map<number, string>()
     let stage = 'opening, profile import and cursor checks'
     const timeout = setTimeout(() => window.smoke.result({ ok: false, error: 'Browser smoke timed out', stage, pending: [...pending.values()] }), Number(new URLSearchParams(location.search).get('timeout') || 30000))
     const run = async () => {
+      stage = 'cancellation while opening the browser panel'
+      let finishOpening!: () => void
+      const opening = new Promise<void>((resolve) => {
+        finishOpening = resolve
+      })
+      const unexpected = () => {
+        throw new Error('This script should not access a page')
+      }
+      const waitingBrowser = new SideBrowser(unexpected, unexpected, unexpected, () => opening)
+      try {
+        const pending = waitingBrowser.call({ method: 'Jaz.run', params: { code: 'const cancelledBinding = 41' } })
+          .then(() => 'completed', (error: Error) => error.message)
+        waitingBrowser.cancel()
+        finishOpening()
+        if (await pending !== 'Side browser changed during the action') {
+          throw new Error('A command waiting for the browser panel did not cancel')
+        }
+        const recovered = await waitingBrowser.call({ method: 'Jaz.run', params: { code: 'nodeRepl.write(typeof cancelledBinding)' } }) as { text: string }
+        if (!recovered.text.endsWith('undefined')) {
+          throw new Error('A cancelled command ran after the browser panel opened')
+        }
+      } finally {
+        waitingBrowser.dispose()
+      }
       stage = 'Mermaid rendering, streaming, themes and source fallback'
       await exerciseMermaid()
       if (new URLSearchParams(location.search).get('suite') === 'side-panel') {

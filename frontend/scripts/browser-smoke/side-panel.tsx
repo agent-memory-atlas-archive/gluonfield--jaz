@@ -12,6 +12,8 @@ import { FileReaderLinkProvider, PreviewLinkProvider, RenderedMarkdown } from '@
 import { isPreviewWebviewPending, type PreviewWebviewElement } from '@/components/session/previewWebview'
 import type { Session } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
+import { setApiBaseUrl } from '@/lib/api/client'
+import type { BrowserAction, BrowserActionResult } from '@/lib/browserApi'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { setThemePref } from '@/lib/theme'
 import { TitlebarActionsOutlet, TitlebarProvider, TitlebarSlotOutlet } from '@/lib/titlebar'
@@ -501,11 +503,90 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     await until(() => panel.activeTab?.kind === 'file' && Boolean(element.querySelector('[role="tabpanel"] h1')))
     await until(() => Math.abs(element.querySelector('[role="separator"]')!.parentElement!.getBoundingClientRect().width - panel.width) < 1)
     await window.smoke.capture('side-panel-restored-tabs')
+
+    const backend = await window.smoke.backend()
+    setApiBaseUrl(backend)
+    queryClient.setQueryData(keys.browserSettings, { enabled: true, mode: 'desktop' })
+    const action = async (input: BrowserAction | { action: 'tabs' } | { action: 'script'; code: string }): Promise<BrowserActionResult> => {
+      const endpoint = input.action === 'script' ? '/exercise-script/tabs' : '/v1/sessions/tabs/browser'
+      const response = await fetch(backend + endpoint, { method: 'POST', body: JSON.stringify(input) })
+      if (!response.ok) {
+        throw new Error(await response.text())
+      }
+      return response.json()
+    }
+    await until(async () => (await fetch(`${backend}/v1/sessions/tabs/browser`, { method: 'POST', body: '{"action":"status"}' })).ok)
+    panel.selectTab('tabs')
+    await until(() => ready('tabs'))
+    const agentView = webview('tabs')
+    const agentID = agentView.getWebContentsId()
+    const agentURL = await evaluate(agentView, 'location.href') as string
+    const shown = () => panel.open && panel.mode === 'tabs' && panel.activeTab?.id === 'tabs' && !document.querySelector<HTMLElement>('[data-browser-session="tabs"]')!.inert
+    for (const input of [
+      { action: 'navigate', url: agentURL },
+      { action: 'state' },
+      { action: 'script', code: 'await tab.cdp.send("Runtime.evaluate", { expression: "window.visibilityProbe = 73" })' },
+    ] satisfies Parameters<typeof action>[0][]) {
+      panel.close()
+      await until(() => !panel.open)
+      await action({ action: 'tabs' })
+      if (panel.open) {
+        throw new Error('Listing browser tabs opened an idle panel')
+      }
+      await action(input)
+      if (!shown()) {
+        throw new Error(`${input.action} did not reveal the retained agent browser`)
+      }
+      if (webview('tabs').getWebContentsId() !== agentID) {
+        throw new Error('Revealing the agent browser replaced its webview')
+      }
+    }
+    panel.toggleMode('overview')
+    await until(() => panel.mode === 'overview')
+    await action({ action: 'state' })
+    if (!shown()) {
+      throw new Error('Browser activity did not switch Overview to the browser')
+    }
+    panel.selectTab(retainedTabId)
+    await until(() => panel.activeTab?.id === retainedTabId)
+    await action({ action: 'script', code: 'await tab.getAXState()' })
+    if (!shown() || await evaluate(retainedView, 'window.chatNavigationValue') !== 73 || await evaluate(agentView, 'window.visibilityProbe') !== 73) {
+      throw new Error('Browser activity did not select its own tab while preserving the other page')
+    }
+    const pending = action({ action: 'script', code: `await tab.cdp.send('Runtime.evaluate', {
+expression: 'new Promise(resolve => { window.resumeVisibility = resolve })',
+awaitPromise: true
+})
+await tab.cdp.send('Runtime.evaluate', { expression: 'window.visibilityProbe += 1' })` })
+    await until(async () => await evaluate(agentView, 'typeof window.resumeVisibility') === 'function')
+    panel.close()
+    await until(() => !panel.open)
+    await evaluate(agentView, 'window.resumeVisibility()')
+    await pending
+    if (!shown() || await evaluate(agentView, 'window.visibilityProbe') !== 74) {
+      throw new Error('Continuing a raw CDP script did not reveal its browser after panel closure')
+    }
+    const observed = await action({ action: 'state' })
+    const page = observed.data as { elements: { name: string; ref: string }[] }
+    const target = page.elements.find((entry) => entry.name === 'Run this step')!
+    panel.close()
+    await until(() => !panel.open && element.querySelector('[role="separator"]')!.parentElement!.getBoundingClientRect().width === 0)
+    await action({ action: 'click', ref: target.ref })
+    if (!shown() || !await evaluate(agentView, 'window.clicks === 1 && window.trusted')) {
+      throw new Error('Clicking from a closed panel did not reveal the browser and deliver trusted input')
+    }
+    await window.smoke.capture('browser-activity-reveals-panel')
+    await navigate('other-chat')
+    await action({ action: 'state' })
+    if (panel.open || panel.activeTab?.id !== 'file') {
+      throw new Error('Background browser work opened another conversation’s panel')
+    }
   } catch (error) {
     await window.smoke.capture('side-panel-tabs-failure')
     throw error
   } finally {
     root.unmount()
+    setApiBaseUrl(location.origin)
     queryClient.clear()
     window.WebSocket = NativeSocket
     element.remove()

@@ -21,6 +21,7 @@ export class SideBrowser {
     private readonly open: (url: string) => void,
     private readonly execute: (request: BrowserCommandRequest) => Promise<unknown>,
     action: (input: BrowserAction, signal: AbortSignal) => Promise<BrowserActionResult>,
+    private readonly show: () => void | Promise<void>,
   ) {
     this.repl = new BrowserRepl((input, signal) => input.action === 'cdp'
       ? this.sendCDP(input)
@@ -35,6 +36,9 @@ export class SideBrowser {
   }
 
   async call({ method, params, sessionId }: BrowserCommand): Promise<unknown> {
+    if (method !== 'Jaz.tab') {
+      await this.reveal()
+    }
     const generation = this.generation
     const viewport = this.viewport
     if (method === 'Jaz.run') {
@@ -110,6 +114,7 @@ export class SideBrowser {
     if (!this.viewport) {
       throw new Error('Side browser is closed; call tab.goto to open it')
     }
+    await this.reveal()
     const data = await this.command({ ...command, webContentsId: this.viewport.getWebContentsId() })
     return { status: 'ok', data }
   }
@@ -123,6 +128,14 @@ export class SideBrowser {
       if (focused instanceof HTMLElement && focused !== viewport && document.activeElement === viewport) {
         focused.focus({ preventScroll: true })
       }
+    }
+  }
+
+  private async reveal(): Promise<void> {
+    const generation = this.generation
+    await this.show()
+    if (generation !== this.generation) {
+      throw new Error('Side browser changed during the action')
     }
   }
 

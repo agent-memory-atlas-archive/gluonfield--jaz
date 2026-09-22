@@ -2,9 +2,13 @@
 
 Enable browser tools in **Settings → Browser** and select **Jaz side browser**.
 Keep the desktop app running while the agent works. Once a conversation has
-connected, its browser can keep working while you switch chats, change panels,
-or hide the browser. Active conversations retain their own page, viewport and
-JavaScript bindings; opening their Preview panel shows the same page again.
+connected, browser activity in the current conversation opens the right side
+panel and selects the agent's browser tab. This includes commands against an
+existing page and commands continuing inside a script after the panel is hidden.
+Commands wait for the desktop panel's opening animation before observing or acting.
+Status and tab-list checks leave the panel alone. Other conversations keep working
+in the background without changing the current chat's panel. Active conversations
+retain their own page, viewport and JavaScript bindings.
 An agent can also open its first page after you leave that conversation.
 Browser commands preserve the focused chat control. Hidden panels disable pointer
 interaction and hide the agent cursor while their browser work continues.
@@ -337,6 +341,10 @@ The production browser workspace is also exercised across chat and panel
 switches: a pending script continues, hidden pages accept trusted clicks and
 screenshots, another chat opens its first page in the background, and returning
 preserves the original webview, page, dimensions and isolated script bindings.
+The actual side-panel controls verify that same-URL navigation, page reads,
+scripts and continuing raw CDP commands reveal the retained agent tab from a
+closed panel, Overview or another browser tab; tab listing and other chats leave
+the current panel alone.
 Abandoned annotations stop intercepting clicks when their panel is hidden;
 the retained surface preserves the resize handle's full hit area.
 With a shortened idle deadline, the fixture verifies native webview destruction,
