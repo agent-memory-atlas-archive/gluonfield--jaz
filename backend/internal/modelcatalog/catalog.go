@@ -88,7 +88,7 @@ var (
 			openRouterBackedModel(provider.DefaultOpenAIModel, "GPT-5.4 Mini", "Fast and inexpensive", "openai/gpt-5.4-mini"),
 		},
 		"claude": {
-			modelWithoutProviderReasoning("opus[1m]", "Opus 5", "Recommended"),
+			modelWithoutProviderReasoning("opus[1m]", "Opus 5.5", "Recommended"),
 			openRouterBackedModel("claude-fable-5-1", "Fable 5.1", "Most capable for the hardest tasks", "anthropic/claude-fable-5.1"),
 			openRouterBackedModel("claude-fable-5[1m]", "Fable 5", "Previous Fable model", "anthropic/claude-fable-5"),
 			openRouterBackedModel("sonnet", "Sonnet 5", "Efficient for routine tasks", "anthropic/claude-sonnet-5"),

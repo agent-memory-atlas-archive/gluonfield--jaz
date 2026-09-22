@@ -258,7 +258,7 @@ func resolveClaudeAuth(auth AgentAuthConfig, cfg AgentConfig, root string, env m
 	mode := auth.Mode
 	if mode == AuthModeAuto || mode == "" {
 		mode = AuthModeJazProfile
-		if claudeAuthFailureRecorded(jaz) || claudeAuthFileAvailable(jaz) {
+		if claudeAuthFileAvailable(jaz) {
 			mode = AuthModeJazProfile
 		} else if claudeAccountAuthAvailable(cfg.Env) || claudeAccountAuthAvailable(env) || claudeAuthFileAvailable(existing) {
 			mode = AuthModeExistingCLI
@@ -285,16 +285,13 @@ func resolveClaudeAuth(auth AgentAuthConfig, cfg AgentConfig, root string, env m
 	accountAuthConfigured := source == AuthModeExistingCLI &&
 		(claudeAccountAuthAvailable(cfg.Env) || claudeAccountAuthAvailable(env))
 	apiKeyConfigured := status.resolveAPIKey(AgentClaude, root, env)
-	rejectedLogin := source == AuthModeJazProfile && path != "" && claudeAuthFailureRecorded(path)
 	switch {
 	case accountAuthConfigured:
 		status.markAuthenticated("env", AuthKindOAuth)
-	case path != "" && !rejectedLogin && claudeProfileAuthAvailable(path):
+	case path != "" && claudeProfileAuthAvailable(path):
 		status.markAuthenticated("claude_json", AuthKindOAuth)
 	case apiKeyConfigured:
 		status.markAuthenticated("api_key_env", AuthKindAPIKey)
-	case rejectedLogin:
-		status.Reason = "Claude rejected the saved login; reconnect Claude"
 	case source == AuthModeExistingCLI && configuredExisting == "":
 		status.markAuthenticated("existing_cli", AuthKindOAuth)
 	default:

@@ -112,7 +112,7 @@ func (m *Manager) acquireSessionProcess(ctx context.Context, job *jobState) (*jo
 			job = current
 			continue
 		}
-		if current == job && process != nil && serveErr == nil {
+		if current == job && process != nil && serveErr == nil && !job.claudeAuthFailed() {
 			return job, nil
 		}
 		if serveErr != nil && job.turnDone() != nil {

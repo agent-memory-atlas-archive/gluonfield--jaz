@@ -11,38 +11,18 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/wins/jaz/backend/internal/runtimefiles"
 )
 
 const (
-	authFailureMarker         = ".jaz-auth-failed"
 	macOSSecurityItemNotFound = 44
 	claudeCredentialReadLimit = 5 * time.Second
 )
 
-func (m *Manager) recordRuntimeAuthFailure(job *jobState, message string) {
-	if CanonicalAgentName(job.ACPAgent) != AgentClaude {
-		return
-	}
-	cfg, ok, err := m.configuredAgent(job.ACPAgent)
-	if err != nil || !ok {
-		return
-	}
-	if err := recordClaudeAuthFailure(cfg.Auth, m.cfg.Root, message); err != nil {
-		m.log.Warn("record acp auth failure", "session", job.ID, "error", err)
-	}
-}
-
-func recordClaudeAuthFailure(auth AgentAuthConfig, root, message string) error {
-	if auth.Mode == AuthModeExistingCLI || !claudeAuthFailure(message) {
-		return nil
-	}
-	configDir := runtimefiles.New(root).ACPClaudeConfig
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(configDir, authFailureMarker), []byte(strings.TrimSpace(message)+"\n"), 0o600)
+func (j *jobState) claudeAuthFailed() bool {
+	j.mu.RLock()
+	defer j.mu.RUnlock()
+	return j.ACPAgent == AgentClaude && j.State == StateFailed && j.turn == nil && j.finishing == nil &&
+		claudeAuthFailure(j.Error)
 }
 
 func claudeAuthFailure(message string) bool {
@@ -59,10 +39,6 @@ func claudeAuthFailure(message string) bool {
 		}
 	}
 	return false
-}
-
-func claudeAuthFailureRecorded(configDir string) bool {
-	return fileExists(filepath.Join(configDir, authFailureMarker))
 }
 
 // claudeProfileAuthAvailable reports whether a Claude profile Jaz can name still
@@ -113,7 +89,7 @@ func removeClaudeProfileCredentials(configDir string) error {
 	if err := removeClaudeProfileKeychainCredential(configDir); err != nil {
 		return err
 	}
-	for _, name := range []string{".claude.json", ".credentials.json", authFailureMarker} {
+	for _, name := range []string{".claude.json", ".credentials.json", ".jaz-auth-failed"} {
 		if err := os.Remove(filepath.Join(configDir, name)); err != nil && !os.IsNotExist(err) {
 			return err
 		}

@@ -18,6 +18,8 @@ func TestFakeACPAgentProcess(t *testing.T) {
 	if os.Getenv("JAZ_FAKE_ACP_AGENT") != "1" {
 		return
 	}
+	_, authErr := os.Stat(os.Getenv("JAZ_FAKE_ACP_AUTH_REQUIRED_FILE"))
+	authRequired := authErr == nil
 	if path := os.Getenv("JAZ_FAKE_ACP_START_LOG"); path != "" {
 		file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
@@ -377,7 +379,7 @@ func TestFakeACPAgentProcess(t *testing.T) {
 				Meta map[string]any `json:"_meta"`
 			}
 			_ = json.Unmarshal(msg.Params, &promptReq)
-			if os.Getenv("JAZ_FAKE_ACP_AUTH_REQUIRED") == "1" {
+			if authRequired {
 				resp, _ := jsonrpc.NewErrorResponse(*msg.ID, jsonrpc.InternalError("Authentication required", nil))
 				_ = conn.Send(context.Background(), resp)
 				continue
