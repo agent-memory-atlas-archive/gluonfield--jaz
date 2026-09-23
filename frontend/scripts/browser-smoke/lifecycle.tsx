@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useCallback, useLayoutEffect, useState, type CSSProperties } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import { BrowserPanelSlot, BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
 import { setApiBaseUrl } from '@/lib/api/client'
@@ -15,6 +16,9 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
   const element = document.createElement('div')
   element.style.cssText = 'position:absolute;inset:0;background:white'
   document.body.append(element)
+  const chatInput = document.createElement('input')
+  chatInput.style.cssText = 'position:absolute;top:120px;left:40px;width:200px'
+  document.body.append(chatInput)
   const root = createRoot(element)
   let selectChat: (id: string) => void
   let showPanel: (visible: boolean) => void
@@ -25,7 +29,12 @@ export async function exerciseBrowserLifecycle(backend: string, onStage: (stage:
     const [browserId, setBrowserId] = useState(id)
     const sessions = useBrowserSessions()
     const [width, setWidth] = useState(640)
-    const show = useCallback(() => setVisible(true), [])
+    const show = useCallback(() => {
+      flushSync(() => {
+        setBrowserId(id)
+        setVisible(true)
+      })
+    }, [id])
     const close = useCallback(() => setVisible(false), [])
     const annotate = useCallback(() => {
       throw new Error('An abandoned annotation was submitted')
@@ -100,10 +109,27 @@ nodeRepl.write(retained)`)
     selectChat!('browser-background')
     await connected('browser-background')
     await waitFor(() => panel('browser-fixture').inert)
+    const inputBounds = chatInput.getBoundingClientRect()
+    const inputX = Math.round(inputBounds.x + inputBounds.width / 2)
+    const inputY = Math.round(inputBounds.y + inputBounds.height / 2)
+    await window.smoke.pointer('mouseDown', inputX, inputY)
+    await window.smoke.pointer('mouseUp', inputX, inputY)
+    await window.smoke.key('a')
+    if (document.activeElement !== chatInput || chatInput.value !== 'a') {
+      throw new Error(`Chat typing failed before background input: ${document.activeElement?.tagName}, ${chatInput.value}`)
+    }
     await evaluate(firstView, 'window.finishBackground()')
     const finished = await inFlight
     if (!finished.text?.includes('41') || !await evaluate(firstView, 'window.clicks === 1 && window.trusted')) {
       throw new Error('An in-flight script did not continue with trusted input after switching chats')
+    }
+    const cursor = panel('browser-fixture').querySelector<HTMLElement>('[data-browser-agent-cursor]')!
+    if (cursor.checkVisibility() || getComputedStyle(firstView.parentElement!.parentElement!).pointerEvents !== 'none') {
+      throw new Error('A hidden browser exposes its cursor or accepts pointer input')
+    }
+    await window.smoke.key('x')
+    if (document.activeElement !== chatInput || String(chatInput.value) !== 'ax') {
+      throw new Error(`Background browser input interfered with typing in chat: ${document.activeElement?.tagName}, ${chatInput.value}`)
     }
     const hiddenSize = await evaluate(firstView, '[innerWidth,innerHeight].join(",")')
     if (hiddenSize !== firstSize) {
@@ -135,8 +161,8 @@ nodeRepl.write(retained)`)
     })
     const extraID = webview('extra-tab').getWebContentsId()
     const agentWhileBrowsing = await script('browser-fixture', 'await tab.cdp.send("Runtime.evaluate", { expression: "window.agentTabProbe = 41" })\nnodeRepl.write(retained)')
-    if (agentWhileBrowsing.text !== '41' || !await evaluate(firstView, 'window.agentTabProbe === 41') || !await evaluate(webview('extra-tab'), 'window.agentTabProbe === undefined') || !panel('browser-fixture').inert) {
-      throw new Error('An additional browser took over the conversation’s agent browser')
+    if (agentWhileBrowsing.text !== '41' || !await evaluate(firstView, 'window.agentTabProbe === 41') || !await evaluate(webview('extra-tab'), 'window.agentTabProbe === undefined') || panel('browser-fixture').inert) {
+      throw new Error('Browser activity did not reveal its own tab while preserving the additional browser')
     }
     selectBrowser!('browser-fixture')
     await waitFor(() => !panel('browser-fixture').inert)
@@ -168,8 +194,9 @@ await tab.getAXState()`)
     await waitFor(() => panel('browser-fixture').inert)
     await script('browser-fixture', 'await tab.click(target)\nawait tab.getAXState()')
     if (!await evaluate(firstView, 'window.clicks === 2')) throw new Error('Switching panels stopped the browser')
-    showPanel!(true)
-    await waitFor(() => !panel('browser-fixture').inert)
+    if (panel('browser-fixture').inert) {
+      throw new Error('Browser input did not reopen its hidden panel')
+    }
     const first = await script('browser-fixture', 'nodeRepl.write(retained)')
     const second = await script('browser-background', 'nodeRepl.write(retained)')
     if (first.text !== '41' || second.text !== '92') throw new Error('Browser script bindings crossed conversations')
@@ -257,6 +284,7 @@ await tab.getAXState()`)
     root.unmount()
     queryClient.clear()
     element.remove()
+    chatInput.remove()
     setApiBaseUrl(location.origin)
   }
 }

@@ -46,6 +46,7 @@ function Fixture() {
       }
       return response.json()
     },
+    () => {},
   ))
   useEffect(() => {
     const pending = new Map<number, string>()
@@ -57,6 +58,30 @@ function Fixture() {
       if (new URLSearchParams(location.search).get('suite') === 'model-picker') {
         window.smoke.result({ ok: true, checks: ['Codex and Claude presets, fixed-model efforts, dragging, keyboard focus, provider settings and persistence'] })
         return
+      }
+      stage = 'cancellation while opening the browser panel'
+      let finishOpening!: () => void
+      const opening = new Promise<void>((resolve) => {
+        finishOpening = resolve
+      })
+      const unexpected = () => {
+        throw new Error('This script should not access a page')
+      }
+      const waitingBrowser = new SideBrowser(unexpected, unexpected, unexpected, () => opening)
+      try {
+        const pending = waitingBrowser.call({ method: 'Jaz.run', params: { code: 'const cancelledBinding = 41' } })
+          .then(() => 'completed', (error: Error) => error.message)
+        waitingBrowser.cancel()
+        finishOpening()
+        if (await pending !== 'Side browser changed during the action') {
+          throw new Error('A command waiting for the browser panel did not cancel')
+        }
+        const recovered = await waitingBrowser.call({ method: 'Jaz.run', params: { code: 'nodeRepl.write(typeof cancelledBinding)' } }) as { text: string }
+        if (!recovered.text.endsWith('undefined')) {
+          throw new Error('A cancelled command ran after the browser panel opened')
+        }
+      } finally {
+        waitingBrowser.dispose()
       }
       stage = 'Mermaid rendering, streaming, themes and source fallback'
       await exerciseMermaid()

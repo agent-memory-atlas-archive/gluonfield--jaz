@@ -8,6 +8,7 @@ import (
 )
 
 type SessionStore interface {
+	SessionGoalStore
 	NewSessionID() string
 	CreateSession(input CreateSession) (Session, error)
 	EnsureSession(id string) error

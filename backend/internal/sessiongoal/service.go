@@ -14,7 +14,6 @@ import (
 
 type Store interface {
 	storage.SessionStore
-	storage.SessionEventAppender
 	storage.UsageEventStore
 }
 
@@ -171,7 +170,7 @@ func (s *Service) refreshCurrent(_ context.Context, sessionID string, scope refr
 	if err != nil {
 		return nil, err
 	}
-	return s.publishIfUsageChanged(session, session.Goal, next, now)
+	return s.publishIfUsageChanged(session, session.Goal, next)
 }
 
 func (s *Service) publishRefreshed(session storage.Session, state *goal.State, now time.Time) (*goal.State, error) {
@@ -179,7 +178,7 @@ func (s *Service) publishRefreshed(session storage.Session, state *goal.State, n
 	if err != nil {
 		return nil, err
 	}
-	return s.publish(session.ID, refreshed, now)
+	return s.publish(session, refreshed)
 }
 
 func (s *Service) refreshAndPublishUsageChange(session storage.Session, state *goal.State, now time.Time, scope refreshScope) (*goal.State, error) {
@@ -187,15 +186,15 @@ func (s *Service) refreshAndPublishUsageChange(session storage.Session, state *g
 	if err != nil {
 		return nil, err
 	}
-	return s.publishIfUsageChanged(session, state, next, now)
+	return s.publishIfUsageChanged(session, state, next)
 }
 
-func (s *Service) publishIfUsageChanged(session storage.Session, current *goal.State, next *goal.State, now time.Time) (*goal.State, error) {
+func (s *Service) publishIfUsageChanged(session storage.Session, current *goal.State, next *goal.State) (*goal.State, error) {
 	normalized := goal.NormalizeState(current)
 	if normalized != nil && normalized.TokensUsed == next.TokensUsed && sameInt64(normalized.RemainingTokens, next.RemainingTokens) {
 		return next, nil
 	}
-	return s.publish(session.ID, next, now)
+	return s.publish(session, next)
 }
 
 func (s *Service) refresh(session storage.Session, state *goal.State, now time.Time, scope refreshScope) (*goal.State, error) {
@@ -247,18 +246,13 @@ func (scope refreshScope) countsCompletedThroughCurrentTurn() bool {
 	return !scope.includeCompletedSince.IsZero()
 }
 
-func (s *Service) publish(sessionID string, state *goal.State, now time.Time) (*goal.State, error) {
-	events := []sessionevents.Event{{
-		SessionID: sessionID,
-		Type:      sessionevents.TypeGoalUpdate,
-		Goal:      state,
-		At:        now,
-	}}
-	if err := s.Store.AppendSessionEvents(sessionID, events...); err != nil {
+func (s *Service) publish(session storage.Session, state *goal.State) (*goal.State, error) {
+	event, err := s.Store.UpdateSessionGoal(session.ID, session.Goal, state)
+	if err != nil {
 		return nil, err
 	}
 	if s.Events != nil {
-		s.Events.Publish(events[0])
+		s.Events.Publish(event)
 	}
 	return state, nil
 }

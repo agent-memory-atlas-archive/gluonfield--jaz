@@ -49,6 +49,7 @@ type routeDeps struct {
 	Preview         *previewapi.Handler
 	SessionMessages *sessionsapi.MessagesHandler
 	SessionOverview *sessionsapi.OverviewHandler
+	SessionGoal     *sessionsapi.GoalHandler
 	AgentSession    *agentsessionsapi.Handler
 	Voice           *voiceapi.Handler
 }
@@ -62,6 +63,7 @@ func NewRoutes(deps routeDeps) server.Routes {
 		{Pattern: "POST /v1/sessions/{session}/agent/input", Handler: http.HandlerFunc(deps.AgentSession.Input)},
 		{Pattern: "GET /v1/sessions/{session}/messages", Handler: deps.SessionMessages},
 		{Pattern: "GET /v1/sessions/{session}/overview", Handler: deps.SessionOverview},
+		{Pattern: "DELETE /v1/sessions/{session}/goal", Handler: deps.SessionGoal},
 		{Pattern: "GET /v1/settings/voice", Handler: http.HandlerFunc(deps.Voice.Settings)},
 		{Pattern: "PUT /v1/settings/voice", Handler: http.HandlerFunc(deps.Voice.Settings)},
 		{Pattern: "POST /v1/voice/connect", Handler: http.HandlerFunc(deps.Voice.Connect)},

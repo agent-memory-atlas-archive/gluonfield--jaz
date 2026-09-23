@@ -92,6 +92,7 @@ func TestHTTPModuleProvidesRoute(t *testing.T) {
 	requireRoute(t, routes, "GET /v1/feed/completions")
 	requireRoute(t, routes, "GET /v1/sessions/{session}/messages")
 	requireRoute(t, routes, "GET /v1/sessions/{session}/overview")
+	requireRoute(t, routes, "DELETE /v1/sessions/{session}/goal")
 	requireRoute(t, routes, "POST /v1/sessions/{session}/agent/input")
 	requireRoute(t, routes, "GET /v1/settings/voice")
 	requireRoute(t, routes, "PUT /v1/settings/voice")

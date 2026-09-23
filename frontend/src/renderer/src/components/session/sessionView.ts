@@ -85,8 +85,11 @@ export function latestACPModeState(sessionId: string, events: SessionEvent[]): A
 }
 
 export function latestACPGoalRequested(sessionId: string, events: SessionEvent[]): boolean | undefined {
-  const event = events.findLast((item) => item.acp?.id === sessionId && item.acp.goal_requested != null)
-  return event?.acp?.goal_requested
+  const event = events.findLast((item) =>
+    (item.session_id === sessionId && item.type === 'goal_clear') ||
+    (item.acp?.id === sessionId && item.acp.goal_requested != null),
+  )
+  return event?.type === 'goal_clear' ? false : event?.acp?.goal_requested
 }
 
 function acpSnapshotEvents(job: ACPJobSnapshot): SessionEvent[] {
@@ -267,11 +270,10 @@ export function deriveSessionView(
   const planAvailable = session.runtime !== 'acp' || !acpModesKnown || Boolean(currentModes?.plan_mode_id)
   const planActive = planModeActive(currentModes)
   const goalAvailable = sessionSupportsGoal(session)
-  const runtimeEvents = [...persistedEvents, ...snapshotEvents, ...liveEvents]
-  const latestGoal = latestGoalEvent(session.id, runtimeEvents)
+  const latestGoal = latestGoalEvent(session.id, transcriptEvents)
   const goal = latestGoal === null ? undefined : latestGoal ?? session.goal
   const goalActive = goalIsActive(goal)
-  const goalRequested = Boolean(latestACPGoalRequested(session.id, runtimeEvents) ?? acpGoalRequested)
+  const goalRequested = Boolean(latestACPGoalRequested(session.id, transcriptEvents) ?? acpGoalRequested)
   const hasBlockingPendingPermission = Array.from(activePermissions).some(
     (id) => !activePlanApprovalPermissions.has(id),
   )

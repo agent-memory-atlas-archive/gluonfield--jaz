@@ -22,7 +22,9 @@ func TestReopenMarksRunningChatsInterruptedWithoutLosingState(t *testing.T) {
 		t.Fatal(err)
 	}
 	session.Status = storage.StatusRunning
-	session.Turn = &storage.Turn{PlanRequested: true}
+	if err := store.StartSessionTurn(session.ID, storage.Turn{PlanRequested: true}); err != nil {
+		t.Fatal(err)
+	}
 	session.LastAttentionAt = time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
 	session.QueuedMessages = []storage.QueuedMessage{{ID: "queued", Text: "next request"}}
 	session.PendingSteer = &storage.QueuedMessage{ID: "steer", Text: "follow-up"}

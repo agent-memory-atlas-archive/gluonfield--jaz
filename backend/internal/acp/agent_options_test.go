@@ -31,7 +31,7 @@ func TestAgentOptionsIncludesConfiguredModelOptions(t *testing.T) {
 	if options.Name != AgentClaude || options.DefaultModel != "opus[1m]" || options.DefaultReasoningEffort != "xhigh" {
 		t.Fatalf("defaults = %#v", options)
 	}
-	if len(options.Models) != 1 || options.Models[0].Model != "opus[1m]" || options.Models[0].Label != "Opus 5" {
+	if len(options.Models) != 1 || options.Models[0].Model != "opus[1m]" || options.Models[0].Label != "Opus 5.5" {
 		t.Fatalf("models = %#v", options.Models)
 	}
 }

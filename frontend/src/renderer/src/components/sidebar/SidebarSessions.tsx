@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ChevronDown, Folder, FolderPlus, SquarePen } from 'lucide-react'
+import { ChevronDown, Folder, SquarePen } from 'lucide-react'
 import { motion, Reorder, type Transition, useDragControls } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
-import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog'
 import { AnimatedList, AnimatedListItem } from '@/components/ui/AnimatedList'
 import { Collapse } from '@/components/ui/Collapse'
 import { HoverCardGroup } from '@/components/ui/HoverCard'
@@ -328,8 +327,6 @@ function RecentSessionList({
 
 export function SidebarSessions({ open }: { open: boolean }) {
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const [creatingProject, setCreatingProject] = useState(false)
   const sessions = useQuery(sidebarSessionsQuery)
   const projects = useQuery(projectsQuery)
   const [organization, setOrganization] = useSidebarOrganization()
@@ -424,23 +421,6 @@ export function SidebarSessions({ open }: { open: boolean }) {
         />
         <div>
           <SidebarOrganizationMenu organization={organization} onChange={changeOrganization} />
-          <button
-            type="button"
-            onClick={() => setCreatingProject(true)}
-            className="flex h-10 w-full items-center gap-2 rounded-full px-2.5 text-left text-[13px] text-ink-2 transition-colors duration-150 hover:bg-list-hover hover:text-ink max-sm:h-11 max-sm:px-3 max-sm:text-[15px]"
-          >
-            <FolderPlus size={15} className="mx-0.5 shrink-0" />
-            New project
-          </button>
-          {creatingProject ? (
-            <CreateProjectDialog
-              onClose={() => setCreatingProject(false)}
-              onCreated={(project) => {
-                setCreatingProject(false)
-                navigate({ to: '/new', search: { project: project.path } })
-              }}
-            />
-          ) : null}
           {organization === 'project' ? (
             <ProjectSessionList
               blocks={blocks}

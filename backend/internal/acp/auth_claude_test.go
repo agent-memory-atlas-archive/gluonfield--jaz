@@ -58,7 +58,7 @@ func TestPrepareClaudeLoginClearsJazProfile(t *testing.T) {
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{".claude.json", ".credentials.json", authFailureMarker} {
+	for _, name := range []string{".claude.json", ".credentials.json", ".jaz-auth-failed"} {
 		if err := os.WriteFile(filepath.Join(configDir, name), []byte("stale"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +67,7 @@ func TestPrepareClaudeLoginClearsJazProfile(t *testing.T) {
 	if err := PrepareAgentLoginInvocation(AgentClaude, AgentAuthConfig{Mode: AuthModeJazProfile}, root, invocation); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{".claude.json", ".credentials.json", authFailureMarker} {
+	for _, name := range []string{".claude.json", ".credentials.json", ".jaz-auth-failed"} {
 		if _, err := os.Stat(filepath.Join(configDir, name)); !os.IsNotExist(err) {
 			t.Fatalf("%s still exists: %v", name, err)
 		}
@@ -99,15 +99,5 @@ func TestClaudeLoginUsesCanonicalJazProfile(t *testing.T) {
 	}
 	if normalized.Path != "" || login.Mode != AuthModeJazProfile || login.Path != "" {
 		t.Fatalf("normalized=%#v login=%#v", normalized, login)
-	}
-}
-
-func TestRecordClaudeAuthFailureIgnoresUnrelatedErrors(t *testing.T) {
-	root := t.TempDir()
-	if err := recordClaudeAuthFailure(AgentAuthConfig{Mode: AuthModeJazProfile}, root, "network unavailable"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(root, "acp", "claude", authFailureMarker)); !os.IsNotExist(err) {
-		t.Fatalf("unrelated error recorded as auth failure: %v", err)
 	}
 }

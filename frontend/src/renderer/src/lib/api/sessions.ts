@@ -344,6 +344,10 @@ export function cancelSession(id: string): Promise<{ ok: boolean }> {
   return post<{ ok: boolean }>(`/v1/sessions/${id}/cancel`)
 }
 
+export function clearSessionGoal(id: string): Promise<void> {
+  return del<void>(`/v1/sessions/${id}/goal`)
+}
+
 export function compactSession(id: string): Promise<{ ok: boolean; acp_state?: string }> {
   return post<{ ok: boolean; acp_state?: string }>(`/v1/sessions/${id}/compact`)
 }

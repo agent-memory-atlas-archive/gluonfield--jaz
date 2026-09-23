@@ -1,6 +1,25 @@
 import { expect, test } from 'bun:test'
 import { BrowserSessions } from './browserSessions'
 
+test('revealing browser activity preserves the page and only opens its hidden current viewer', () => {
+  const sessions = new BrowserSessions()
+  const shown = []
+  const leave = sessions.bind('first', () => shown.push('first'))
+  sessions.open('first', 'https://example.com')
+  const target = sessions.getSnapshot()[0].target
+  const hide = sessions.present('first', {})
+  sessions.show('first')
+  expect(shown).toEqual(['first'])
+  hide()
+  sessions.show('first')
+  expect(shown).toEqual(['first', 'first'])
+  expect(sessions.getSnapshot()[0].target).toBe(target)
+  leave()
+  sessions.bind('second', () => shown.push('second'))
+  sessions.show('first')
+  expect(shown).toEqual(['first', 'first'])
+})
+
 test('leaving a conversation retains its browser without opening another chat panel', () => {
   const sessions = new BrowserSessions()
   const shown = []

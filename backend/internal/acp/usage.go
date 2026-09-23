@@ -16,12 +16,6 @@ type usageStore interface {
 	AddUsage(string, storage.Usage) error
 }
 
-type goalUsageStore interface {
-	storage.SessionStore
-	storage.SessionEventAppender
-	storage.UsageEventStore
-}
-
 type usageReport struct {
 	ID        string
 	Auxiliary bool
@@ -61,7 +55,7 @@ func (m *Manager) recordSessionUsage(sessionID string, accumulator *usageAccumul
 }
 
 func (m *Manager) refreshGoalUsage(sessionID string) {
-	store, ok := m.store.(goalUsageStore)
+	store, ok := m.store.(sessiongoal.Store)
 	if !ok {
 		return
 	}

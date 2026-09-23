@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { clientRuntime } from '@/lib/clientRuntime'
 import { useBackendChange } from '@/lib/connection'
 import { modalDialogOpen } from '@/lib/dom/modal'
@@ -41,7 +42,9 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     return { tabs, activeId: tabs[0]?.id ?? null }
   })
   const [containerWidth, setContainerWidth] = useState(0)
+  const container = useRef<HTMLDivElement | null>(null)
   const containerRef = useCallback((element: HTMLDivElement | null) => {
+    container.current = element
     if (!element) {
       return
     }
@@ -106,7 +109,12 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     dispatch({ type: 'open', tab })
     showTabs()
   }, [showTabs])
-  const showPreview = useCallback(() => openTab({ id: sessionId, kind: 'preview' }), [openTab, sessionId])
+  const showPreview = useCallback(async () => {
+    flushSync(() => openTab({ id: sessionId, kind: 'preview' }))
+    await Promise.allSettled(container.current?.getAnimations({ subtree: true })
+      .filter((animation) => animation instanceof CSSTransition && animation.transitionProperty === 'width')
+      .map((animation) => animation.finished) ?? [])
+  }, [openTab, sessionId])
   useSessionPreview(sessionId, showPreview)
 
   const addTab = useCallback((kind: SidePanelTab['kind']) => {

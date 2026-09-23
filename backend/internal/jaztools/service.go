@@ -111,7 +111,6 @@ type sessionSource interface {
 
 type goalStoreAdapter struct {
 	storage.SessionStore
-	storage.SessionEventAppender
 	storage.UsageEventStore
 }
 
@@ -135,18 +134,17 @@ func New(
 		whatsAppTools:   whatsAppTools,
 		telegramTools:   telegramTools,
 		visualizeTools:  visualize.NewMCPTools(sessionEvents, events),
-		goalTools:       newGoalTools(sessionEvents, events, sessions, usage),
+		goalTools:       newGoalTools(events, sessions, usage),
 		widgetPublisher: widgetPublisher,
 		sessions:        sessions,
 		url:             strings.TrimSpace(urls.JazToolsMCP),
 	}
 }
 
-func newGoalTools(sessionEvents storage.SessionEventAppender, events *sessionevents.Bus, sessions storage.SessionStore, usage storage.UsageEventStore) *sessiongoal.MCPTools {
+func newGoalTools(events *sessionevents.Bus, sessions storage.SessionStore, usage storage.UsageEventStore) *sessiongoal.MCPTools {
 	store := goalStoreAdapter{
-		SessionStore:         sessions,
-		SessionEventAppender: sessionEvents,
-		UsageEventStore:      usage,
+		SessionStore:    sessions,
+		UsageEventStore: usage,
 	}
 	return sessiongoal.NewMCPTools(sessiongoal.New(store, events))
 }

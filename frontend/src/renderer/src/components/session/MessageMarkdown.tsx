@@ -250,6 +250,7 @@ const MessageMarkdownLink: AnchorComponent = ({ children, href, ...props }) => {
 }
 
 const PlainMarkdownLink: AnchorComponent = ({ node: _node, children, href, ...props }) => {
+  const openPreview = usePreviewLink()
   const openFile = useContext(FileReaderLinkContext)
   const files = useContext(MarkdownFileContext)
   const localFile = localFileFromLink(href, children, files?.documentPath)
@@ -281,6 +282,12 @@ const PlainMarkdownLink: AnchorComponent = ({ node: _node, children, href, ...pr
       href={href}
       target="_blank"
       rel="noreferrer"
+      onClick={(event) => {
+        if (openPreview && shouldPreviewLink(event)) {
+          event.preventDefault()
+          openPreview(href)
+        }
+      }}
     >
       <Favicon url={href} className="chat-prose-link-icon" />
       <span className="min-w-0">{linkedChildren}</span>

@@ -309,7 +309,7 @@ func restartNamedProcessTestManager(t *testing.T, manager *acp.Manager, store *j
 	return restarted
 }
 
-func TestManagerRecordsClaudeRuntimeAuthFailure(t *testing.T) {
+func TestManagerRestartsClaudeAfterAuthFailure(t *testing.T) {
 	for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_APIKEY", "JAZ_ACP_CLAUDE_API_KEY"} {
 		t.Setenv(key, "")
 	}
@@ -321,8 +321,22 @@ func TestManagerRecordsClaudeRuntimeAuthFailure(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(configDir, ".claude.json"), []byte(`{"oauthAccount":{"accountUuid":"account-id"}}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	credential := filepath.Join(configDir, ".credentials.json")
+	if err := os.WriteFile(credential, []byte(`{"claudeAiOauth":{"accessToken":"fresh-login"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, ".jaz-auth-failed"), []byte("old failure"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	startLog := filepath.Join(t.TempDir(), "starts")
+	rejected := filepath.Join(t.TempDir(), "rejected")
+	if err := os.WriteFile(rejected, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	manager, spawned := newClaudeTestManager(t, root, map[string]string{
-		"JAZ_FAKE_ACP_AUTH_REQUIRED": "1",
+		"JAZ_FAKE_ACP_AUTH_REQUIRED_FILE": rejected,
+		"JAZ_FAKE_ACP_START_LOG":          startLog,
+		"JAZ_FAKE_ACP_LOAD":               "1",
 	})
 
 	ctx := context.Background()
@@ -337,8 +351,21 @@ func TestManagerRecordsClaudeRuntimeAuthFailure(t *testing.T) {
 		t.Fatalf("failed job = %#v", job)
 	}
 	status := acp.ProbeAgentAuth(acp.AgentClaude, acp.AgentConfig{Auth: acp.AgentAuthConfig{Mode: acp.AuthModeJazProfile}}, root, nil)
-	if status.Authenticated || !strings.Contains(status.Reason, "reconnect Claude") {
-		t.Fatalf("auth status after runtime rejection = %#v", status)
+	if !status.Authenticated {
+		t.Fatalf("stale runtime rejection hides saved login: %#v", status)
+	}
+	if err := os.Remove(rejected); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Send(ctx, acp.SendRequest{Session: spawned.SessionID, Message: "retry", Completion: acp.CompletionInline}); err != nil {
+		t.Fatal(err)
+	}
+	job, err = manager.Wait(ctx, acp.WaitRequest{Session: spawned.SessionID, Timeout: 10 * time.Second})
+	if err != nil || job.State != acp.StateIdle {
+		t.Fatalf("retried job = %#v, %v", job, err)
+	}
+	if starts := processStarts(t, startLog); starts != 2 {
+		t.Fatalf("process starts after retry = %d, want a fresh credential reader", starts)
 	}
 }
 

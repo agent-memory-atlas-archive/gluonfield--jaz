@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/wins/jaz/backend/internal/goal"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 	"github.com/wins/jaz/backend/internal/storage/sqlite/generated/eventdb"
@@ -58,6 +59,28 @@ func (s *Store) LoadLatestACPTurn(ctx context.Context, id string) ([]sessioneven
 }
 
 func (s *Store) AppendSessionEvents(id string, events ...sessionevents.Event) error {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	return s.appendSessionEventBatch(id, events...)
+}
+
+func (s *Store) UpdateSessionGoal(id string, previous, next *goal.State) (sessionevents.Event, error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	session, err := s.loadSession(id)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	event, err := storage.GoalMutationEvent(session, previous, next)
+	if err != nil {
+		return sessionevents.Event{}, err
+	}
+	events := []sessionevents.Event{event}
+	err = s.appendSessionEventBatch(session.ID, events...)
+	return events[0], err
+}
+
+func (s *Store) appendSessionEventBatch(id string, events ...sessionevents.Event) error {
 	if len(events) == 0 {
 		return nil
 	}
@@ -74,9 +97,7 @@ func (s *Store) AppendSessionEvents(id string, events ...sessionevents.Event) er
 		}
 	}
 	expanded, last := sessionevents.SplitTextEvents(events, storage.MaxTextEventBytes)
-	s.writeMu.Lock()
 	compactionPending, appendErr := s.appendSessionEvents(context.Background(), id, now, goalProjection.Seen, goalRaw, expanded)
-	s.writeMu.Unlock()
 	if appendErr != nil {
 		return appendErr
 	}

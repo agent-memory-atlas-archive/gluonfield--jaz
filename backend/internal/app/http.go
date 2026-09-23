@@ -36,6 +36,7 @@ func HTTPModule() fx.Option {
 		fx.Annotate(agentsessionsapi.NewHandler, fx.From(new(*acp.Manager))),
 		sessionsapi.NewMessagesHandler,
 		sessionsapi.NewOverviewHandler,
+		fx.Annotate(sessionsapi.NewGoalHandler, fx.From(new(*acp.Manager))),
 		NewRoutes,
 		NewPublicRoutes,
 	)

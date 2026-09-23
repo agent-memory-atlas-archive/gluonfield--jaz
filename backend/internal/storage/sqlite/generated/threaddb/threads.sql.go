@@ -840,6 +840,7 @@ const updateGoal = `-- name: UpdateGoal :exec
 UPDATE threads
 SET
   goal = ?1,
+  turn = CASE WHEN ?1 = '{}' AND turn <> '' THEN json_remove(turn, '$.goal_requested') ELSE turn END,
   updated_at_ms = ?2
 WHERE id = ?3
 `
@@ -1072,8 +1073,7 @@ ON CONFLICT(id) DO UPDATE SET
   pinned = excluded.pinned,
   pending_steer_message = excluded.pending_steer_message,
   unread = excluded.unread,
-  goal = excluded.goal,
-  turn = excluded.turn
+  turn = CASE WHEN excluded.status IN ('running', 'interrupted') THEN threads.turn ELSE '' END
 `
 
 type UpsertSessionParams struct {

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { deriveSessionView } from '@/components/session/sessionView'
 import { findActiveTrigger } from '@/components/session/composerTokens'
+import { mergeSessionEvent } from '@/lib/sessionEvents'
 
 test('native commands autocomplete only at the start and retain ordinary arguments', () => {
   expect(findActiveTrigger('/comp', 5)).toEqual({ trigger: '/', start: 0, query: 'comp' })
@@ -66,4 +67,83 @@ test('a new user turn or an aggregate snapshot cannot inherit an old thinking si
   const old = event(2, 'acp_thought', { acp: { id: 'thread', thought: 'Old reasoning' } })
   expect(deriveSessionView(data([old], 3), []).acpThinking).toBe(false)
   expect(deriveSessionView({ ...data(), acp_thought: 'Unknown order' }, []).acpThinking).toBe(false)
+})
+
+test('clearing goal mode stays off when streamed status replaces an earlier cache entry', () => {
+  const updates = [
+    event(2, 'acp', {
+      projection_key: 'acp_status:thread',
+      acp: { id: 'thread', state: 'running', goal_requested: true },
+    }),
+    event(3, 'goal_update', {
+      projection_key: 'goal_update:thread',
+      goal: { objective: 'Finish the work', status: 'active' },
+      acp: undefined,
+    }),
+    event(4, 'acp_tool', {
+      projection_key: 'acp_tool:thread:read',
+      acp: { id: 'thread', state: 'running', goal_requested: true, tool_calls: [{ id: 'read' }] },
+    }),
+    event(5, 'acp', {
+      projection_key: 'acp_status:thread',
+      acp: { id: 'thread', state: 'cancelled', goal_requested: false },
+    }),
+    event(6, 'goal_clear', { projection_key: 'goal_update:thread', acp: undefined }),
+  ]
+  const active = updates.slice(0, 3).reduce(mergeSessionEvent, [])
+  expect(deriveSessionView(data(), active).goalActive).toBe(true)
+  expect(deriveSessionView(data(), active).goalRequested).toBe(true)
+
+  const cleared = updates.reduce(mergeSessionEvent, [])
+  expect(cleared.map((item) => item.seq)).toEqual([5, 6, 4])
+  const view = deriveSessionView(data(), cleared)
+  expect(view.goalActive).toBe(false)
+  expect(view.goalRequested).toBe(false)
+
+  const normalTurn = mergeSessionEvent(cleared, event(7, 'acp', {
+    projection_key: 'acp_status:thread',
+    acp: { id: 'thread', state: 'running', goal_requested: false },
+  }))
+  expect(deriveSessionView(data(), normalTurn).goalRequested).toBe(false)
+  const requestedAgain = mergeSessionEvent(normalTurn, event(8, 'acp', {
+    projection_key: 'acp_status:thread',
+    acp: { id: 'thread', state: 'running', goal_requested: true },
+  }))
+  expect(deriveSessionView(data(), requestedAgain).goalRequested).toBe(true)
+})
+
+test('refreshed goal clear wins over older streamed events before the stream cache is pruned', () => {
+  const oldGoal = event(2, 'goal_update', {
+    projection_key: 'goal_update:thread',
+    goal: { objective: 'Finish the work', status: 'active' },
+    acp: undefined,
+  })
+  const oldRequest = event(3, 'acp', {
+    projection_key: 'acp_status:thread',
+    acp: { id: 'thread', state: 'running', goal_requested: true },
+  })
+  const persisted = [
+    event(4, 'acp', {
+      projection_key: 'acp_status:thread',
+      acp: { id: 'thread', state: 'cancelled', goal_requested: false },
+    }),
+    event(5, 'goal_clear', { projection_key: 'goal_update:thread', acp: undefined }),
+  ]
+  for (const live of [[oldGoal, oldRequest], []]) {
+    const view = deriveSessionView({ ...data(persisted), acp_goal_requested: false }, live)
+    expect(view.goal).toBeUndefined()
+    expect(view.goalRequested).toBe(false)
+  }
+})
+
+test('goal clear disarms a running turn without requiring a cancelled status', () => {
+  const running = event(2, 'acp', {
+    acp: { id: 'thread', state: 'running', goal_requested: true },
+  })
+  const view = deriveSessionView({ ...data([running]), acp_goal_requested: true }, [
+    event(3, 'goal_clear', { acp: undefined }),
+  ])
+  expect(view.goalRequested).toBe(false)
+  expect(view.goalActive).toBe(false)
+  expect(view.transcriptEvents.find((item) => item.seq === 2).acp.state).toBe('running')
 })

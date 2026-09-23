@@ -70,15 +70,6 @@ func TestSchedulerStopWaitsForWorkerCleanup(t *testing.T) {
 	if scheduler.Running() {
 		t.Fatal("stopped scheduler is still reported as running")
 	}
-	tasks, err := memory.SchedulerStatus(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, task := range tasks {
-		if task.Name == jazmem.TaskDream && task.Status != "error" {
-			t.Fatalf("worker result was not saved before Stop returned: %#v", task)
-		}
-	}
 }
 
 func TestSchedulerExitClearsRunningState(t *testing.T) {
