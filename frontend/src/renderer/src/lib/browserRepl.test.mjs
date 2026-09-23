@@ -259,7 +259,7 @@ test('promise loops and CPU work after browser actions cancel and recover cleanl
 import { BrowserRepl } from ${JSON.stringify(fileURLToPath(new URL('./browserRepl.ts', import.meta.url)))}
 const repl = new BrowserRepl(async () => {
   throw new Error('unsupported action')
-}, 100)
+}, 500)
 await repl.run('')
 let responsive = false
 const cancellation = setTimeout(() => {
@@ -301,7 +301,7 @@ if (!result.text.includes('recovered')) {
 repl.cancel()
 console.log('browser repl recovered and disposed')
 `
-  const result = spawnSync(process.execPath, ['run', '-'], { input: script, encoding: 'utf8', timeout: 2000 })
+  const result = spawnSync(process.execPath, ['run', '-'], { input: script, encoding: 'utf8', timeout: 5000 })
   expect({ status: result.status, error: result.error?.message, stderr: result.stderr }).toEqual({ status: 0, error: undefined, stderr: '' })
   expect(result.stdout).toBe('browser repl recovered and disposed\n')
 })

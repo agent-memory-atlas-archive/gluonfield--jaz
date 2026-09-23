@@ -29,9 +29,9 @@ globalThis.fetch = async () => new globalThis.Response(null, { status: 503 })
 const reactDOM = await import('react-dom')
 mock.module('react-dom', () => ({ ...reactDOM, createPortal: (children) => children }))
 mock.module('@/lib/connection', () => ({ useBackendChange: () => {} }))
-const browserSessions = await import('@/lib/browserSessions')
+const browserSessionsModule = await import('@/lib/browserSessions')
 mock.module('@/lib/browserSessions', () => ({
-  ...browserSessions,
+  ...browserSessionsModule,
   useSessionPreview: () => ({ target: { displayUrl: '', sourceUrl: '' }, setTarget: () => {} }),
 }))
 mock.module('@/lib/appearance', () => ({
@@ -42,16 +42,22 @@ mock.module('@/lib/appearance', () => ({
 }))
 
 const { Route } = await import('@/routes/sessions.$sessionId')
+const { SidePanelStateProvider } = await import('@/components/session/SidePanelState')
 const { ToastProvider } = await import('@/components/ui/toast')
 const { TitlebarProvider } = await import('@/lib/titlebar')
 const { VoiceProvider } = await import('@/lib/voice/VoiceProvider')
+const { BrowserSessions, BrowserSessionsContext } = await import('@/lib/browserSessions')
 const { keys } = await import('@/lib/query/keys')
 const { ApiError } = await import('@/lib/api/response')
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false, retryOnMount: false, retryDelay: 10, staleTime: Infinity } } })
+const sessions = new BrowserSessions()
 const rootRoute = createRootRoute({
   component: () => createElement(ToastProvider, null,
-    createElement(TitlebarProvider, null, createElement(VoiceProvider, null, createElement(Outlet)))),
+    createElement(TitlebarProvider, null,
+      createElement(VoiceProvider, null,
+        createElement(BrowserSessionsContext.Provider, { value: sessions },
+          createElement(SidePanelStateProvider, null, createElement(Outlet)))))),
 })
 const router = createRouter({
   routeTree: rootRoute.addChildren([Route.update({ path: '/sessions/$sessionId', getParentRoute: () => rootRoute })]),

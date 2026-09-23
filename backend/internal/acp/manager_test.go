@@ -1109,7 +1109,7 @@ func TestManagerSpawnAcceptsConfiguredClaudeModelLabel(t *testing.T) {
 			"claude": {
 				Command:         os.Args[0],
 				Args:            []string{"-test.run=TestFakeACPAgentProcess"},
-				Model:           "opus-5",
+				Model:           "opus",
 				ReasoningEffort: "xhigh",
 				Env: map[string]string{
 					"JAZ_FAKE_ACP_AGENT":               "1",
@@ -1134,8 +1134,8 @@ func TestManagerSpawnAcceptsConfiguredClaudeModelLabel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.Model != "opus[1m]" {
-		t.Fatalf("claude model = %q, want opus[1m]", session.Model)
+	if session.Model != "opus" {
+		t.Fatalf("claude model = %q, want opus", session.Model)
 	}
 }
 
