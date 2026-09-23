@@ -75,7 +75,7 @@ func New(root string) (*Store, error) {
 		return nil, err
 	}
 	store.exportMirror = exportMirror
-	db, err := sql.Open("sqlite", sqliteDSN(filepath.Join(root, "jaz.sqlite")))
+	db, err := sql.Open("sqlite", filepath.Join(root, "jaz.sqlite")+"?_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)")
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +83,6 @@ func New(root string) (*Store, error) {
 	db.SetMaxIdleConns(8)
 	store.db = db
 	store.searchQueries = search.New(db)
-	if err := store.configure(); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
 	if err := store.migrate(); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -100,10 +96,6 @@ func New(root string) (*Store, error) {
 		return nil, err
 	}
 	return store, nil
-}
-
-func sqliteDSN(path string) string {
-	return path + "?_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)"
 }
 
 func (s *Store) Close() error {
@@ -135,18 +127,4 @@ func (s *Store) NewSessionID() string {
 		return fmt.Sprintf("%s-00000000", time.Now().UTC().Format("20060102T150405"))
 	}
 	return fmt.Sprintf("%s-%s", time.Now().UTC().Format("20060102T150405"), hex.EncodeToString(b[:]))
-}
-
-func (s *Store) configure() error {
-	for _, stmt := range []string{
-		`PRAGMA foreign_keys = ON`,
-		`PRAGMA journal_mode = WAL`,
-		`PRAGMA synchronous = NORMAL`,
-		`PRAGMA busy_timeout = 5000`,
-	} {
-		if _, err := s.db.Exec(stmt); err != nil {
-			return err
-		}
-	}
-	return nil
 }

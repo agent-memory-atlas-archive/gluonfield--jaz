@@ -907,14 +907,19 @@ func TestNewOpensDriveStylePathWithPragmas(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "jaz.sqlite")); err != nil {
 		t.Fatal(err)
 	}
-	var foreignKeys, busyTimeout int
-	if err := store.db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.db.QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
-		t.Fatal(err)
-	}
-	if foreignKeys != 1 || busyTimeout != 5000 {
-		t.Fatalf("foreign_keys = %d, busy_timeout = %d", foreignKeys, busyTimeout)
+	for range 2 {
+		conn, err := store.db.Conn(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		var busyTimeout, foreignKeys, synchronous int
+		var journalMode string
+		if err := conn.QueryRowContext(context.Background(), `SELECT (SELECT * FROM pragma_busy_timeout), (SELECT * FROM pragma_foreign_keys), (SELECT * FROM pragma_journal_mode), (SELECT * FROM pragma_synchronous)`).Scan(&busyTimeout, &foreignKeys, &journalMode, &synchronous); err != nil {
+			t.Fatal(err)
+		}
+		if busyTimeout != 5000 || foreignKeys != 1 || journalMode != "wal" || synchronous != 1 {
+			t.Fatalf("busy_timeout = %d, foreign_keys = %d, journal_mode = %q, synchronous = %d", busyTimeout, foreignKeys, journalMode, synchronous)
+		}
 	}
 }
