@@ -205,10 +205,34 @@ export async function exerciseModelPicker(): Promise<void> {
     }
     const rect = slider().getBoundingClientRect()
     const y = Math.round(rect.y + rect.height / 2)
+    const thumb = slider().parentElement!.querySelector<HTMLElement>('[data-effort-thumb]')!
+    const fill = slider().parentElement!.querySelector<HTMLElement>('[data-effort-fill]')!
+    const center = () => {
+      const bounds = thumb.getBoundingClientRect()
+      return bounds.x + bounds.width / 2
+    }
+    await until(() => Math.abs(center() - (rect.right - 14)) < 1)
     await window.smoke.pointer('mouseDown', Math.round(rect.right - 16), y)
     await frame()
+    const positions: number[] = []
+    const fillOffsets: number[] = []
+    const end = performance.now() + 300
+    const measuring = (async () => {
+      while (performance.now() < end) {
+        positions.push(center())
+        fillOffsets.push(Math.abs(fill.getBoundingClientRect().right - center()))
+        await frame()
+      }
+    })()
     await window.smoke.pointer('mouseMove', Math.round(rect.left + 16), y)
-    await frame()
+    await measuring
+    const left = Math.min(...positions)
+    const right = Math.max(...positions)
+    const intermediate = positions.filter((x) => x > left + (right - left) * 0.1 && x < right - (right - left) * 0.1)
+    if (right - left < 100 || intermediate.length < 2 || Math.max(...fillOffsets) > 1) {
+      throw new Error('Slider motion did not ease the thumb and fill together: ' + JSON.stringify({ positions, fillOffsets }))
+    }
+    console.log('Effort slider motion:', JSON.stringify({ frames: positions.length, intermediate: intermediate.length, maxFillOffset: Math.max(...fillOffsets) }))
     await window.smoke.pointer('mouseMove', Math.round(rect.right - 16), y)
     await window.smoke.pointer('mouseUp', Math.round(rect.right - 16), y)
     await until(() => configIs('claude', 'opus[1m]', 'ultracode'))

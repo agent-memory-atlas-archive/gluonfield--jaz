@@ -104,10 +104,10 @@ export function ModelSelect({
                   type="button"
                   onClick={() => setView('models')}
                   aria-label={`Select model, ${label}`}
-                  className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-control px-2 text-[12px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
+                  className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-control px-2 text-[12px] font-medium transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
                 >
                   <span className="min-w-0 truncate text-ink">
-                    {label} <span className={ultra ? 'jaz-gradient' : 'text-ink-3'}>{effortLabel}</span>
+                    {label} <span className={ultra ? 'jaz-gradient' : 'text-ink-2'}>{effortLabel}</span>
                   </span>
                   {loading ? <LoaderCircle size={13} className="shrink-0 animate-spin text-ink-3" /> : <ChevronRight size={13} className="shrink-0 text-ink-3" />}
                 </button>

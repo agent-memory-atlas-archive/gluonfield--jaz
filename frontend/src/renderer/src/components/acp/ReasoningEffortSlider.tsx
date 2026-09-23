@@ -25,6 +25,9 @@ export function ReasoningEffortSlider({
   const selected = value || defaultValue || ''
   const index = options.findIndex((option) => option.value === selected)
   const ultra = isUltraEffort(selected)
+  const reducedMotion = useReducedEffectsMotion()
+  const position = stopPosition(Math.max(0, index), options.length)
+  const transition = reducedMotion ? '' : 'transition-[left,width,opacity,background-color,box-shadow,scale] duration-150 ease-out'
 
   return (
     <div className={`${compact ? '[--effort-thumb:28px] [--effort-track:24px]' : '[--effort-thumb:32px] [--effort-track:28px]'} ${disabled ? 'opacity-60' : ''}`}>
@@ -33,11 +36,13 @@ export function ReasoningEffortSlider({
           Effort <span className={`font-semibold ${ultra ? 'jaz-gradient' : 'text-ink'}`}>{options[index]?.label ?? 'Default'}</span>
         </p>
       ) : null}
-      <div className={`relative flex items-center ${compact ? 'h-9' : 'h-10'}`}>
+      <div className={`group relative flex items-center ${compact ? 'h-9' : 'h-10'}`}>
         <div className="absolute inset-x-0 h-(--effort-track) overflow-hidden rounded-[10px] bg-ink/10">
-          {index >= 0 && !ultra ? (
-            <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: stopPosition(index, options.length) }} />
-          ) : null}
+          <div
+            data-effort-fill
+            className={`absolute inset-y-0 left-0 bg-primary ${transition}`}
+            style={{ width: position, opacity: index >= 0 && !ultra ? 1 : 0 }}
+          />
           <UltracodeDither active={ultra} />
         </div>
         {options.map((option, i) => (
@@ -47,6 +52,14 @@ export function ReasoningEffortSlider({
             style={{ left: stopPosition(i, options.length) }}
           />
         ))}
+        <span
+          data-effort-thumb
+          aria-hidden
+          className={`pointer-events-none absolute top-1/2 size-(--effort-thumb) -translate-x-1/2 -translate-y-1/2 rounded-full group-focus-within:brightness-110 ${transition} ${reducedMotion ? '' : 'group-active:scale-105'} ${ultra
+            ? 'bg-primary shadow-[0_1px_3px_rgba(0,0,0,0.35),0_0_12px_var(--color-primary)]'
+            : 'bg-ink shadow-[0_1px_3px_rgba(0,0,0,0.35)]'}`}
+          style={{ left: position, opacity: index < 0 ? 0 : 1 }}
+        />
         <input
           type="range"
           min={0}
@@ -68,18 +81,12 @@ export function ReasoningEffortSlider({
               onChange(options[0].value)
             }
           }}
-          className={`absolute inset-0 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none disabled:cursor-default
+          className="absolute inset-0 w-full cursor-pointer appearance-none rounded-full opacity-0 outline-none disabled:cursor-default
             [&::-webkit-slider-runnable-track]:h-(--effort-track)
             [&::-webkit-slider-thumb]:-mt-0.5 [&::-webkit-slider-thumb]:size-(--effort-thumb)
-            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:transition-[background-color,box-shadow] [&::-webkit-slider-thumb]:duration-150
-            focus-visible:[&::-webkit-slider-thumb]:brightness-125
+            [&::-webkit-slider-thumb]:appearance-none
             [&::-moz-range-thumb]:size-(--effort-thumb) [&::-moz-range-thumb]:appearance-none
-            [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 ${
-              ultra
-                ? '[&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35),0_0_12px_var(--color-primary)] [&::-moz-range-thumb]:bg-primary'
-                : '[&::-webkit-slider-thumb]:bg-ink [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35)] [&::-moz-range-thumb]:bg-ink'
-            } ${index < 0 ? '[&::-webkit-slider-thumb]:opacity-0 [&::-moz-range-thumb]:opacity-0' : ''}`}
+            [&::-moz-range-thumb]:border-0"
         />
       </div>
       {!compact ? (
