@@ -76,7 +76,6 @@ export function useNewThreadControls() {
     modelsLoading,
     reasoningStatus,
     reasoningBlocked,
-    pickerMode: selection?.mode ?? 'recommended',
     setSelection: (next: ModelSelection) => {
       const updated = { ...selections, [selectionKey]: next }
       setSelections(updated)
@@ -127,14 +126,12 @@ export function AgentModelControls({
       {controls.showModelPicker ? (
         <ModelSelect
           key={controls.runtime}
-          agent={controls.runtime}
           value={controls.model}
           suggestions={controls.modelSuggestions}
           loading={controls.modelsLoading}
           placement={placement}
           disabled={disabled}
           onChange={controls.setSelection}
-          mode={controls.pickerMode}
           effort={controls.effort}
           effortOptions={controls.effortOptions}
         />

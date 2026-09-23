@@ -15,7 +15,6 @@ export function ReasoningEffortSlider({
   defaultValue,
   compact = false,
   disabled,
-  ariaLabel = 'Reasoning effort',
   onChange,
 }: {
   options: ReasoningEffortOption[]
@@ -23,7 +22,6 @@ export function ReasoningEffortSlider({
   defaultValue?: string
   compact?: boolean
   disabled?: boolean
-  ariaLabel?: string
   onChange: (value: string) => void
 }) {
   const selected = value || defaultValue || ''
@@ -34,14 +32,11 @@ export function ReasoningEffortSlider({
     <div className={disabled ? 'opacity-60' : ''}>
       {!compact ? (
         <p className="text-[13px] text-ink-3">
-          Effort <span className="font-semibold text-ink">{options[index]?.label ?? 'Default'}</span>
+          Effort <span className={`font-semibold ${ultra ? 'jaz-gradient' : 'text-ink'}`}>{options[index]?.label ?? 'Default'}</span>
         </p>
       ) : null}
       <div className="relative flex h-10 items-center">
-        <div className="absolute inset-x-0 h-7 overflow-hidden rounded-full bg-ink/10">
-          {index >= 0 ? (
-            <div className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: stopPosition(index, options.length) }} />
-          ) : null}
+        <div className="absolute inset-x-0 h-7 overflow-hidden rounded-[10px] bg-ink/10">
           <UltracodeDither active={ultra} />
         </div>
         {options.map((option, i) => (
@@ -57,21 +52,33 @@ export function ReasoningEffortSlider({
           max={options.length - 1}
           step={1}
           value={Math.max(0, index)}
-          aria-label={ariaLabel}
-          aria-valuetext={options[index]?.label ?? 'Default'}
+          aria-label="Reasoning effort"
+          aria-valuetext={options[index]?.label ?? (selected || 'Default')}
           disabled={disabled}
           onChange={(event) => onChange(options[Number(event.target.value)].value)}
-          className={`absolute inset-0 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default
+          onClick={(event) => {
+            if (index < 0) {
+              onChange(options[Number(event.currentTarget.value)].value)
+            }
+          }}
+          onKeyDown={(event) => {
+            if (index < 0 && ['Home', 'ArrowLeft', 'ArrowDown'].includes(event.key)) {
+              event.preventDefault()
+              onChange(options[0].value)
+            }
+          }}
+          className={`absolute inset-0 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none disabled:cursor-default
             [&::-webkit-slider-runnable-track]:h-7
             [&::-webkit-slider-thumb]:-mt-0.5 [&::-webkit-slider-thumb]:size-8
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.2)]
+            [&::-webkit-slider-thumb]:transition-[background-color,box-shadow] [&::-webkit-slider-thumb]:duration-150
+            focus-visible:[&::-webkit-slider-thumb]:brightness-125
             [&::-moz-range-thumb]:size-8 [&::-moz-range-thumb]:appearance-none
             [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 ${
               ultra
-                ? '[&::-webkit-slider-thumb]:bg-primary [&::-moz-range-thumb]:bg-primary'
-                : '[&::-webkit-slider-thumb]:bg-ink [&::-moz-range-thumb]:bg-ink'
-            }`}
+                ? '[&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35),0_0_12px_var(--color-primary)] [&::-moz-range-thumb]:bg-primary'
+                : '[&::-webkit-slider-thumb]:bg-ink/90 [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35)] [&::-moz-range-thumb]:bg-ink/90'
+            } ${index < 0 ? '[&::-webkit-slider-thumb]:opacity-0 [&::-moz-range-thumb]:opacity-0' : ''}`}
         />
       </div>
       {!compact ? (

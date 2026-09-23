@@ -53,10 +53,10 @@ function Fixture() {
     let stage = 'opening, profile import and cursor checks'
     const timeout = setTimeout(() => window.smoke.result({ ok: false, error: 'Browser smoke timed out', stage, pending: [...pending.values()] }), Number(new URLSearchParams(location.search).get('timeout') || 30000))
     const run = async () => {
-      stage = 'model picker presets, efforts, focus and persistence'
+      stage = 'model picker efforts, animation, focus and persistence'
       await exerciseModelPicker()
       if (new URLSearchParams(location.search).get('suite') === 'model-picker') {
-        window.smoke.result({ ok: true, checks: ['Codex and Claude presets, fixed-model efforts, dragging, keyboard focus, provider settings and persistence'] })
+        window.smoke.result({ ok: true, checks: ['Codex and Claude model selection, five efforts, animation, borderless focus, dragging, provider settings and persistence'] })
         return
       }
       stage = 'cancellation while opening the browser panel'

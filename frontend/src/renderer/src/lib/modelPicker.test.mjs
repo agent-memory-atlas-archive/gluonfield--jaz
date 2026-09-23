@@ -1,74 +1,35 @@
-import { describe, expect, test } from 'bun:test'
-import { modelPresets, parseModelSelections } from './modelPicker'
-import { modelReasoningSelection } from './reasoningEfforts'
+import { expect, test } from 'bun:test'
+import { pickerEffortOptions, parseModelSelections } from './modelPicker'
 
-const model = (value, efforts, aliases) => ({
-  value,
-  label: value,
-  aliases,
-  reasoning: { status: 'ready', efforts },
-})
-const codex = [
-  model('gpt-6-astra', ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']),
-  model('gpt-5.6-sol', ['low', 'medium', 'high', 'xhigh']),
-  model('gpt-5.6-terra', ['low', 'medium', 'high']),
-]
+const options = (values) => values.map((value) => ({ value, label: value }))
 
-describe('model picker presets', () => {
-  test('orders the six Codex combinations without adding advanced efforts', () => {
-    expect(modelPresets('codex', codex).map(({ model, effort }) => [model, effort])).toEqual([
-      ['gpt-5.6-terra', 'low'],
-      ['gpt-5.6-sol', 'low'],
-      ['gpt-5.6-sol', 'medium'],
-      ['gpt-6-astra', 'low'],
-      ['gpt-6-astra', 'medium'],
-      ['gpt-6-astra', 'xhigh'],
-    ])
-  })
-
-  test('uses provider model IDs and only advertised efforts', () => {
-    const suggestions = [
-      model('openai/gpt-6-astra', ['medium'], ['gpt-6-astra']),
-      { ...codex[1], reasoning: { status: 'pending' } },
-    ]
-    expect(modelPresets('codex', suggestions)).toEqual([
-      { model: 'openai/gpt-6-astra', effort: 'medium', mode: 'recommended' },
-    ])
-    expect(modelPresets('codex', [])).toEqual([])
-    expect(modelPresets('grok', codex)).toEqual([])
-  })
-
-  test('Claude presets leave Max and Ultracode accessible on the fixed Opus model', () => {
-    const suggestions = [
-      { ...model('opus[1m]', ['low', 'medium', 'high', 'xhigh', 'max', 'ultracode']), label: 'Opus 5.5' },
-      model('sonnet', ['low', 'medium', 'high']),
-    ]
-    expect(modelPresets('claude', suggestions).map(({ model, effort }) => [model, effort])).toEqual([
-      ['sonnet', 'low'],
-      ['sonnet', 'medium'],
-      ['opus[1m]', 'low'],
-      ['opus[1m]', 'medium'],
-      ['opus[1m]', 'high'],
-      ['opus[1m]', 'xhigh'],
-    ])
-    for (const effort of ['high', 'xhigh', 'max', 'ultracode']) {
-      const selection = modelReasoningSelection({
-        agent: 'claude', model: 'opus[1m]', requested: effort, settingsMode: false,
-        catalog: { status: 'ready', suggestions, unknownModel: 'unavailable' },
-      })
-      expect(selection.effectiveEffort).toBe(effort)
-      expect(selection.supported).toBe(true)
-    }
-  })
+test('picker exposes only five efforts in order without changing provider IDs', () => {
+  const available = options(['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultracode'])
+  expect(pickerEffortOptions(available).map(({ value }) => value)).toEqual(['low', 'medium', 'high', 'xhigh', 'ultracode'])
+  expect(available).toHaveLength(9)
+  expect(pickerEffortOptions(options(['ultra', 'max', 'xhigh', 'high', 'medium', 'low']))).toEqual([
+    { value: 'low', label: 'low' },
+    { value: 'medium', label: 'medium' },
+    { value: 'high', label: 'high' },
+    { value: 'xhigh', label: 'Xhigh' },
+    { value: 'ultra', label: 'Ultracode' },
+  ])
+  expect(pickerEffortOptions(options(['ultra', 'ultracode']))).toEqual([{ value: 'ultracode', label: 'Ultracode' }])
 })
 
-test('saved picker choices preserve mode and keep agents and providers separate', () => {
+test('picker only offers efforts the selected model supports', () => {
+  expect(pickerEffortOptions(options(['max', 'high', 'low'])).map(({ value }) => value)).toEqual(['low', 'high'])
+  expect(pickerEffortOptions([])).toEqual([])
+})
+
+test('saved picker choices keep agents and providers separate and discard obsolete modes', () => {
   const selections = {
-    'codex/openai': { model: 'gpt-6-astra', effort: 'medium', mode: 'recommended' },
-    'codex/openrouter': { model: 'qwen/qwen3', effort: '', mode: 'model' },
-    'claude/': { model: 'opus[1m]', effort: 'ultracode', mode: 'model' },
+    'codex/openai': { model: 'gpt-6-astra', effort: 'medium' },
+    'codex/openrouter': { model: 'qwen/qwen3', effort: '' },
+    'claude/': { model: 'opus[1m]', effort: 'ultracode' },
   }
   expect(parseModelSelections(JSON.stringify(selections))).toEqual(selections)
+  expect(parseModelSelections(JSON.stringify({ 'claude/': { ...selections['claude/'], mode: 'recommended' } }))).toEqual({ 'claude/': selections['claude/'] })
   for (const raw of [null, 'null', '{bad json', '{"claude/":null}', '{"codex/openai":{"model":2}}']) {
     expect(parseModelSelections(raw)).toEqual({})
   }

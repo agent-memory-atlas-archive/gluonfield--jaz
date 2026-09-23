@@ -3,7 +3,6 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from '@/components/session/MentionInput'
 import { RuntimeSelect } from '@/components/session/NewThreadControls'
 import { ModelSelect } from '@/components/session/ModelSelect'
-import type { ModelPickerMode } from '@/lib/modelPicker'
 import { boardsQuery } from '@/lib/api/boards'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import { enabledACPAgents, runtimeModelState } from '@/lib/agentRuntimes'
@@ -178,7 +177,6 @@ function LoopPromptCard({
   autoFocus?: boolean
   set: SetDraft
 }) {
-  const [pickerMode, setPickerMode] = useState<ModelPickerMode>('recommended')
   const mention = useMentionInput({
     fileRoot: draft.directory,
     disabled,
@@ -264,17 +262,12 @@ function LoopPromptCard({
                 />
                 <ModelSelect
                   key={draft.runtime}
-                  agent={draft.runtime}
                   value={model}
                   suggestions={modelSuggestions}
                   loading={modelsLoading}
                   disabled={disabled}
                   placement="below"
-                  mode={pickerMode}
-                  onChange={(next) => {
-                    setPickerMode(next.mode)
-                    set({ model: next.model, reasoningEffort: next.effort })
-                  }}
+                  onChange={(next) => set({ model: next.model, reasoningEffort: next.effort })}
                   effort={reasoningEffort}
                   effortOptions={effortOptions}
                 />

@@ -10,7 +10,7 @@ export async function exerciseModelPicker(): Promise<void> {
   const model = (value: string, label: string, efforts: string[]): ModelCatalogEntry => ({
     value, label, reasoning: { status: 'ready', efforts, default_effort: 'medium' },
   })
-  const efforts = ['low', 'medium', 'high', 'xhigh', 'max']
+  const efforts = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
   const codex = [
     model('gpt-6-astra', 'GPT-6 Astra', [...efforts, 'ultra']),
     model('gpt-5.6-sol', 'GPT-5.6 Sol', [...efforts, 'ultra']),
@@ -18,7 +18,10 @@ export async function exerciseModelPicker(): Promise<void> {
   ]
   const claude = [
     model('opus[1m]', 'Opus 5.5', [...efforts, 'ultracode']),
+    model('fable', 'Fable 5.1', efforts),
+    model('fable-5', 'Fable 5', efforts),
     model('sonnet', 'Sonnet 5', efforts),
+    model('sonnet[1m]', 'Sonnet 5 (1M context)', efforts),
     model('haiku', 'Haiku 4.5', []),
   ]
   const providers = ['openai', 'openrouter'].map((id) => ({ id, label: id, base_url: '', implemented: true }))
@@ -33,6 +36,8 @@ export async function exerciseModelPicker(): Promise<void> {
       claude: { local: true, supports_auth: false, reasoning_efforts: [], models: claude },
     },
   }
+  const originallyDark = document.documentElement.classList.contains('dark')
+  document.documentElement.classList.add('dark')
   const originalFetch = window.fetch
   const originalAgent = localStorage.getItem(NEW_SESSION_AGENT_KEY)
   const originalModels = localStorage.getItem(NEW_SESSION_MODELS_KEY)
@@ -94,10 +99,42 @@ export async function exerciseModelPicker(): Promise<void> {
     await until(() => Boolean(slider()))
     await until(() => document.activeElement?.getAttribute('aria-label')?.startsWith('Select model,') === true)
     await until(() => getComputedStyle(document.querySelector('[role="dialog"]')!.parentElement!).opacity === '1')
+    const heading = document.activeElement!.getBoundingClientRect()
+    if (heading.height > 28 || heading.width >= slider().getBoundingClientRect().width - 20) {
+      throw new Error('Model hover surface is too large')
+    }
+    assertNoFocusBorder(document.activeElement!)
+    await window.smoke.pointer('mouseMove', Math.round(heading.x + heading.width / 2), Math.round(heading.y + heading.height / 2))
+  }
+  const assertNoFocusBorder = (element: Element) => {
+    const style = getComputedStyle(element)
+    if (style.outlineStyle !== 'none' || style.boxShadow !== 'none') {
+      throw new Error('Picker shows a focus border: ' + style.outline + ' / ' + style.boxShadow)
+    }
   }
   const openModels = async () => {
+    const panel = document.querySelector('[role="dialog"]')!
+    const heights: number[] = []
+    const untilTime = performance.now() + 500
+    const measure = async () => {
+      while (performance.now() < untilTime) {
+        heights.push(panel.getBoundingClientRect().height)
+        await frame()
+      }
+    }
+    const measuring = measure()
     await click([...document.querySelectorAll('button')].find((item) => item.getAttribute('aria-label')?.startsWith('Select model,')))
-    await until(() => document.activeElement?.getAttribute('aria-label') === 'Search models')
+    await until(() => document.activeElement?.getAttribute('role') === 'menuitemradio')
+    await measuring
+    const first = heights[0]
+    const last = heights.at(-1)!
+    if (Math.abs(last - first) > 10 && !heights.some((height) => height > Math.min(first, last) + 2 && height < Math.max(first, last) - 2)) {
+      throw new Error('Model list height jumped instead of animating')
+    }
+    if (panel.querySelector('input') || button('Recommended') || button('Back to effort')) {
+      throw new Error('Model list includes removed controls')
+    }
+    assertNoFocusBorder(document.activeElement!)
   }
   const close = async () => {
     await window.smoke.key('Escape')
@@ -115,23 +152,28 @@ export async function exerciseModelPicker(): Promise<void> {
     if (document.activeElement !== slider()) {
       throw new Error('Natural Tab sequence missed the slider')
     }
+    if (slider().max !== '4') {
+      throw new Error('Codex must have five efforts')
+    }
+    assertNoFocusBorder(slider())
     await window.smoke.key('Home')
-    const expected = [
-      ['gpt-5.6-terra', 'low'], ['gpt-5.6-sol', 'low'], ['gpt-5.6-sol', 'medium'],
-      ['gpt-6-astra', 'low'], ['gpt-6-astra', 'medium'], ['gpt-6-astra', 'xhigh'],
-    ]
-    for (const [index, [id, effort]] of expected.entries()) {
-      if (index > 0) {
-        await window.smoke.key('Right')
-      }
-      await until(() => configIs('codex', id, effort))
+    await until(() => configIs('codex', 'gpt-6-astra', 'low'))
+    for (const effort of ['medium', 'high', 'xhigh', 'ultra']) {
+      await window.smoke.key('Right')
+      await until(() => configIs('codex', 'gpt-6-astra', effort))
+    }
+    await openModels()
+    await click(button('GPT-5.6 Terra'))
+    await until(() => configIs('codex', 'gpt-5.6-terra', 'medium'))
+    if (slider().max !== '3') {
+      throw new Error('Terra shows unavailable Ultracode')
     }
     await openModels()
     await click(button('GPT-6 Astra'))
     await until(() => slider()?.getAttribute('aria-label') === 'Reasoning effort')
     await window.smoke.key('Tab')
     if (document.activeElement !== slider()) {
-      throw new Error('Fixed model selection lost keyboard focus: ' + document.activeElement?.outerHTML)
+      throw new Error('Model selection lost keyboard focus: ' + document.activeElement?.outerHTML)
     }
     await window.smoke.key('End')
     await until(() => configIs('codex', 'gpt-6-astra', 'ultra'))
@@ -141,13 +183,23 @@ export async function exerciseModelPicker(): Promise<void> {
     await click(button('Claude'))
     await until(() => configIs('claude', 'opus[1m]', 'xhigh'))
     await openPicker()
+    await window.smoke.capture('claude-picker-hover')
     await openModels()
+    await window.smoke.capture('claude-models')
+    await window.smoke.key('Down')
+    await until(() => document.activeElement?.textContent === 'Fable 5.1')
+    await window.smoke.key('Up')
+    await until(() => document.activeElement?.textContent === 'Opus 5.5')
     await click(button('Opus 5.5'))
-    await until(() => slider()?.getAttribute('aria-label') === 'Reasoning effort')
+    await until(() => Boolean(slider()))
     await window.smoke.key('Tab')
+    if (slider().max !== '4') {
+      throw new Error('Claude must have five efforts')
+    }
+    assertNoFocusBorder(slider())
     await window.smoke.key('Home')
-    await window.smoke.key('Right')
-    for (const effort of ['high', 'xhigh', 'max', 'ultracode']) {
+    await until(() => configIs('claude', 'opus[1m]', 'low'))
+    for (const effort of ['medium', 'high', 'xhigh', 'ultracode']) {
       await window.smoke.key('Right')
       await until(() => configIs('claude', 'opus[1m]', effort))
     }
@@ -160,14 +212,15 @@ export async function exerciseModelPicker(): Promise<void> {
     await window.smoke.pointer('mouseMove', Math.round(rect.right - 16), y)
     await window.smoke.pointer('mouseUp', Math.round(rect.right - 16), y)
     await until(() => configIs('claude', 'opus[1m]', 'ultracode'))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     await window.smoke.capture('claude-picker')
     await close()
     const previousControls = controls
     render(1)
-    await until(() => controls !== previousControls && controls.pickerMode === 'model' && configIs('claude', 'opus[1m]', 'ultracode'))
+    await until(() => controls !== previousControls && configIs('claude', 'opus[1m]', 'ultracode'))
     await click(button('Agent: Claude'))
     await click(button('Codex'))
-    await until(() => controls.pickerMode === 'model' && configIs('codex', 'gpt-6-astra', 'ultra'))
+    await until(() => configIs('codex', 'gpt-6-astra', 'ultra'))
     settings.acp.codex = { ...settings.acp.codex, model_provider: 'openrouter', model: 'qwen/qwen3', reasoning_effort: 'high' }
     client.setQueryData(keys.agentSettings, { ...settings })
     await until(() => configIs('codex', 'qwen/qwen3', 'high'))
@@ -176,8 +229,8 @@ export async function exerciseModelPicker(): Promise<void> {
     await until(() => configIs('codex', 'gpt-6-astra', 'ultra'))
     await openPicker()
     await openModels()
-    await click(button('Recommended'))
-    await until(() => slider()?.getAttribute('aria-label') === 'Recommended model and effort')
+    await click(button('GPT-6 Astra'))
+    await until(() => Boolean(slider()))
     await close()
     await window.smoke.resize(390, 760)
     await openPicker()
@@ -187,7 +240,20 @@ export async function exerciseModelPicker(): Promise<void> {
     }
     await window.smoke.capture('model-picker-mobile')
     await close()
+    controls.setSelection({ model: 'gpt-6-astra', effort: 'max' })
+    await until(() => configIs('codex', 'gpt-6-astra', 'max'))
+    await openPicker()
+    if (slider().max !== '4') {
+      throw new Error('An inherited Max effort added an extra stop')
+    }
+    const firstStop = slider().getBoundingClientRect()
+    await window.smoke.pointer('mouseDown', Math.round(firstStop.left + 16), Math.round(firstStop.y + firstStop.height / 2))
+    await window.smoke.pointer('mouseUp', Math.round(firstStop.left + 16), Math.round(firstStop.y + firstStop.height / 2))
+    await until(() => configIs('codex', 'gpt-6-astra', 'low'))
+    await close()
+
   } finally {
+    document.documentElement.classList.toggle('dark', originallyDark)
     root.unmount()
     client.clear()
     element.remove()
