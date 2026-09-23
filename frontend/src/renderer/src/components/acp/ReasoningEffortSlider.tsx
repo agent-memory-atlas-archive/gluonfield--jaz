@@ -2,11 +2,9 @@ import { useEffect, useRef } from 'react'
 import type { ReasoningEffortOption } from '@/lib/api/types'
 import { useReducedEffectsMotion } from '@/lib/effectsMotion'
 
-const THUMB = 32
-
 function stopPosition(index: number, count: number): string {
   if (count <= 1) return '50%'
-  return `calc(${THUMB / 2}px + ${index / (count - 1)} * (100% - ${THUMB}px))`
+  return `calc(var(--effort-thumb) / 2 + ${index / (count - 1)} * (100% - var(--effort-thumb)))`
 }
 
 export function ReasoningEffortSlider({
@@ -29,14 +27,17 @@ export function ReasoningEffortSlider({
   const ultra = isUltraEffort(selected)
 
   return (
-    <div className={disabled ? 'opacity-60' : ''}>
+    <div className={`${compact ? '[--effort-thumb:28px] [--effort-track:24px]' : '[--effort-thumb:32px] [--effort-track:28px]'} ${disabled ? 'opacity-60' : ''}`}>
       {!compact ? (
         <p className="text-[13px] text-ink-3">
           Effort <span className={`font-semibold ${ultra ? 'jaz-gradient' : 'text-ink'}`}>{options[index]?.label ?? 'Default'}</span>
         </p>
       ) : null}
-      <div className="relative flex h-10 items-center">
-        <div className="absolute inset-x-0 h-7 overflow-hidden rounded-[10px] bg-ink/10">
+      <div className={`relative flex items-center ${compact ? 'h-9' : 'h-10'}`}>
+        <div className="absolute inset-x-0 h-(--effort-track) overflow-hidden rounded-[10px] bg-ink/10">
+          {index >= 0 && !ultra ? (
+            <div className="absolute inset-y-0 left-0 bg-primary" style={{ width: stopPosition(index, options.length) }} />
+          ) : null}
           <UltracodeDither active={ultra} />
         </div>
         {options.map((option, i) => (
@@ -68,16 +69,16 @@ export function ReasoningEffortSlider({
             }
           }}
           className={`absolute inset-0 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none disabled:cursor-default
-            [&::-webkit-slider-runnable-track]:h-7
-            [&::-webkit-slider-thumb]:-mt-0.5 [&::-webkit-slider-thumb]:size-8
+            [&::-webkit-slider-runnable-track]:h-(--effort-track)
+            [&::-webkit-slider-thumb]:-mt-0.5 [&::-webkit-slider-thumb]:size-(--effort-thumb)
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
             [&::-webkit-slider-thumb]:transition-[background-color,box-shadow] [&::-webkit-slider-thumb]:duration-150
             focus-visible:[&::-webkit-slider-thumb]:brightness-125
-            [&::-moz-range-thumb]:size-8 [&::-moz-range-thumb]:appearance-none
+            [&::-moz-range-thumb]:size-(--effort-thumb) [&::-moz-range-thumb]:appearance-none
             [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 ${
               ultra
                 ? '[&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35),0_0_12px_var(--color-primary)] [&::-moz-range-thumb]:bg-primary'
-                : '[&::-webkit-slider-thumb]:bg-ink/90 [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35)] [&::-moz-range-thumb]:bg-ink/90'
+                : '[&::-webkit-slider-thumb]:bg-ink [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35)] [&::-moz-range-thumb]:bg-ink'
             } ${index < 0 ? '[&::-webkit-slider-thumb]:opacity-0 [&::-moz-range-thumb]:opacity-0' : ''}`}
         />
       </div>

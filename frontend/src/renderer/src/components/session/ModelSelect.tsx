@@ -41,8 +41,8 @@ export function ModelSelect({
     : reasoningEffortLabel(effortValue, options)
   const ultra = effortValue === 'ultra' || effortValue === 'ultracode'
   const height = view === 'models'
-    ? Math.min(256, Math.max(1, suggestions.length) * 32)
-    : options.length > 1 ? 72 : 32
+    ? Math.min(224, Math.max(1, suggestions.length) * 28)
+    : options.length > 1 ? 64 : 28
 
   const selectModel = (model: ModelSuggestion) => {
     onChange({
@@ -85,7 +85,7 @@ export function ModelSelect({
       <motion.div
         role="dialog"
         aria-label="Model and effort"
-        className="model-picker w-[280px] max-w-[calc(100vw-32px)] overflow-hidden"
+        className="model-picker w-[256px] max-w-[calc(100vw-32px)] overflow-hidden"
         initial={false}
         animate={{ height }}
         transition={{ duration: reduceMotion ? 0 : 0.2, ease: [0.2, 0, 0, 1] }}
@@ -104,12 +104,12 @@ export function ModelSelect({
                   type="button"
                   onClick={() => setView('models')}
                   aria-label={`Select model, ${label}`}
-                  className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-control px-2 text-[13px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
+                  className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-control px-2 text-[12px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2"
                 >
                   <span className="min-w-0 truncate text-ink">
                     {label} <span className={ultra ? 'jaz-gradient' : 'text-ink-3'}>{effortLabel}</span>
                   </span>
-                  {loading ? <LoaderCircle size={14} className="shrink-0 animate-spin text-ink-3" /> : <ChevronRight size={14} className="shrink-0 text-ink-3" />}
+                  {loading ? <LoaderCircle size={13} className="shrink-0 animate-spin text-ink-3" /> : <ChevronRight size={13} className="shrink-0 text-ink-3" />}
                 </button>
               </div>
               {options.length > 1 ? (
@@ -126,7 +126,7 @@ export function ModelSelect({
             <div
               role="menu"
               aria-label="Models"
-              className="max-h-64 overflow-y-auto"
+              className="max-h-56 overflow-y-auto"
               onKeyDown={(event) => {
                 if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
                   return
@@ -145,13 +145,13 @@ export function ModelSelect({
                   aria-checked={model.value === selected?.value}
                   autoFocus={model.value === selected?.value || (!selected && index === 0)}
                   onClick={() => selectModel(model)}
-                  className={`flex h-8 w-full items-center gap-2 rounded-control px-2.5 text-left text-[13px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 ${model.value === selected?.value ? 'text-ink' : 'text-ink-2'}`}
+                  className={`flex h-7 w-full items-center gap-2 rounded-control px-2.5 text-left text-[12px] transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 ${model.value === selected?.value ? 'text-ink' : 'text-ink-2'}`}
                 >
                   <span className="min-w-0 flex-1 truncate">{model.label}</span>
                   {model.value === selected?.value ? <Check size={13} className="shrink-0 text-ink-3" /> : null}
                 </button>
               ))}
-              {!suggestions.length ? <div className="h-8 px-2.5 text-[13px] leading-8 text-ink-3">{loading ? 'Loading models…' : 'No models available'}</div> : null}
+              {!suggestions.length ? <div className="h-7 px-2.5 text-[12px] leading-7 text-ink-3">{loading ? 'Loading models…' : 'No models available'}</div> : null}
             </div>
           )}
         </motion.div>
