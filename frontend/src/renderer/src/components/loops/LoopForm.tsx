@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from '@/components/session/MentionInput'
-import { ModelSelect, RuntimeSelect } from '@/components/session/NewThreadControls'
+import { RuntimeSelect } from '@/components/session/NewThreadControls'
+import { ModelSelect } from '@/components/session/ModelSelect'
+import type { ModelPickerMode } from '@/lib/modelPicker'
 import { boardsQuery } from '@/lib/api/boards'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import { enabledACPAgents, runtimeModelState } from '@/lib/agentRuntimes'
@@ -176,6 +178,7 @@ function LoopPromptCard({
   autoFocus?: boolean
   set: SetDraft
 }) {
+  const [pickerMode, setPickerMode] = useState<ModelPickerMode>('recommended')
   const mention = useMentionInput({
     fileRoot: draft.directory,
     disabled,
@@ -201,7 +204,7 @@ function LoopPromptCard({
   }, [agents, draft.runtime, runtimeReady, set])
 
   const runtimeModel = runtimeModelState(agentSettings, draft.runtime, draft.provider)
-  const { usesProvider, providers: runtimeProviders, provider, selectedProvider } = runtimeModel
+  const { usesProvider, provider, selectedProvider } = runtimeModel
   const defaultModel = runtimeModel.defaultModel
   const model = draft.model || defaultModel
   const requestedEffort = draft.reasoningEffort || runtimeModel.defaultEffort
@@ -260,28 +263,20 @@ function LoopPromptCard({
                   onChange={(runtime) => set({ runtime, provider: '', model: '', reasoningEffort: '' })}
                 />
                 <ModelSelect
+                  key={draft.runtime}
+                  agent={draft.runtime}
                   value={model}
                   suggestions={modelSuggestions}
                   loading={modelsLoading}
                   disabled={disabled}
                   placement="below"
-                  onChange={(next) => set({ model: next, reasoningEffort: '' })}
-                  providers={
-                    usesProvider
-                      ? runtimeProviders.map((p) => ({ value: p.id, label: p.label }))
-                      : undefined
-                  }
-                  provider={usesProvider ? provider : undefined}
-                  onProviderChange={
-                    usesProvider
-                      ? (next) => set({ provider: next, model: '', reasoningEffort: '' })
-                      : undefined
-                  }
+                  mode={pickerMode}
+                  onChange={(next) => {
+                    setPickerMode(next.mode)
+                    set({ model: next.model, reasoningEffort: next.effort })
+                  }}
                   effort={reasoningEffort}
                   effortOptions={effortOptions}
-                  // 'Default' clears the override; the selection snaps back to the
-                  // resolved settings effort.
-                  onEffortChange={(next) => set({ reasoningEffort: next })}
                 />
               </>
             ) : null}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReasoningEffortOption } from '@/lib/api/types'
 import { useReducedEffectsMotion } from '@/lib/effectsMotion'
 
@@ -13,94 +13,73 @@ export function ReasoningEffortSlider({
   options,
   value,
   defaultValue,
+  compact = false,
   disabled,
+  ariaLabel = 'Reasoning effort',
   onChange,
 }: {
   options: ReasoningEffortOption[]
   value: string
   defaultValue?: string
+  compact?: boolean
   disabled?: boolean
-  onChange: (effort: string) => void
+  ariaLabel?: string
+  onChange: (value: string) => void
 }) {
-  const trackRef = useRef<HTMLDivElement>(null)
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
-
   const selected = value || defaultValue || ''
-  let index = options.findIndex((option) => option.value === selected)
-  if (index < 0) index = Math.floor((options.length - 1) / 2)
-
-  const shown = options[previewIndex ?? index]
-  const ultra = isUltraEffort(shown?.value)
-
-  const indexFromPointer = (clientX: number): number => {
-    const rect = trackRef.current?.getBoundingClientRect()
-    if (!rect || rect.width <= THUMB) return index
-    const nx = (clientX - rect.left - THUMB / 2) / (rect.width - THUMB)
-    return Math.max(0, Math.min(options.length - 1, Math.round(nx * (options.length - 1))))
-  }
+  const index = options.findIndex((option) => option.value === selected)
+  const ultra = isUltraEffort(selected)
 
   return (
-    <div className={disabled ? 'pointer-events-none opacity-60' : ''}>
-      <p className="text-[13px] text-ink-3">
-        Effort{' '}
-        <span className={`font-semibold ${ultra ? 'jaz-gradient' : 'text-ink'}`}>
-          {shown?.label ?? 'Default'}
-        </span>
-      </p>
-      <div
-        ref={trackRef}
-        className="relative mt-1.5 h-7"
-        onMouseMove={(e) => setPreviewIndex(indexFromPointer(e.clientX))}
-        onMouseLeave={() => setPreviewIndex(null)}
-      >
-        <div
-          className={`absolute inset-0 rounded-[10px] bg-ink/10 ${ultra ? 'effort-ultra-track' : ''}`}
-        />
+    <div className={disabled ? 'opacity-60' : ''}>
+      {!compact ? (
+        <p className="text-[13px] text-ink-3">
+          Effort <span className="font-semibold text-ink">{options[index]?.label ?? 'Default'}</span>
+        </p>
+      ) : null}
+      <div className="relative flex h-10 items-center">
+        <div className="absolute inset-x-0 h-7 overflow-hidden rounded-full bg-ink/10">
+          {index >= 0 ? (
+            <div className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: stopPosition(index, options.length) }} />
+          ) : null}
+          <UltracodeDither active={ultra} />
+        </div>
         {options.map((option, i) => (
           <span
             key={option.value}
-            className={`absolute top-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full ${
-              isUltraEffort(option.value)
-                ? 'bg-primary shadow-[0_0_6px_var(--color-primary)]'
-                : 'bg-ink/25'
-            }`}
+            className="pointer-events-none absolute top-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink/30"
             style={{ left: stopPosition(i, options.length) }}
           />
         ))}
-        <div className="absolute inset-0 overflow-hidden rounded-[10px]">
-          <UltracodeDither active={ultra} />
-        </div>
         <input
           type="range"
           min={0}
           max={options.length - 1}
           step={1}
-          value={index}
-          aria-label="Reasoning effort"
-          aria-valuetext={shown?.label}
+          value={Math.max(0, index)}
+          aria-label={ariaLabel}
+          aria-valuetext={options[index]?.label ?? 'Default'}
           disabled={disabled}
-          onChange={(e) => onChange(options[Number(e.target.value)]?.value ?? '')}
-          className={`absolute inset-0 w-full cursor-pointer appearance-none bg-transparent outline-none
+          onChange={(event) => onChange(options[Number(event.target.value)].value)}
+          className={`absolute inset-0 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default
             [&::-webkit-slider-runnable-track]:h-7
             [&::-webkit-slider-thumb]:-mt-0.5 [&::-webkit-slider-thumb]:size-8
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-            [&::-webkit-slider-thumb]:transition-[background-color,box-shadow] [&::-webkit-slider-thumb]:duration-150
+            [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.2)]
             [&::-moz-range-thumb]:size-8 [&::-moz-range-thumb]:appearance-none
             [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 ${
               ultra
-                ? `[&::-webkit-slider-thumb]:bg-primary
-                   [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35),0_0_12px_var(--color-primary)]
-                   [&::-moz-range-thumb]:bg-primary`
-                : `[&::-webkit-slider-thumb]:bg-ink/90 hover:[&::-webkit-slider-thumb]:bg-ink
-                   [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.35)]
-                   [&::-moz-range-thumb]:bg-ink/90`
+                ? '[&::-webkit-slider-thumb]:bg-primary [&::-moz-range-thumb]:bg-primary'
+                : '[&::-webkit-slider-thumb]:bg-ink [&::-moz-range-thumb]:bg-ink'
             }`}
         />
       </div>
-      <div className="mt-1 flex items-baseline justify-between text-[12px] text-ink-3">
-        <span>Faster</span>
-        <span>Smarter</span>
-      </div>
+      {!compact ? (
+        <div className="flex justify-between text-[12px] text-ink-3">
+          <span>Faster</span>
+          <span>Smarter</span>
+        </div>
+      ) : null}
     </div>
   )
 }

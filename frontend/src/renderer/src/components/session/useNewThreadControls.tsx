@@ -1,12 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { ModelSelect, RuntimeSelect } from '@/components/session/NewThreadControls'
+import { RuntimeSelect } from '@/components/session/NewThreadControls'
+import { ModelSelect } from '@/components/session/ModelSelect'
 import { enabledACPAgents, runtimeModelState } from '@/lib/agentRuntimes'
 import type { CreateSessionInput } from '@/lib/api/sessions'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import { composerConfig } from '@/lib/jazDefaults'
 import { useModelReasoningState } from '@/lib/modelReasoning'
-import { NEW_SESSION_AGENT_KEY } from '@/lib/newSessionConfig'
+import { parseModelSelections, type ModelSelection } from '@/lib/modelPicker'
+import { NEW_SESSION_AGENT_KEY, NEW_SESSION_MODELS_KEY } from '@/lib/newSessionConfig'
 
 export function useNewThreadControls() {
   const settingsQuery = useQuery(agentSettingsQuery)
@@ -16,15 +18,10 @@ export function useNewThreadControls() {
   const runtimeAvailable = runtimeReady && agents.length > 0
 
   const [runtime, setRuntime] = useState(() => localStorage.getItem(NEW_SESSION_AGENT_KEY) || '')
-  const [providerOverride, setProviderOverride] = useState<string | null>(null)
-  const [modelOverride, setModelOverride] = useState<string | null>(null)
-  const [effortOverride, setEffortOverride] = useState<string | null>(null)
+  const [selections, setSelections] = useState(() => parseModelSelections(localStorage.getItem(NEW_SESSION_MODELS_KEY)))
 
   const selectRuntime = (next: string) => {
     setRuntime(next)
-    setProviderOverride(null)
-    setModelOverride(null)
-    setEffortOverride(null)
     if (next) localStorage.setItem(NEW_SESSION_AGENT_KEY, next)
     else localStorage.removeItem(NEW_SESSION_AGENT_KEY)
   }
@@ -34,23 +31,21 @@ export function useNewThreadControls() {
     const next = agents[0] ?? ''
     if (next === runtime) return
     setRuntime(next)
-    setProviderOverride(null)
-    setModelOverride(null)
-    setEffortOverride(null)
     localStorage.removeItem(NEW_SESSION_AGENT_KEY)
   }, [agents, runtime, runtimeReady])
 
-  const model = runtimeModelState(agentSettings, runtime, providerOverride)
-  const { usesProvider, providers: runtimeProviders, provider, selectedProvider } = model
-  const selectedModel = modelOverride ?? model.defaultModel
-  const requestedEffort = effortOverride ?? model.defaultEffort
+  const model = runtimeModelState(agentSettings, runtime)
+  const { usesProvider, provider, selectedProvider } = model
+  const selectionKey = `${runtime}/${provider}`
+  const selection = selections[selectionKey]
+  const selectedModel = selection?.model ?? model.defaultModel
+  const requestedEffort = selection?.effort ?? model.defaultEffort
 
   const {
     modelSuggestions,
     modelsLoading,
     reasoningOptions: effortOptions,
     effectiveReasoningEffort: effort,
-    reasoningEffortSupported,
     reasoningStatus,
     reasoningBlocked,
   } = useModelReasoningState({
@@ -62,11 +57,6 @@ export function useNewThreadControls() {
     provider,
     selectedProvider,
   })
-  useEffect(() => {
-    if (effortOverride != null && !reasoningEffortSupported) {
-      setEffortOverride(null)
-    }
-  }, [effortOverride, reasoningEffortSupported])
 
   const composer = composerConfig()
 
@@ -86,21 +76,14 @@ export function useNewThreadControls() {
     modelsLoading,
     reasoningStatus,
     reasoningBlocked,
-    usesProvider,
-    providers: usesProvider ? runtimeProviders.map((p) => ({ value: p.id, label: p.label })) : undefined,
-    provider: usesProvider ? provider : undefined,
-    setProvider: (next: string) => {
-      setProviderOverride(next)
-      setModelOverride(null)
-      setEffortOverride(null)
-    },
-    setModel: (next: string) => {
-      setModelOverride(next)
-      setEffortOverride(null)
+    pickerMode: selection?.mode ?? 'recommended',
+    setSelection: (next: ModelSelection) => {
+      const updated = { ...selections, [selectionKey]: next }
+      setSelections(updated)
+      localStorage.setItem(NEW_SESSION_MODELS_KEY, JSON.stringify(updated))
     },
     effort,
     effortOptions,
-    setEffort: (next: string) => setEffortOverride(next === '' ? null : next),
     // The launched config IS the resolved config shown in the UI — same model,
     // provider, and clamped effort — so display and launch cannot diverge.
     sessionConfig: (extra: { directory: string; worktree: boolean }, title?: string): CreateSessionInput => ({
@@ -143,18 +126,17 @@ export function AgentModelControls({
       ) : null}
       {controls.showModelPicker ? (
         <ModelSelect
+          key={controls.runtime}
+          agent={controls.runtime}
           value={controls.model}
           suggestions={controls.modelSuggestions}
           loading={controls.modelsLoading}
           placement={placement}
           disabled={disabled}
-          onChange={controls.setModel}
-          providers={controls.providers}
-          provider={controls.provider}
-          onProviderChange={controls.usesProvider ? controls.setProvider : undefined}
+          onChange={controls.setSelection}
+          mode={controls.pickerMode}
           effort={controls.effort}
           effortOptions={controls.effortOptions}
-          onEffortChange={controls.setEffort}
         />
       ) : null}
     </>

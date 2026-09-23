@@ -9,26 +9,16 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AgentLogo, hasAgentLogo } from '@/components/acp/AgentLogo'
-import { ReasoningEffortSlider } from '@/components/acp/ReasoningEffortSlider'
 import { Button } from '@/components/ui/Button'
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog'
 import { Modal } from '@/components/ui/Modal'
 import { ContextMenu, MenuRow, Popover } from '@/components/ui/Popover'
-import { Select } from '@/components/ui/Select'
 import { agentLabel } from '@/lib/agentLabel'
 import { deleteProject, projectsQuery, type Project } from '@/lib/api/sessions'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
-import type { ReasoningEffortOption } from '@/lib/api/types'
-import {
-  filterModelSuggestions,
-  modelSuggestionFor,
-  modelSuggestionLabel,
-  type ModelSuggestion,
-} from '@/lib/models'
 import { keys } from '@/lib/query/keys'
-import { reasoningEffortLabel, REASONING_EFFORT_OPTIONS } from '@/lib/reasoningEfforts'
 
 // Selects the ACP agent backing a new thread.
 export function RuntimeSelect({
@@ -82,157 +72,6 @@ export function RuntimeSelect({
           </span>
         </MenuRow>
       ))}
-    </Popover>
-  )
-}
-
-// Picks the model for a new thread: curated suggestions for the chosen
-// agent/provider plus free-text entry for anything else.
-export function ModelSelect({
-  value,
-  suggestions,
-  loading,
-  disabled,
-  placement,
-  onChange,
-  providers,
-  provider,
-  onProviderChange,
-  effort,
-  effortOptions = REASONING_EFFORT_OPTIONS,
-  onEffortChange,
-}: {
-  value: string
-  suggestions: ModelSuggestion[]
-  loading?: boolean
-  disabled?: boolean
-  placement?: 'above' | 'below'
-  onChange: (model: string) => void
-  providers?: { value: string; label: string }[]
-  provider?: string
-  onProviderChange?: (provider: string) => void
-  // '' inherits the Settings > Agents default for the chosen agent/provider.
-  effort?: string
-  effortOptions?: ReasoningEffortOption[]
-  onEffortChange?: (effort: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    if (open) {
-      setQuery('')
-      requestAnimationFrame(() => inputRef.current?.focus())
-    }
-  }, [open])
-
-  const filtered = useMemo(() => filterModelSuggestions(suggestions, query), [suggestions, query])
-  const typed = query.trim()
-  const typedIsNew = typed !== '' && !suggestions.some((s) => s.value === typed)
-  const label = value === '' ? 'Model' : modelSuggestionLabel(suggestions, value)
-  const selectedSuggestion = modelSuggestionFor(suggestions, value)
-  const effortStops = effortOptions.filter((option) => option.value !== '')
-  const automaticReasoning = selectedSuggestion?.reasoning.automatic === true && effortStops.length === 0
-  // An unset effort still reasons at the model's own default (e.g. Grok's "high"),
-  // so surface that here — matching the slider, which anchors on default_effort too.
-  const selectedEffort = (effort ?? '') || selectedSuggestion?.reasoning.default_effort || ''
-  const effortValue = effortOptions.some((option) => option.value === selectedEffort) ? selectedEffort : ''
-  const effortLabel = automaticReasoning ? 'Thinking' : reasoningEffortLabel(effortValue, effortOptions)
-  const showEffortSlider = Boolean(onEffortChange) && effortStops.length > 1
-  const reasoningDescription = automaticReasoning
-    ? ', reasoning: automatic'
-    : effortValue
-      ? `, reasoning effort: ${effortLabel}`
-      : ''
-  const description = `Model: ${value === '' ? 'default' : label}${reasoningDescription}`
-  return (
-    <Popover
-      open={open}
-      onClose={() => setOpen(false)}
-      placement={placement}
-      trigger={
-        <Button
-          variant="secondary"
-          size="sm"
-          className="max-w-[13rem]"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-label={description}
-          title={description}
-          disabled={disabled}
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className="truncate">{label}</span>
-          {automaticReasoning || effortValue ? (
-            <span className="shrink-0 text-primary">{effortLabel}</span>
-          ) : null}
-          <ChevronDown size={13} className="shrink-0" />
-        </Button>
-      }
-    >
-      <div className="w-[260px]">
-        {providers && providers.length > 1 && onProviderChange ? (
-          <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-0.5">
-            <span className="text-[11px] text-ink-3">Provider</span>
-            <Select
-              value={provider ?? providers[0].value}
-              options={providers}
-              onChange={onProviderChange}
-              aria-label="Provider"
-              className="min-w-[140px] max-w-[180px]"
-            />
-          </div>
-        ) : null}
-        <div className="px-1 pt-1 pb-1.5">
-          <input
-            ref={inputRef}
-            value={query}
-            placeholder="Search models…"
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && typed !== '') {
-                e.preventDefault()
-                onChange(typed)
-              }
-            }}
-            className="h-7 w-full rounded-full bg-ink/10 px-2.5 text-[12px] text-ink outline-none transition-colors duration-150 placeholder:text-ink-3 focus:bg-ink/15"
-          />
-        </div>
-        <div className={`${showEffortSlider ? 'max-h-[180px]' : 'max-h-[240px]'} overflow-y-auto`}>
-          {typedIsNew ? (
-            <MenuRow selected={typed === value} onClick={() => onChange(typed)}>
-              Use “{typed}”
-            </MenuRow>
-          ) : null}
-          {loading ? (
-            <div className="flex h-7 items-center gap-2 px-2 text-[13px] text-ink-3">
-              <LoaderCircle size={13} className="animate-spin" />
-              Loading models…
-            </div>
-          ) : filtered.length > 0 ? (
-            filtered.map((s) => (
-              <MenuRow key={s.value} selected={s.value === value} onClick={() => onChange(s.value)}>
-                {s.label}
-              </MenuRow>
-            ))
-          ) : !typedIsNew ? (
-            <div className="px-2 py-1 text-[13px] text-ink-3">No matching models.</div>
-          ) : null}
-        </div>
-        {showEffortSlider && onEffortChange ? (
-          <>
-            <div className="my-1 border-t border-border" />
-            <div className="px-3 pt-1.5 pb-2.5">
-              <ReasoningEffortSlider
-                options={effortStops}
-                value={effortValue}
-                defaultValue={selectedSuggestion?.reasoning.default_effort}
-                onChange={onEffortChange}
-              />
-            </div>
-          </>
-        ) : null}
-      </div>
     </Popover>
   )
 }

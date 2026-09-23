@@ -361,7 +361,7 @@ func TestServiceAgentModelsUseRawOpenRouterReasoning(t *testing.T) {
 	if strings.Join(efforts["sonnet"].Reasoning.Efforts, ",") != "low,medium,high,max" {
 		t.Fatalf("sonnet efforts = %#v", efforts["sonnet"].Reasoning.Efforts)
 	}
-	if efforts["opus[1m]"].Label != "Opus 5" || efforts["opus[1m]"].OpenRouterID != "" ||
+	if efforts["opus[1m]"].Label != "Opus 5.5" || efforts["opus[1m]"].OpenRouterID != "" ||
 		efforts["opus[1m]"].Reasoning.Status != ReasoningUnavailable {
 		t.Fatalf("opus model = %#v", efforts["opus[1m]"])
 	}

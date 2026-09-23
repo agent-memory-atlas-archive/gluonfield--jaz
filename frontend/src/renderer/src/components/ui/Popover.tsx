@@ -43,6 +43,7 @@ export function Popover({
   const menuRef = useRef<HTMLDivElement>(null)
   const reducedMotion = useReducedMotion()
   const [rect, setRect] = useState<DOMRect | null>(null)
+  const [menuWidth, setMenuWidth] = useState(0)
   const wasOpen = useRef(false)
   const updateRect = useCallback(() => {
     const next = anchorRef.current ? layoutRect(anchorRef.current) : null
@@ -57,6 +58,10 @@ export function Popover({
     wasOpen.current = open
     if (shouldUpdate) updateRect()
   })
+
+  useLayoutEffect(() => {
+    if (open && menuRef.current) setMenuWidth(layoutRect(menuRef.current).width)
+  }, [open, rect, children])
 
   useEffect(() => {
     if (!open) return
@@ -73,11 +78,12 @@ export function Popover({
   let style: CSSProperties = {}
   if (rect) {
     const vp = layoutViewport()
+    const left = align === 'end' ? rect.right - menuWidth : rect.left
     style = {
       position: 'fixed',
       zIndex: 'var(--z-modal)',
       ...(placement === 'below' ? { top: rect.bottom + GAP } : { bottom: vp.height - rect.top + GAP }),
-      ...(align === 'end' ? { right: vp.width - rect.right } : { left: rect.left }),
+      left: Math.max(8, Math.min(left, vp.width - menuWidth - 8)),
     }
   }
 
