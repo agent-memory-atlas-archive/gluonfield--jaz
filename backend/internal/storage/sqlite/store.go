@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -104,13 +103,7 @@ func New(root string) (*Store, error) {
 }
 
 func sqliteDSN(path string) string {
-	u := url.URL{Scheme: "file", Path: path}
-	query := u.Query()
-	for _, pragma := range []string{"foreign_keys(1)", "synchronous(NORMAL)", "busy_timeout(5000)"} {
-		query.Add("_pragma", pragma)
-	}
-	u.RawQuery = query.Encode()
-	return u.String()
+	return path + "?_pragma=foreign_keys(1)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)"
 }
 
 func (s *Store) Close() error {

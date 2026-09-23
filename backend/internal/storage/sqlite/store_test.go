@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -891,5 +892,29 @@ func TestAppendMessagesPreservesExistingTimestamps(t *testing.T) {
 	}
 	if !records[1].CreatedAt.After(records[0].CreatedAt) {
 		t.Fatalf("second timestamp %s should be after first %s", records[1].CreatedAt, records[0].CreatedAt)
+	}
+}
+
+func TestNewOpensDriveStylePathWithPragmas(t *testing.T) {
+	t.Chdir(t.TempDir())
+	root := "C:jaz"
+	store, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	if _, err := os.Stat(filepath.Join(root, "jaz.sqlite")); err != nil {
+		t.Fatal(err)
+	}
+	var foreignKeys, busyTimeout int
+	if err := store.db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.db.QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
+		t.Fatal(err)
+	}
+	if foreignKeys != 1 || busyTimeout != 5000 {
+		t.Fatalf("foreign_keys = %d, busy_timeout = %d", foreignKeys, busyTimeout)
 	}
 }
