@@ -22,13 +22,25 @@ type SchedulerControl interface {
 	Running() bool
 }
 
+type SearchRequest struct {
+	Query    string
+	Limit    int
+	Deep     bool
+	ParentID string
+}
+
+type Searcher interface {
+	SearchMemory(context.Context, SearchRequest) (string, error)
+}
+
 type Service struct {
 	*jazmem.Memory
 
 	Scheduler SchedulerControl
 
-	store  storage.SettingsStorage
-	mcpURL string
+	store    storage.SettingsStorage
+	mcpURL   string
+	searcher Searcher
 
 	mcpOnce sync.Once
 	mcp     http.Handler
@@ -39,6 +51,10 @@ type Service struct {
 
 func New(memory *jazmem.Memory, store storage.SettingsStorage, scheduler SchedulerControl, mcpURL string) *Service {
 	return &Service{Memory: memory, Scheduler: scheduler, store: store, mcpURL: mcpURL}
+}
+
+func (s *Service) SetSearcher(searcher Searcher) {
+	s.searcher = searcher
 }
 
 // Enabled is the live master switch, read per use so toggling needs no restart.

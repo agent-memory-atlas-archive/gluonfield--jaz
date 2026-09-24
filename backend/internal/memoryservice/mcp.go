@@ -10,6 +10,7 @@ import (
 	"github.com/gluonfield/jazmem/pkg/jazmem"
 	"github.com/gluonfield/jazmem/pkg/jazmemhttp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/wins/jaz/backend/internal/mcpsession"
 )
 
 const (
@@ -21,7 +22,7 @@ func (s *Service) AddMCPTools(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        PublicSearchToolName,
 		Title:       "Search Jaz memory",
-		Description: "Search Jaz memory directly and return ranked page snippets. Search again with concrete names or variants when results are thin; call memory_get_page for the complete source or edit context.",
+		Description: "Search Jaz memory with the configured Memory agent. Returns a concise answer with source page references; search-agent tokens are recorded separately as Memory Search. Use memory_get_page for complete source text or edit context.",
 	}, tools.Search)
 	jazmemhttp.AddMCPGetPageTool(server, gatedJazmem{service: s})
 }
@@ -59,13 +60,28 @@ type SearchInput struct {
 	Deep  bool   `json:"deep,omitempty" jsonschema:"wider retrieval with linked-page expansion"`
 }
 
-func (t memoryTools) Search(ctx context.Context, _ *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, jazmem.SearchResponse, error) {
+func (t memoryTools) Search(ctx context.Context, req *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, any, error) {
 	query := strings.TrimSpace(input.Query)
 	if query == "" {
-		return nil, jazmem.SearchResponse{}, errors.New("query is required")
+		return nil, nil, errors.New("query is required")
 	}
-	response, err := (gatedJazmem{service: t.service}).Retrieve(ctx, query, jazmem.SearchOptions{Limit: input.Limit, Deep: input.Deep})
-	return nil, response, err
+	if err := (gatedJazmem{service: t.service}).ready(); err != nil {
+		return nil, nil, err
+	}
+	limit := input.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	answer, err := t.service.searcher.SearchMemory(ctx, SearchRequest{
+		Query:    query,
+		Limit:    min(limit, 50),
+		Deep:     input.Deep,
+		ParentID: mcpsession.SessionID(req),
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: answer}}}, nil, nil
 }
 
 func (m gatedJazmem) Retrieve(ctx context.Context, query string, opts jazmem.SearchOptions) (jazmem.SearchResponse, error) {

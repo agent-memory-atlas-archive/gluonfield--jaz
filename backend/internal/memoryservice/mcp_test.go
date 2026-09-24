@@ -3,11 +3,14 @@ package memoryservice
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/gluonfield/jazmem/pkg/jazmem"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/wins/jaz/backend/internal/mcpsession"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
@@ -35,34 +38,49 @@ func TestGatedJazmemGetPageAcceptsAbsoluteMemoryPage(t *testing.T) {
 	}
 }
 
-func TestMemorySearchReturnsRankedResultsDirectly(t *testing.T) {
-	root := t.TempDir()
-	mem, err := jazmem.Open(jazmem.Config{Root: root, DBPath: filepath.Join(t.TempDir(), "index.sqlite")})
-	if err != nil {
-		t.Fatal(err)
+func TestMemorySearchDelegatesWithCallingSession(t *testing.T) {
+	for _, limit := range []int{0, 5, 100} {
+		service := New(nil, memorySettingsStore{}, nil, "")
+		var got SearchRequest
+		service.SetSearcher(searcherFunc(func(_ context.Context, req SearchRequest) (string, error) {
+			got = req
+			return "Answer [source](projects/jaz)", nil
+		}))
+		result, structured, err := (memoryTools{service: service}).Search(context.Background(), &mcp.CallToolRequest{
+			Extra: &mcp.RequestExtra{Header: mcpsession.Header("parent-session")},
+		}, SearchInput{Query: "  active chat context  ", Limit: limit, Deep: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantLimit := min(limit, 50)
+		if limit == 0 {
+			wantLimit = 10
+		}
+		if got != (SearchRequest{Query: "active chat context", Limit: wantLimit, Deep: true, ParentID: "parent-session"}) {
+			t.Fatalf("request = %#v", got)
+		}
+		if structured != nil || len(result.Content) != 1 || result.Content[0].(*mcp.TextContent).Text != "Answer [source](projects/jaz)" {
+			t.Fatalf("result = %#v, structured = %#v", result, structured)
+		}
 	}
-	t.Cleanup(func() { _ = mem.Close() })
-	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "projects", "jaz.md"), []byte("# Jaz\n\nMemory search should preserve the active chat context."), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := mem.Reindex(context.Background(), jazmem.ReindexOptions{}); err != nil {
-		t.Fatal(err)
-	}
+}
 
-	_, response, err := (memoryTools{service: New(mem, memorySettingsStore{}, nil, "")}).Search(
-		context.Background(),
-		nil,
-		SearchInput{Query: "active chat context", Limit: 5},
-	)
-	if err != nil {
-		t.Fatal(err)
+func TestMemorySearchReturnsWorkerError(t *testing.T) {
+	service := New(nil, memorySettingsStore{}, nil, "")
+	want := errors.New("provider unavailable")
+	service.SetSearcher(searcherFunc(func(context.Context, SearchRequest) (string, error) {
+		return "", want
+	}))
+	_, _, err := (memoryTools{service: service}).Search(context.Background(), nil, SearchInput{Query: "Jaz"})
+	if !errors.Is(err, want) {
+		t.Fatalf("error = %v", err)
 	}
-	if len(response.Results) != 1 || response.Results[0].Slug != "projects/jaz" {
-		t.Fatalf("results = %#v", response.Results)
-	}
+}
+
+type searcherFunc func(context.Context, SearchRequest) (string, error)
+
+func (f searcherFunc) SearchMemory(ctx context.Context, req SearchRequest) (string, error) {
+	return f(ctx, req)
 }
 
 func TestGatedJazmemGetPageRejectsAbsolutePathOutsideMemoryRoot(t *testing.T) {
