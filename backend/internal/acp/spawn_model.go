@@ -75,7 +75,7 @@ func (m *Manager) probeAgentSession(ctx context.Context, req SpawnRequest, cfg A
 	}
 	defer ac.close()
 	info, err := m.newACPProtocolSession(ctx, ac, "model probe", newSessionRequest{
-		Meta:       agentPolicyForAgent(req.ACPAgent).mergeSessionMeta(nil, cfg.ReasoningEffort),
+		Meta:       agentPolicyForAgent(req.ACPAgent).mergeSessionMeta(nil, cfg),
 		Cwd:        cwd,
 		MCPServers: m.mcpServersForAgent(ctx, ac.initRaw, req.MCPServerPolicy),
 	})

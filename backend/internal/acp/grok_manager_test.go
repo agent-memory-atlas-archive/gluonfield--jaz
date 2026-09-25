@@ -4,13 +4,11 @@ import (
 	"context"
 	"io"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/acp"
-	"github.com/wins/jaz/backend/internal/modelcatalog"
 	"github.com/wins/jaz/backend/internal/promptmodule"
 	"github.com/wins/jaz/backend/internal/storage"
 	jsonstore "github.com/wins/jaz/backend/internal/storage/json"
@@ -59,7 +57,7 @@ func TestManagerLeavesGrokModesUnmanagedWhenAgentReportsNoModes(t *testing.T) {
 	}
 }
 
-func TestManagerFailsGrokModelOverrideWhenItCannotApplyStartupArgs(t *testing.T) {
+func TestManagerAppliesGrokReasoningEffortThroughConfigOption(t *testing.T) {
 	store, err := jsonstore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -69,19 +67,31 @@ func TestManagerFailsGrokModelOverrideWhenItCannotApplyStartupArgs(t *testing.T)
 		Workspace: t.TempDir(),
 		Agents: map[string]acp.AgentConfig{
 			"grok": {
-				Command: os.Args[0],
-				Args:    []string{"-test.run=TestFakeACPAgentProcess"},
-				Model:   modelcatalog.DefaultGrokModel,
-				Env:     map[string]string{"JAZ_FAKE_ACP_AGENT": "1"},
+				Command:         os.Args[0],
+				Args:            []string{"-test.run=TestFakeACPAgentProcess"},
+				ReasoningEffort: "xhigh",
+				Env: map[string]string{
+					"JAZ_FAKE_ACP_AGENT":         "1",
+					"JAZ_FAKE_ACP_SET_CONFIG":    "1",
+					"JAZ_FAKE_ACP_EXPECT_EFFORT": "xhigh",
+				},
 			},
 		},
 	}, log.New(io.Discard))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	_, err = manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "grok", Slug: "grok-model"})
-	if err == nil || !strings.Contains(err.Error(), "requires the local grok command") {
-		t.Fatalf("error = %v", err)
+	spawned, err := manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "grok", Slug: "grok-effort"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = manager.Cancel(context.Background(), spawned.SessionID) }()
+	session, err := store.LoadSession(spawned.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.ReasoningEffort != "xhigh" {
+		t.Fatalf("unexpected session reasoning effort %#v", session)
 	}
 }
 

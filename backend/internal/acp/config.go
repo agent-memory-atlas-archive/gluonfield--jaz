@@ -303,8 +303,6 @@ func BuiltinAgents() AgentCatalog {
 				"--always-approve",
 				"stdio",
 			},
-			Model:           modelcatalog.DefaultGrokModel,
-			ReasoningEffort: DefaultAgentReasoningEffort(AgentGrok),
 		},
 		AgentOpenCode: {
 			Command:                 "npx",

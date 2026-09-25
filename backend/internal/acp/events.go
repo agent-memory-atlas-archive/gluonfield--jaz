@@ -259,7 +259,7 @@ func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPe
 // rawInput {"plan": ...} and as a text content block; either is the full plan the
 // user is being asked to approve, so the approval surface can render it.
 func permissionPlanContent(call acpschema.ToolCallUpdate) string {
-	if kindString(call.Kind) != string(acpschema.ToolKindSwitchMode) {
+	if derefString(call.Kind) != string(acpschema.ToolKindSwitchMode) {
 		return ""
 	}
 	var in struct {

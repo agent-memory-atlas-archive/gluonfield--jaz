@@ -49,14 +49,6 @@ var reasoningEffortRank = map[string]int{
 	"none": 0, "minimal": 1, "low": 2, "medium": 3, "high": 4, "xhigh": 5, "max": 6, "ultra": 7, "ultracode": 8,
 }
 
-const (
-	DefaultGrokModel  = "grok-4.7"
-	GrokFastModel     = "grok-4.7-build-fast"
-	GrokPreviousModel = "grok-4.6"
-	GrokLegacyModel   = "grok-4.5"
-	GrokComposerModel = "grok-composer-2.5-fast"
-)
-
 func sortReasoningEfforts(efforts []string) {
 	sort.SliceStable(efforts, func(i, j int) bool {
 		return reasoningEffortRank[efforts[i]] < reasoningEffortRank[efforts[j]]
@@ -97,13 +89,6 @@ var (
 			openRouterBackedModel("claude-fable-5[1m]", "Fable 5", "Previous Fable model", "anthropic/claude-fable-5"),
 			openRouterBackedModel("sonnet", "Sonnet 5", "Efficient for routine tasks", "anthropic/claude-sonnet-5"),
 			openRouterBackedModel("haiku", "Haiku 4.5", "Fastest for quick answers", "anthropic/claude-haiku-4.5"),
-		},
-		"grok": {
-			modelWithoutProviderReasoning(DefaultGrokModel, "Grok 4.7", "Default Grok model"),
-			modelWithoutProviderReasoning(GrokFastModel, "Grok 4.7 Fast", "Faster Grok 4.7"),
-			modelWithoutProviderReasoning(GrokPreviousModel, "Grok 4.6", "Previous Grok model"),
-			modelWithoutProviderReasoning(GrokLegacyModel, "Grok 4.5", "Older Grok model"),
-			modelWithoutProviderReasoning(GrokComposerModel, "Composer 2.5", "Cursor's coding model"),
 		},
 		"opencode": {
 			openRouterNativeModel(provider.DefaultOpenRouterModel, "GLM 5.2", "Default OpenRouter coding model"),

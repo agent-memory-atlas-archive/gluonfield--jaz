@@ -83,19 +83,18 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	if schema == nil {
 		return nil, nil
 	}
+	parsed := make(map[string]elicitationField, len(schema.Properties))
 	customFields := map[string]string{}
 	keys := make([]string, 0, len(schema.Properties))
 	for key, property := range schema.Properties {
-		if parent, ok := strings.CutSuffix(key, "_custom"); ok {
-			customFields[parent] = key
-			continue
-		}
-		if codex := codexElicitationMeta(property); codex["role"] == "user_note" {
-			if parent, _ := codex["questionId"].(string); parent != "" {
-				customFields[parent] = key
+		field := readElicitationField(key, property, message)
+		if field.note {
+			if field.noteFor != "" {
+				customFields[field.noteFor] = key
 			}
 			continue
 		}
+		parsed[key] = field
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -103,18 +102,12 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	questions := make([]sessionevents.ACPQuestion, 0, len(keys))
 	fields := make(map[string]elicitationAnswerField, len(keys))
 	for _, key := range keys {
+		field := parsed[key]
 		property := schema.Properties[key]
 		options := elicitationOptions(property)
-		header, question, formMessage := strings.TrimSpace(property.Title), strings.TrimSpace(property.Description), strings.TrimSpace(message)
-		codexMeta := codexElicitationMeta(property)
-		if codexMeta != nil {
-			// Codex titles a field with the question and describes it with the
-			// header; its form message is boilerplate, not the question.
-			header, question, formMessage = question, header, ""
-		}
-		questionText := firstNonEmpty(question, header, formMessage, key)
+		questionText := firstNonEmpty(field.question, field.header, field.message, key)
 		if len(keys) == 1 {
-			questionText = firstNonEmpty(formMessage, questionText)
+			questionText = firstNonEmpty(field.message, questionText)
 		}
 		if questionText == "" {
 			continue
@@ -124,13 +117,12 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 			optionSet[option.Label] = true
 		}
 		customField := customFields[key]
-		hasCustom := customField != ""
 		questions = append(questions, sessionevents.ACPQuestion{
 			ID:       key,
-			Header:   header,
+			Header:   field.header,
 			Question: questionText,
-			IsOther:  hasCustom || len(options) == 0,
-			IsSecret: codexMeta["isSecret"] == true,
+			IsOther:  customField != "" || len(options) == 0,
+			IsSecret: field.secret,
 			Options:  options,
 		})
 		fields[key] = elicitationAnswerField{
@@ -143,9 +135,40 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	return questions, fields
 }
 
-func codexElicitationMeta(property acpschema.ElicitationPropertySchema) map[string]any {
-	codex, _ := property.Meta[codexMetaKey].(map[string]any)
-	return codex
+type elicitationField struct {
+	header, question, message string
+	note                      bool
+	noteFor                   string
+	secret                    bool
+}
+
+// readElicitationField reads one requested property in its agent's dialect.
+// Claude titles a field with its header, asks a lone question in the form
+// message and pairs free text as "<id>_custom". Codex titles a field with the
+// question, describes it with the header, sends a boilerplate form message and
+// marks note fields in _meta.codex.
+func readElicitationField(key string, property acpschema.ElicitationPropertySchema, message string) elicitationField {
+	field := elicitationField{
+		header:   strings.TrimSpace(property.Title),
+		question: strings.TrimSpace(property.Description),
+		message:  strings.TrimSpace(message),
+	}
+	if parent, ok := strings.CutSuffix(key, "_custom"); ok {
+		field.note, field.noteFor = true, parent
+		return field
+	}
+	codex, ok := property.Meta[codexMetaKey].(map[string]any)
+	if !ok {
+		return field
+	}
+	if codex["role"] == "user_note" {
+		field.note = true
+		field.noteFor, _ = codex["questionId"].(string)
+		return field
+	}
+	field.header, field.question, field.message = field.question, field.header, ""
+	field.secret = codex["isSecret"] == true
+	return field
 }
 
 func elicitationOptions(property acpschema.ElicitationPropertySchema) []sessionevents.ACPQuestionOption {

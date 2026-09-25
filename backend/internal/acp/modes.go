@@ -92,7 +92,7 @@ func (m *Manager) applyTurnConfig(ctx context.Context, job *jobState, configID, 
 	raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 		SessionID: acpschema.SessionID(acpSessionID),
 		ConfigID:  acpschema.SessionConfigID(configID),
-		Value:     acpschema.SessionConfigValueID(value),
+		Value:     acpschema.SessionConfigValue(acpschema.SessionConfigValueID(value)),
 	})
 	if err != nil {
 		return fmt.Errorf("set acp session %q config to %q: %w", configID, value, err)

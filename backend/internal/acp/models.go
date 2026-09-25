@@ -63,10 +63,11 @@ const (
 
 type agentPolicy struct {
 	modelConfigID           string
+	modelMetaKey            string
 	effortConfigID          string
 	effortInModelSuffix     bool
 	providerInLaunch        bool
-	modelConfiguredAtLaunch bool
+	modelSetAtSessionStart  bool
 	systemPromptAtLaunch    bool
 	promptPersistsOnRestore bool
 	materializesOnPrompt    bool
@@ -74,6 +75,7 @@ type agentPolicy struct {
 	resolvesContextTag      bool
 	effortOptions           []ReasoningEffortOption
 	ultracodeSetting        bool
+	systemPromptAppendMeta  bool
 }
 
 var baseReasoningEffortOptions = []ReasoningEffortOption{
@@ -125,18 +127,23 @@ func agentPolicyForAgent(agentName string) agentPolicy {
 		}
 	case AgentKimi:
 		return agentPolicy{
-			modelConfigID: sessionConfigModel,
+			modelConfigID:          sessionConfigModel,
+			systemPromptAppendMeta: true,
 		}
 	case AgentGrok:
+		// Grok rebuilds its system prompt without session rules when the model
+		// changes after session/new, so the model rides session/new instead.
 		return agentPolicy{
-			effortOptions: baseReasoningEffortOptions,
+			modelMetaKey:           "modelId",
+			modelSetAtSessionStart: true,
+			effortOptions:          baseReasoningEffortOptions,
 		}
 	case AgentOpenCode:
 		return agentPolicy{
-			modelConfigID:           sessionConfigModel,
-			effortConfigID:          claudeSessionConfigEffort,
-			modelConfiguredAtLaunch: true,
-			effortOptions:           openCodeReasoningEffortOptions,
+			modelConfigID:          sessionConfigModel,
+			effortConfigID:         claudeSessionConfigEffort,
+			modelSetAtSessionStart: true,
+			effortOptions:          openCodeReasoningEffortOptions,
 		}
 	case AgentAntigravity:
 		return agentPolicy{
@@ -217,8 +224,14 @@ func (p agentPolicy) sessionConfigEffort(value string) string {
 	return effort
 }
 
-func (p agentPolicy) mergeSessionMeta(meta map[string]any, effort string) map[string]any {
-	normalized, err := p.normalizeReasoningEffort(effort)
+func (p agentPolicy) mergeSessionMeta(meta map[string]any, cfg AgentConfig) map[string]any {
+	if model := configuredSessionModel(cfg.ProviderQualifiedModel()); p.modelMetaKey != "" && model != "" {
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		meta[p.modelMetaKey] = model
+	}
+	normalized, err := p.normalizeReasoningEffort(cfg.ReasoningEffort)
 	if err != nil || !p.ultracodeSetting || normalized != claudeReasoningEffortUltracode {
 		return meta
 	}
@@ -294,7 +307,7 @@ func (m *Manager) setConfiguredSessionModel(ctx context.Context, peer *jsonrpc.P
 		raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 			SessionID: sessionID,
 			ConfigID:  acpschema.SessionConfigID(policy.modelConfigID),
-			Value:     acpschema.SessionConfigValueID(model),
+			Value:     acpschema.SessionConfigValue(acpschema.SessionConfigValueID(model)),
 		})
 		if err == nil {
 			return raw, nil
@@ -336,7 +349,7 @@ func (m *Manager) setConfiguredReasoningEffort(ctx context.Context, peer *jsonrp
 	raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 		SessionID: sessionID,
 		ConfigID:  acpschema.SessionConfigID(configID),
-		Value:     acpschema.SessionConfigValueID(effort),
+		Value:     acpschema.SessionConfigValue(acpschema.SessionConfigValueID(effort)),
 	})
 	if err == nil {
 		return raw, nil
@@ -360,13 +373,8 @@ func (m *Manager) configuredModeState(
 	effort := policy.sessionConfigEffort(cfg.ReasoningEffort)
 	model := policy.sessionConfigModel(cfg)
 	modelToSet := model
-	if policy.modelConfiguredAtLaunch {
+	if policy.modelSetAtSessionStart {
 		modelToSet = ""
-	}
-	if _, handled, err := resolveGrokStartupConfig(agentName, cfg); err != nil {
-		return ModeState{}, err
-	} else if handled {
-		return m.initializeModeState(ctx, peer, agentName, session)
 	}
 	modelRaw, err := m.setConfiguredSessionModel(ctx, peer, agentName, session.response.SessionID, modelToSet, session.modelState)
 	if err != nil {
