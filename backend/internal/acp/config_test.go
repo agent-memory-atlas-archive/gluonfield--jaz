@@ -770,7 +770,7 @@ func TestProcessEnvWritesOpenCodeInstructionsWithResolvedCwd(t *testing.T) {
 	}
 }
 
-func TestProcessEnvDoesNotOverrideDefaultOpenCodeProvider(t *testing.T) {
+func TestProcessEnvPinsOpenCodeKeyWithoutOverridingDefaultProvider(t *testing.T) {
 	root := t.TempDir()
 	env, err := NewManager(nil, Config{
 		Root: root,
@@ -794,8 +794,9 @@ func TestProcessEnvDoesNotOverrideDefaultOpenCodeProvider(t *testing.T) {
 	if err := json.Unmarshal([]byte(env["OPENCODE_CONFIG_CONTENT"]), &content); err != nil {
 		t.Fatalf("config content = %q: %v", env["OPENCODE_CONFIG_CONTENT"], err)
 	}
-	if len(content.Provider) != 0 {
-		t.Fatalf("default openrouter provider should not be overridden: %#v", content.Provider)
+	want := map[string]any{"openrouter": map[string]any{"options": map[string]any{"apiKey": "{env:OPENROUTER_API_KEY}"}}}
+	if !reflect.DeepEqual(content.Provider, want) {
+		t.Fatalf("provider config = %#v, want only the bound key pinned", content.Provider)
 	}
 }
 

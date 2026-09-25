@@ -401,15 +401,16 @@ func (m *Manager) buildProcessEnv(ctx context.Context, name string, agent AgentC
 		if strings.TrimSpace(env["OPENCODE_CONFIG_DIR"]) == "" {
 			env["OPENCODE_CONFIG_DIR"] = auth.Config.Path
 		}
+		auth.BindAPIKeyEnv(env)
 		if prepare {
 			if err := os.MkdirAll(env["OPENCODE_CONFIG_DIR"], 0o700); err != nil {
 				prepareErr = firstError(prepareErr, fmt.Errorf("prepare opencode profile %s: %w", env["OPENCODE_CONFIG_DIR"], err))
 			}
-			if err := m.prepareOpenCodeConfig(ctx, env, agent, cwd, artifactSurface, mcpServerPolicy, systemPromptExtensions); err != nil {
+			keyEnv, _, _ := auth.APIKeyBinding()
+			if err := m.prepareOpenCodeConfig(ctx, env, agent, keyEnv, cwd, artifactSurface, mcpServerPolicy, systemPromptExtensions); err != nil {
 				prepareErr = firstError(prepareErr, err)
 			}
 		}
-		auth.BindAPIKeyEnv(env)
 	}
 	if name == AgentAntigravity {
 		// Antigravity authenticates through the agy CLI's own keyring, never an

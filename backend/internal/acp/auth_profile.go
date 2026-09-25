@@ -131,10 +131,6 @@ func hasJazAuthProfile(name string) bool {
 	}
 }
 
-func resolveAgentAuth(name string, cfg AgentConfig, root string, env map[string]string) resolvedAgentAuth {
-	return resolveAgentAuthWithProviders(name, cfg, root, env, nil)
-}
-
 func resolveAgentAuthWithProviders(name string, cfg AgentConfig, root string, env map[string]string, providers map[string]modelprovider.ModelProviderConfig) resolvedAgentAuth {
 	name = CanonicalAgentName(name)
 	auth, err := NormalizeAgentAuthConfig(name, cfg.Auth)

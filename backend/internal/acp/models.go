@@ -11,7 +11,6 @@ import (
 	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
 
-	"github.com/wins/jaz/backend/internal/provider"
 )
 
 const agentMethodSessionSetModel = "session/set_model"
@@ -680,14 +679,6 @@ func newACPSessionInfo(raw json.RawMessage, session acpschema.NewSessionResponse
 		modelState:    parseSessionModelState(raw),
 		configOptions: parseSessionConfigOptions(raw),
 	}
-}
-
-func configuredReasoningEffort(value string) string {
-	effort, err := provider.NormalizeReasoningEffort(value)
-	if err != nil {
-		return strings.TrimSpace(value)
-	}
-	return effort
 }
 
 func AgentOptionsForConfig(name string, cfg AgentConfig) AgentOptions {

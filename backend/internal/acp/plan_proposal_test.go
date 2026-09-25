@@ -121,41 +121,6 @@ func TestCodexPlanRequestedTextPrecedesClarifyingQuestion(t *testing.T) {
 	assertNoEvent(t, f.events)
 }
 
-func TestCodexPlanRequestedPlanDocumentPublishesProposedPlan(t *testing.T) {
-	f := newPlanTurnFixture(t, AgentCodex)
-
-	f.update(t, map[string]any{
-		"sessionUpdate": "agent_message_chunk",
-		"messageId":     "codex-plan-context",
-		"content":       map[string]any{"type": "text", "text": "The repository inspection is complete."},
-	})
-	message := receiveEvent(t, f.events)
-	if message.Type != "acp_message" || message.Content != "The repository inspection is complete." {
-		t.Fatalf("message event = %#v", message)
-	}
-
-	planText := "Implement the scoped fix and run the relevant checks."
-	f.update(t, map[string]any{
-		"sessionUpdate": "plan",
-		"_meta":         map[string]any{codexPlanKindMetaKey: codexPlanKindProposal},
-		"entries": []map[string]any{{
-			"content":  planText,
-			"status":   "completed",
-			"priority": "medium",
-		}},
-	})
-	assertNoEvent(t, f.events)
-
-	f.finish()
-	proposal := receiveEvent(t, f.events)
-	if proposal.Type != "proposed_plan" || proposal.Plan == nil || !proposal.Plan.AwaitingApproval {
-		t.Fatalf("proposal event = %#v", proposal)
-	}
-	if proposal.Plan.Explanation != planText || len(proposal.Plan.Plan) != 0 {
-		t.Fatalf("proposal plan = %#v", proposal.Plan)
-	}
-}
-
 func TestLocalPlanRequestedTextStreamsLive(t *testing.T) {
 	f := newPlanTurnFixture(t, AgentJaz)
 
@@ -164,41 +129,6 @@ func TestLocalPlanRequestedTextStreamsLive(t *testing.T) {
 	if event.Type != "acp_message" || event.Content != "Here is what I found before proposing the plan." {
 		t.Fatalf("message event = %#v", event)
 	}
-}
-
-func TestPlanRequestedProgressDoesNotBecomeProposedPlan(t *testing.T) {
-	f := newPlanTurnFixture(t, AgentCodex)
-
-	f.update(t, map[string]any{
-		"sessionUpdate": "plan",
-		"_meta":         map[string]any{codexPlanKindMetaKey: codexPlanKindProposal},
-		"entries":       []map[string]any{{"content": "# Plan\n\n- Stale draft", "status": "completed"}},
-	})
-	assertNoEvent(t, f.events)
-	f.update(t, map[string]any{
-		"sessionUpdate": "plan",
-		"_meta":         map[string]any{codexPlanKindMetaKey: "progress"},
-		"entries": []map[string]any{
-			{"content": "Inspect request", "priority": "high", "status": "completed"},
-			{"content": "Wait for approval", "priority": "medium", "status": "in_progress"},
-		},
-	})
-	progress := receiveEvent(t, f.events)
-	if progress.Type != "acp" || progress.ACP == nil || len(progress.ACP.Plan) != 2 {
-		t.Fatalf("progress event = %#v", progress)
-	}
-	f.update(t, map[string]any{
-		"sessionUpdate": "agent_message_chunk",
-		"messageId":     "codex-final-plan",
-		"content":       map[string]any{"type": "text", "text": "The final implementation plan is ready."},
-	})
-	message := receiveEvent(t, f.events)
-	if message.Type != "acp_message" || message.Content != "The final implementation plan is ready." {
-		t.Fatalf("message event = %#v", message)
-	}
-
-	f.finish()
-	assertNoEvent(t, f.events)
 }
 
 func TestPlanRequestedUntypedDocumentDoesNotBecomeProposedPlan(t *testing.T) {
@@ -226,7 +156,6 @@ func TestPlanRequestedDocumentShapedProgressDoesNotBecomeProposedPlan(t *testing
 			f := newPlanTurnFixture(t, AgentCodex)
 			f.update(t, map[string]any{
 				"sessionUpdate": "plan",
-				"_meta":         map[string]any{codexPlanKindMetaKey: "progress"},
 				"entries":       []map[string]any{{"content": test.content, "status": "in_progress"}},
 			})
 			assertNoEvent(t, f.events)
