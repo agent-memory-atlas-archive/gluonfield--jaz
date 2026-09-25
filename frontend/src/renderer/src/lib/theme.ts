@@ -8,8 +8,8 @@ export type ThemePref = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
 
 const KEY = 'jaz.theme'
-const LIGHT_BG = 'oklch(0.963 0.007 262)'
-const DARK_BG = 'oklch(0.208 0.007 262)'
+const LIGHT_BG = 'oklch(0.99 0.002 264)'
+const DARK_BG = 'oklch(0.195 0.005 264)'
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 const listeners = new Set<() => void>()

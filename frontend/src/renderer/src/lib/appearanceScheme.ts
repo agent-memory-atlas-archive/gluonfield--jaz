@@ -39,7 +39,7 @@ const scheme = (accent: string, background: string, foreground: string, contrast
 // ChatGPT.app (surface/ink/accent/contrast); paste a Copy theme string for any
 // custom Codex combination.
 export const THEME_PRESETS: readonly ThemePreset[] = [
-  { id: 'jaz', label: 'Jaz', light: scheme('#3b5bdb', '#eef0f5', '#2a2e3a', 45), dark: scheme('#8aa6ff', '#1b1d24', '#edf0f5', 55) },
+  { id: 'jaz', label: 'Jaz', light: scheme('#3764cd', '#fbfcfd', '#1a1d23', 35), dark: scheme('#77a2fc', '#141517', '#edeef0', 55) },
   // Exact defaults reverse-engineered from Codex desktop chromeTheme he.light/he.dark.
   { id: 'codex', label: 'Codex', light: scheme('#339cff', '#ffffff', '#1a1c1f', 45), dark: scheme('#339cff', '#181818', '#ffffff', 60) },
   // Explicit chrome seeds from Codex code themes (ChatGPT.app asar).
@@ -104,23 +104,18 @@ function luminance(hex: string): number {
 // the conventional white text. (Pure WCAG crossover 0.179 over-darkens blues.)
 const onColor = (hex: string): string => (luminance(hex) > 0.3 ? '#10131a' : '#ffffff')
 
-// Status colors keep a fixed semantic hue across schemes (danger reads red in
-// any theme); only their soft tints get mixed onto the scheme background so they
-// sit on it correctly. Mid-tone values that read on both light and dark.
-const STATUS_DANGER = '#e5484d'
-const STATUS_OK = '#30a46c'
-const STATUS_RUNNING = '#f2a31e'
-
-// Map a scheme to the full --color-* token set. Surfaces step from the
-// background toward the foreground; the ink ramp steps from the foreground
-// toward the background; contrast scales the step magnitude.
-function tokens(c: ColorScheme): Record<string, string> {
+// Map a scheme to the --color-* token set. Surfaces step from the background
+// toward the foreground; the ink ramp steps from the foreground toward the
+// background; contrast scales the step magnitude. Status colors are not
+// scheme inputs: the per-mode stock tokens in globals.css stay in force.
+function tokens(c: ColorScheme, mode: keyof ModeSchemes): Record<string, string> {
   const { accent, background: bg, foreground: fg } = c
   const k = 0.6 + (c.contrast / 100) * 0.8
   const step = (p: number) => Math.min(60, p * k)
   // The clay accent family mirrors primary in a custom scheme (one accent).
   const strong = mix(fg, 16, accent)
-  const soft = mix(accent, 14, bg)
+  // A dark ground swallows a light tint, so the soft fill needs more accent there.
+  const soft = mix(accent, mode === 'dark' ? 24 : 14, bg)
   return {
     bg,
     surface: mix(fg, step(5), bg),
@@ -136,15 +131,11 @@ function tokens(c: ColorScheme): Record<string, string> {
     accent,
     'accent-strong': strong,
     'accent-soft': soft,
-    danger: STATUS_DANGER,
-    'danger-soft': mix(STATUS_DANGER, 14, bg),
-    ok: STATUS_OK,
-    running: STATUS_RUNNING,
   }
 }
 
-const block = (c: ColorScheme): string =>
-  Object.entries(tokens(c))
+const block = (c: ColorScheme, mode: keyof ModeSchemes): string =>
+  Object.entries(tokens(c, mode))
     .map(([k, v]) => `--color-${k}:${v}`)
     .join(';')
 
@@ -159,8 +150,8 @@ export const sameScheme = (a: ColorScheme, b: ColorScheme): boolean =>
 // both modes yields '' — no override at all.
 export function schemeCss(m: ModeSchemes): string {
   const parts: string[] = []
-  if (!sameScheme(m.light, DEFAULT_SCHEME.light)) parts.push(`:root{${block(m.light)}}`)
-  if (!sameScheme(m.dark, DEFAULT_SCHEME.dark)) parts.push(`:root.dark{${block(m.dark)}}`)
+  if (!sameScheme(m.light, DEFAULT_SCHEME.light)) parts.push(`:root{${block(m.light, 'light')}}`)
+  if (!sameScheme(m.dark, DEFAULT_SCHEME.dark)) parts.push(`:root.dark{${block(m.dark, 'dark')}}`)
   return parts.join('\n')
 }
 
@@ -173,10 +164,6 @@ const CSS_KEY = 'jaz.appearance.themeCss'
 const STYLE_ID = 'jaz-theme-overrides'
 
 const listeners = new Set<() => void>()
-
-// The user's stored override layers over the deployment base (CONFIG_BASE).
-const isBase = (m: ModeSchemes): boolean =>
-  sameScheme(m.light, CONFIG_BASE.light) && sameScheme(m.dark, CONFIG_BASE.dark)
 
 function readStored(): ModeSchemes {
   try {
@@ -210,11 +197,16 @@ function render(css: string) {
 
 function commit(next: ModeSchemes) {
   current = next
-  // Persist the user override only when it diverges from the deployment base, so
-  // it keeps tracking the config default otherwise. The derived CSS (vs the Jaz
-  // stock tokens) is cached separately for the pre-paint script.
-  if (isBase(next)) localStorage.removeItem(KEY)
-  else localStorage.setItem(KEY, JSON.stringify(next))
+  // The user's override layers over the deployment base (CONFIG_BASE) per mode:
+  // a mode left at the base is not stored, so it keeps tracking the base when
+  // the stock theme changes. The derived CSS (vs the Jaz stock tokens) is
+  // cached separately for the pre-paint script.
+  const stored = {
+    light: sameScheme(next.light, CONFIG_BASE.light) ? undefined : next.light,
+    dark: sameScheme(next.dark, CONFIG_BASE.dark) ? undefined : next.dark,
+  }
+  if (stored.light || stored.dark) localStorage.setItem(KEY, JSON.stringify(stored))
+  else localStorage.removeItem(KEY)
   const css = schemeCss(next)
   if (css) localStorage.setItem(CSS_KEY, css)
   else localStorage.removeItem(CSS_KEY)

@@ -24,7 +24,7 @@ const theme = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-activeLine': { backgroundColor: 'var(--color-surface-2)' },
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-    backgroundColor: 'var(--color-primary-soft)',
+    backgroundColor: 'var(--color-selection)',
   },
   '.cm-cursor': { borderLeftColor: 'var(--color-ink)' },
   '.cm-scroller': { overflow: 'auto' },
