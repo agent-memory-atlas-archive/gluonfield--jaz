@@ -323,7 +323,7 @@ export function AppearanceSettings() {
         </Row>
         <Row
           title="Show Model Icons"
-          description="Show ACP agent/model marks beside threads in the left sidebar."
+          description="Show ACP agent/model marks beside threads."
         >
           <Switch
             checked={settings.showModelIcons}
