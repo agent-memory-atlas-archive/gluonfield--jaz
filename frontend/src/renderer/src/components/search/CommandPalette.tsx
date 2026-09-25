@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Search, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion, type Transition } from 'motion/react'
 import {
   useCallback,
@@ -10,7 +10,6 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { SettingsSection } from '@/components/settings/sections'
-import { RAINBOW_BEAM } from '@/components/ui/rainbow'
 import type { PaletteItem } from './commandPaletteTypes'
 import { CommandRow, ThreadRow } from './CommandPaletteRows'
 import { useCommandPaletteItems } from './useCommandPaletteItems'
@@ -134,7 +133,7 @@ export function CommandPalette({
     <AnimatePresence initial={false}>
       {open ? (
         <motion.div
-          className="fixed inset-0 z-command flex items-start justify-center overflow-hidden bg-black/25 px-3 py-[10dvh] backdrop-blur-[1.5px]"
+          className="fixed inset-0 z-command flex items-start justify-center overflow-hidden bg-black/25 px-3 py-[10dvh]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -151,131 +150,99 @@ export function CommandPalette({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4, scale: 0.99 }}
             transition={PANEL_TRANSITION}
-            className="relative w-full max-w-[620px]"
+            className="flex max-h-[min(590px,76dvh)] w-full max-w-[620px] flex-col overflow-hidden rounded-[18px] bg-bg shadow-[0_24px_60px_-12px_rgba(0,0,0,0.32),0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-border/70 dark:bg-surface"
           >
-            {/* Rainbow comet border — the same "alive right now" ring the
-                composer wears while focused, orbiting the palette the whole
-                time it's open. It rides this wrapper (not the clipped surface),
-                so the comet shows on the perimeter while the opaque surface
-                covers its center. */}
-            <motion.div
-              aria-hidden
-              className="pointer-events-none absolute -inset-[2px]"
-              initial={{ opacity: 0 }}
-              animate={{
-                opacity: 1,
-                ...(reduceMotion ? {} : { '--ring-angle': ['0deg', '360deg'] }),
-              }}
-              transition={{
-                opacity: { duration: 0.25, ease: 'easeOut' },
-                '--ring-angle': { duration: 2.6, ease: 'linear', repeat: Infinity },
-              }}
-            >
-              {/* glow trailing the comet, bleeding softly outside the panel */}
-              <div
-                className="absolute -inset-[4px] rounded-[18px] opacity-50 blur-[10px]"
-                style={{ background: RAINBOW_BEAM }}
+            <div className="flex items-center gap-2 px-5 pb-1 pt-3">
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(event) => setQuery(event.currentTarget.value)}
+                placeholder="Search threads or run a command"
+                aria-label="Search threads or run a command"
+                className="h-10 min-w-0 flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-ink-3"
               />
-              {/* the comet itself; the panel's opaque surface covers the center */}
-              <div className="absolute inset-0 rounded-[14px]" style={{ background: RAINBOW_BEAM }} />
-            </motion.div>
+              {query ? (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  onClick={() => {
+                    setQuery('')
+                    inputRef.current?.focus()
+                  }}
+                  className="relative -mr-2 grid size-8 shrink-0 place-items-center rounded-full text-ink-3 transition-colors duration-150 before:absolute before:-inset-1 before:content-[''] hover:bg-list-hover hover:text-ink"
+                >
+                  <X size={15} />
+                </button>
+              ) : null}
+            </div>
 
-            <div className="relative flex max-h-[min(590px,76dvh)] flex-col overflow-hidden rounded-[12px] bg-bg shadow-[0_18px_48px_rgba(0,0,0,0.22),0_2px_8px_rgba(0,0,0,0.08)]">
-              <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2.5">
-                <Search size={17} className="shrink-0 text-ink-3" />
-                <input
-                  ref={inputRef}
-                  value={query}
-                  onChange={(event) => setQuery(event.currentTarget.value)}
-                  placeholder="Search threads, actions, settings"
-                  aria-label="Search threads or run a command"
-                  className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-ink outline-none placeholder:text-ink-3"
+            <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2">
+              {commandItems.length ? (
+                <div className="px-3 pb-1 pt-2 text-[13px] text-ink-3">Actions</div>
+              ) : null}
+              {commandItems.map((item, index) => (
+                <CommandRow
+                  key={item.id}
+                  item={item}
+                  active={index === activeIndex}
+                  index={index}
+                  reduceMotion={Boolean(reduceMotion)}
+                  onActive={() => setActiveIndex(index)}
+                  onSelect={() => selectItem(item)}
                 />
-                {query ? (
-                  <button
-                    type="button"
-                    aria-label="Clear search"
-                    title="Clear search"
-                    onClick={() => {
-                      setQuery('')
-                      inputRef.current?.focus()
-                    }}
-                    className="relative grid size-8 shrink-0 place-items-center rounded-[6px] text-ink-3 transition-colors duration-150 before:absolute before:-inset-1 before:content-[''] hover:bg-surface hover:text-ink"
-                  >
-                    <X size={15} />
-                  </button>
-                ) : null}
-              </div>
+              ))}
 
-              <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 py-1.5">
-                {commandItems.length ? (
-                  <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3">
-                    Actions
-                  </div>
-                ) : null}
-                {commandItems.map((item, index) => (
-                  <CommandRow
+              {threadItems.length ? (
+                <motion.div
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={LABEL_TRANSITION}
+                  className="px-3 pb-1 pt-3 text-[13px] text-ink-3"
+                >
+                  Threads
+                </motion.div>
+              ) : null}
+              {threadItems.map((item, index) => {
+                const itemIndex = commandItems.length + index
+                return (
+                  <ThreadRow
                     key={item.id}
-                    item={item}
-                    active={index === activeIndex}
-                    index={index}
+                    result={item.result}
+                    active={itemIndex === activeIndex}
+                    index={itemIndex}
                     reduceMotion={Boolean(reduceMotion)}
-                    onActive={() => setActiveIndex(index)}
+                    onActive={() => setActiveIndex(itemIndex)}
                     onSelect={() => selectItem(item)}
                   />
-                ))}
+                )
+              })}
 
-                {threadItems.length ? (
-                  <motion.div
-                    initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={LABEL_TRANSITION}
-                    className="px-2.5 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-3"
-                  >
-                    Threads
-                  </motion.div>
-                ) : null}
-                {threadItems.map((item, index) => {
-                  const itemIndex = commandItems.length + index
-                  return (
-                    <ThreadRow
-                      key={item.id}
-                      result={item.result}
-                      active={itemIndex === activeIndex}
-                      index={itemIndex}
-                      reduceMotion={Boolean(reduceMotion)}
-                      onActive={() => setActiveIndex(itemIndex)}
-                      onSelect={() => selectItem(item)}
+              {showSkeleton ? (
+                <div className="flex flex-col gap-1 px-0.5 pb-1 pt-1.5">
+                  {[0, 1, 2].map((row) => (
+                    <motion.div
+                      key={row}
+                      initial={false}
+                      animate={reduceMotion ? { opacity: 0.5 } : { opacity: [0.4, 0.65, 0.4] }}
+                      transition={
+                        reduceMotion ? { duration: 0 } : { repeat: Infinity, duration: 1.2, delay: row * 0.08 }
+                      }
+                      className="h-8 rounded-[10px] bg-list-hover"
                     />
-                  )
-                })}
-
-                {showSkeleton ? (
-                  <div className="flex flex-col gap-1 px-0.5 pb-1 pt-1.5">
-                    {[0, 1, 2].map((row) => (
-                      <motion.div
-                        key={row}
-                        initial={false}
-                        animate={reduceMotion ? { opacity: 0.5 } : { opacity: [0.4, 0.65, 0.4] }}
-                        transition={
-                          reduceMotion ? { duration: 0 } : { repeat: Infinity, duration: 1.2, delay: row * 0.08 }
-                        }
-                        className="h-[52px] rounded-[6px] bg-surface"
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                {showNoMatches ? (
-                  <div className="grid min-h-28 place-items-center px-6 text-center">
-                    <p className="text-[13px] text-ink-3">No thread matches "{debouncedQuery}".</p>
-                  </div>
-                ) : null}
-                {showEmpty ? (
-                  <div className="grid min-h-24 place-items-center px-6 text-center">
-                    <p className="text-[13px] text-ink-3">No results.</p>
-                  </div>
-                ) : null}
-              </div>
+                  ))}
+                </div>
+              ) : null}
+              {showNoMatches ? (
+                <div className="grid min-h-28 place-items-center px-6 text-center">
+                  <p className="text-[13px] text-ink-3">No thread matches "{debouncedQuery}".</p>
+                </div>
+              ) : null}
+              {showEmpty ? (
+                <div className="grid min-h-24 place-items-center px-6 text-center">
+                  <p className="text-[13px] text-ink-3">No results.</p>
+                </div>
+              ) : null}
             </div>
           </motion.div>
         </motion.div>
