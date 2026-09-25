@@ -298,9 +298,6 @@ func mergeACPAgentDefaults(name string, stored, seed ACPAgentDefaults) ACPAgentD
 		if strings.TrimSpace(stored.Model) == "grok-build" {
 			stored.Model = seed.Model
 		}
-		if strings.TrimSpace(stored.ReasoningEffort) == "xhigh" {
-			stored.ReasoningEffort = seed.ReasoningEffort
-		}
 	}
 	if strings.TrimSpace(seed.ModelProvider) != "" {
 		cfg := acp.AgentConfig{

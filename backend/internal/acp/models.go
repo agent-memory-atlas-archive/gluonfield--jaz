@@ -10,7 +10,6 @@ import (
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
-
 )
 
 const agentMethodSessionSetModel = "session/set_model"
@@ -66,7 +65,7 @@ type agentPolicy struct {
 	effortConfigID          string
 	effortInModelSuffix     bool
 	providerInLaunch        bool
-	modelSetAtSessionStart  bool
+	modelConfiguredAtLaunch bool
 	systemPromptAtLaunch    bool
 	promptPersistsOnRestore bool
 	materializesOnPrompt    bool
@@ -133,16 +132,16 @@ func agentPolicyForAgent(agentName string) agentPolicy {
 		// Grok rebuilds its system prompt without session rules when the model
 		// changes after session/new, so the model rides session/new instead.
 		return agentPolicy{
-			modelMetaKey:           "modelId",
-			modelSetAtSessionStart: true,
-			effortOptions:          baseReasoningEffortOptions,
+			modelMetaKey:      "modelId",
+			unadvertisedModel: unadvertisedModelRejected,
+			effortOptions:     baseReasoningEffortOptions,
 		}
 	case AgentOpenCode:
 		return agentPolicy{
-			modelConfigID:          sessionConfigModel,
-			effortConfigID:         claudeSessionConfigEffort,
-			modelSetAtSessionStart: true,
-			effortOptions:          openCodeReasoningEffortOptions,
+			modelConfigID:           sessionConfigModel,
+			effortConfigID:          claudeSessionConfigEffort,
+			modelConfiguredAtLaunch: true,
+			effortOptions:           openCodeReasoningEffortOptions,
 		}
 	case AgentAntigravity:
 		return agentPolicy{
@@ -303,11 +302,7 @@ func (m *Manager) setConfiguredSessionModel(ctx context.Context, peer *jsonrpc.P
 		return nil, nil
 	}
 	if policy.usesModelConfigOption() {
-		raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
-			SessionID: sessionID,
-			ConfigID:  acpschema.SessionConfigID(policy.modelConfigID),
-			Value:     acpschema.SessionConfigValue(acpschema.SessionConfigValueID(model)),
-		})
+		raw, err := setSessionConfigOption(ctx, peer, sessionID, policy.modelConfigID, model)
 		if err == nil {
 			return raw, nil
 		}
@@ -331,6 +326,14 @@ func (m *Manager) setConfiguredSessionModel(ctx context.Context, peer *jsonrpc.P
 	return nil, fmt.Errorf("set acp agent %q model %q: %w", agentName, model, err)
 }
 
+func setSessionConfigOption(ctx context.Context, peer *jsonrpc.Peer, sessionID acpschema.SessionID, configID, value string) (json.RawMessage, error) {
+	return peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
+		SessionID: sessionID,
+		ConfigID:  acpschema.SessionConfigID(configID),
+		Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(value)),
+	})
+}
+
 func (m *Manager) setConfiguredReasoningEffort(ctx context.Context, peer *jsonrpc.Peer, agentName string, sessionID acpschema.SessionID, effort, configID string) (json.RawMessage, error) {
 	if effort == "" {
 		return nil, nil
@@ -345,11 +348,7 @@ func (m *Manager) setConfiguredReasoningEffort(ctx context.Context, peer *jsonrp
 	if strings.TrimSpace(configID) == "" {
 		return nil, nil
 	}
-	raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
-		SessionID: sessionID,
-		ConfigID:  acpschema.SessionConfigID(configID),
-		Value:     acpschema.SessionConfigValue(acpschema.SessionConfigValueID(effort)),
-	})
+	raw, err := setSessionConfigOption(ctx, peer, sessionID, configID, effort)
 	if err == nil {
 		return raw, nil
 	}
@@ -372,7 +371,7 @@ func (m *Manager) configuredModeState(
 	effort := policy.sessionConfigEffort(cfg.ReasoningEffort)
 	model := policy.sessionConfigModel(cfg)
 	modelToSet := model
-	if policy.modelSetAtSessionStart {
+	if policy.modelConfiguredAtLaunch || policy.modelMetaKey != "" {
 		modelToSet = ""
 	}
 	modelRaw, err := m.setConfiguredSessionModel(ctx, peer, agentName, session.response.SessionID, modelToSet, session.modelState)

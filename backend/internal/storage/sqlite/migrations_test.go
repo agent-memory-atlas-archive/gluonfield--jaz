@@ -416,3 +416,40 @@ func indexNames(db *sql.DB, table string) (map[string]bool, error) {
 	}
 	return out, rows.Err()
 }
+
+func TestClearUnappliedGrokModelMigration(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, stmt := range []string{
+		`CREATE TABLE settings (namespace TEXT NOT NULL, key TEXT NOT NULL, value_json TEXT NOT NULL)`,
+		`INSERT INTO settings VALUES ('agents', 'defaults', '{"acp":{"grok":{"enabled":true,"model":"grok-4.6","reasoning_effort":"xhigh"},"codex":{"model":"gpt-6-sol"}}}')`,
+		`INSERT INTO settings VALUES ('memory', 'settings', '{"acp":{"grok":{"model":"grok-4.6"}}}')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := sqliteMigrations.ReadFile("migrations/0051_clear_unapplied_grok_model.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(strings.SplitN(string(raw), "-- +goose Down", 2)[0]); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"agents": `{"acp":{"grok":{"enabled":true,"reasoning_effort":"xhigh"},"codex":{"model":"gpt-6-sol"}}}`,
+		"memory": `{"acp":{"grok":{"model":"grok-4.6"}}}`,
+	}
+	for namespace, value := range want {
+		var got string
+		if err := db.QueryRow(`SELECT value_json FROM settings WHERE namespace = ?`, namespace).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != value {
+			t.Fatalf("%s settings = %s, want %s", namespace, got, value)
+		}
+	}
+}

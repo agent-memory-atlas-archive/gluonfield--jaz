@@ -256,31 +256,3 @@ func TestMergeAgentDefaultsDropsRetiredQwenAgent(t *testing.T) {
 		t.Fatalf("retired Qwen agent survived settings merge: %#v", merged.ACP["qwen"])
 	}
 }
-
-func TestACPConfigSourceClearsRetiredGrokReasoningEffort(t *testing.T) {
-	store, err := jsonstore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	seed := testAgentDefaultsSeed()
-	stored := testAgentDefaultsSeed()
-	grok := stored.ACP[acp.AgentGrok]
-	grok.Enabled = true
-	grok.Model = "grok-composer-2.5-fast"
-	grok.ReasoningEffort = "xhigh"
-	stored.ACP[acp.AgentGrok] = grok
-	if _, err := SaveAgentDefaults(store, stored); err != nil {
-		t.Fatal(err)
-	}
-	if err := EnsureAgentDefaults(store, seed); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, ok, err := NewACPConfigSource(store, acp.BuiltinAgents()).AgentConfig(acp.AgentGrok)
-	if err != nil || !ok {
-		t.Fatalf("grok config: ok=%v err=%v", ok, err)
-	}
-	if cfg.Model != grok.Model || cfg.ReasoningEffort != "" {
-		t.Fatalf("grok config = %#v, want Composer without an effort", cfg)
-	}
-}

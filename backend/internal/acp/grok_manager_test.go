@@ -2,8 +2,11 @@ package acp_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,42 +60,95 @@ func TestManagerLeavesGrokModesUnmanagedWhenAgentReportsNoModes(t *testing.T) {
 	}
 }
 
-func TestManagerAppliesGrokReasoningEffortThroughConfigOption(t *testing.T) {
+func TestManagerStartsGrokModelWithRulesAndSetsAdvertisedEffort(t *testing.T) {
+	requestLog := filepath.Join(t.TempDir(), "requests.jsonl")
+	manager, store := newGrokOptionsManager(t, "grok-4.6", requestLog)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	spawned, err := manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "grok", Slug: "grok-model", SystemPromptExtensions: promptmodule.New("grok rules marker")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = manager.Cancel(context.Background(), spawned.SessionID) }()
+
+	raw, err := os.ReadFile(requestLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var modelID string
+	var configIDs []string
+	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
+		var request struct {
+			Method string `json:"method"`
+			Params struct {
+				Meta     map[string]any `json:"_meta"`
+				ConfigID string         `json:"configId"`
+			} `json:"params"`
+		}
+		if err := json.Unmarshal([]byte(line), &request); err != nil {
+			t.Fatal(err)
+		}
+		switch request.Method {
+		case "session/new":
+			if rules, _ := request.Params.Meta["rules"].(string); strings.Contains(rules, "grok rules marker") {
+				modelID, _ = request.Params.Meta["modelId"].(string)
+			}
+		case "session/set_config_option":
+			configIDs = append(configIDs, request.Params.ConfigID)
+		case "session/set_model":
+			t.Fatal("grok model must not change after session/new")
+		}
+	}
+	if modelID != "grok-4.6" || strings.Join(configIDs, ",") != "reasoning_effort" {
+		t.Fatalf("session/new modelId = %q, set_config_option ids = %v", modelID, configIDs)
+	}
+	session, err := store.LoadSession(spawned.SessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.ReasoningEffort != "xhigh" {
+		t.Fatalf("session reasoning effort = %q", session.ReasoningEffort)
+	}
+}
+
+func TestManagerRejectsGrokModelItDoesNotAdvertise(t *testing.T) {
+	manager, _ := newGrokOptionsManager(t, "grok-9", filepath.Join(t.TempDir(), "requests.jsonl"))
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	_, err := manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "grok", Slug: "grok-model"})
+	if err == nil || !strings.Contains(err.Error(), "not advertised") {
+		t.Fatalf("spawn error = %v", err)
+	}
+}
+
+func newGrokOptionsManager(t *testing.T, model, requestLog string) (*acp.Manager, *jsonstore.Store) {
+	t.Helper()
 	store, err := jsonstore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager := acp.NewManager(store, acp.Config{
+	return acp.NewManager(store, acp.Config{
 		Root:      t.TempDir(),
 		Workspace: t.TempDir(),
 		Agents: map[string]acp.AgentConfig{
 			"grok": {
 				Command:         os.Args[0],
 				Args:            []string{"-test.run=TestFakeACPAgentProcess"},
+				Model:           model,
 				ReasoningEffort: "xhigh",
 				Env: map[string]string{
 					"JAZ_FAKE_ACP_AGENT":         "1",
 					"JAZ_FAKE_ACP_SET_CONFIG":    "1",
 					"JAZ_FAKE_ACP_EXPECT_EFFORT": "xhigh",
+					"JAZ_FAKE_ACP_REQUEST_LOG":   requestLog,
+					"JAZ_FAKE_ACP_SESSION_OPTIONS": `[
+						{"id":"model","category":"model","type":"select","currentValue":"grok-4.7","options":[{"value":"grok-4.7","name":"Grok 4.7"},{"value":"grok-4.6","name":"Grok 4.6"}]},
+						{"id":"reasoning_effort","category":"thought_level","type":"select","currentValue":"high","options":[{"value":"xhigh","name":"Extra High"},{"value":"high","name":"High"}]}
+					]`,
 				},
 			},
 		},
-	}, log.New(io.Discard))
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	spawned, err := manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "grok", Slug: "grok-effort"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _, _ = manager.Cancel(context.Background(), spawned.SessionID) }()
-	session, err := store.LoadSession(spawned.SessionID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if session.ReasoningEffort != "xhigh" {
-		t.Fatalf("unexpected session reasoning effort %#v", session)
-	}
+	}, log.New(io.Discard)), store
 }
 
 func TestManagerRebuildsPromptExtensionsWhenResumingGrokLoopRun(t *testing.T) {

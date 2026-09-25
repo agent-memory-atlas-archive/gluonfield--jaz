@@ -87,7 +87,7 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	customFields := map[string]string{}
 	keys := make([]string, 0, len(schema.Properties))
 	for key, property := range schema.Properties {
-		field := readElicitationField(key, property, message)
+		field := readElicitationField(property, message)
 		if field.note {
 			if field.noteFor != "" {
 				customFields[field.noteFor] = key
@@ -144,17 +144,18 @@ type elicitationField struct {
 
 // readElicitationField reads one requested property in its agent's dialect.
 // Claude titles a field with its header, asks a lone question in the form
-// message and pairs free text as "<id>_custom". Codex titles a field with the
-// question, describes it with the header, sends a boilerplate form message and
-// marks note fields in _meta.codex.
-func readElicitationField(key string, property acpschema.ElicitationPropertySchema, message string) elicitationField {
+// message and marks free text with the neutral _askUserQuestionCustomAnswer.
+// Codex titles a field with the question, describes it with the header, sends a
+// boilerplate form message and marks note fields in _meta.codex.
+func readElicitationField(property acpschema.ElicitationPropertySchema, message string) elicitationField {
 	field := elicitationField{
 		header:   strings.TrimSpace(property.Title),
 		question: strings.TrimSpace(property.Description),
 		message:  strings.TrimSpace(message),
 	}
-	if parent, ok := strings.CutSuffix(key, "_custom"); ok {
-		field.note, field.noteFor = true, parent
+	if custom, ok := property.Meta["_askUserQuestionCustomAnswer"].(map[string]any); ok {
+		field.note = true
+		field.noteFor, _ = custom["questionId"].(string)
 		return field
 	}
 	codex, ok := property.Meta[codexMetaKey].(map[string]any)
