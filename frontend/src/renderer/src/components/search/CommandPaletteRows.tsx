@@ -142,11 +142,7 @@ export function ThreadRow({
   const showModelIcons = useShowModelIcons()
   return (
     <PaletteRow {...row}>
-      {showModelIcons ? (
-        <AgentAvatar agent={result.thread_agent} size={16} className="opacity-60" />
-      ) : (
-        <span aria-hidden className="w-4 shrink-0" />
-      )}
+      {showModelIcons ? <AgentAvatar agent={result.thread_agent} size={16} className="opacity-60" /> : null}
       <span className="min-w-0 flex-1">
         <span className={`block truncate ${result.archived ? 'text-ink-2' : ''}`}>{threadSearchTitle(result)}</span>
         {excerpt ? (
