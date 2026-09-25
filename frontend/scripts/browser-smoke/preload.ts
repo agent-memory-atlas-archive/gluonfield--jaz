@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('smoke', {
   popupURLs: () => ipcRenderer.invoke('smoke:popup-urls'),
   tabURLs: () => ipcRenderer.invoke('smoke:tab-urls'),
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
-  pointer: (type: string, x: number, y: number) => ipcRenderer.invoke('smoke:pointer', type, x, y),
+  pointer: (type: string, x: number, y: number, button?: 'left' | 'right') => ipcRenderer.invoke('smoke:pointer', type, x, y, button),
   key: (key: string, modifiers?: string[]) => ipcRenderer.invoke('smoke:key', key, modifiers),
   capture: (name?: string) => ipcRenderer.invoke('smoke:capture', name),
   resize: (width: number, height: number) => ipcRenderer.invoke('smoke:resize', width, height),

@@ -24,7 +24,7 @@ declare global {
       backend(): Promise<string>
       browserExists(id: number): Promise<boolean>
       passwordStore(): Promise<{ count: number; plaintext: boolean }>
-      pointer(type: string, x: number, y: number): Promise<void>
+      pointer(type: string, x: number, y: number, button?: 'left' | 'right'): Promise<void>
       key(key: string, modifiers?: string[]): Promise<void>
       capture(name?: string): Promise<void>
       resize(width: number, height: number): Promise<void>

@@ -193,7 +193,7 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     return { count: records.length, plaintext: records.some((record) => encrypted.includes(Buffer.from(record.password)) || encrypted.includes(Buffer.from(record.username))) }
   })
   let pointerPressed = false
-  ipcMain.handle('smoke:pointer', async (_event, type: 'mouseDown' | 'mouseMove' | 'mouseUp', x: number, y: number) => {
+  ipcMain.handle('smoke:pointer', async (_event, type: 'mouseDown' | 'mouseMove' | 'mouseUp', x: number, y: number, button: 'left' | 'right' = 'left') => {
     if (!window.isFocused()) {
       window.focus()
       window.webContents.focus()
@@ -204,7 +204,7 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     if (type === 'mouseUp') {
       pointerPressed = false
     }
-    window.webContents.sendInputEvent({ type, x, y, button: 'left', clickCount: 1, modifiers: pointerPressed ? ['leftButtonDown'] : [] })
+    window.webContents.sendInputEvent({ type, x, y, button, clickCount: 1, modifiers: pointerPressed ? [`${button}ButtonDown`] : [] })
     await new Promise((resolve) => setTimeout(resolve, 20))
   })
   window.webContents.on('console-message', ({ level, message }) => {

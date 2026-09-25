@@ -130,7 +130,7 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
   }
-  const click = async (target: Element | null) => {
+  const click = async (target: Element | null, pointerButton: 'left' | 'right' = 'left') => {
     if (!target) {
       throw new Error('Missing side panel control')
     }
@@ -152,8 +152,8 @@ export async function exerciseSidePanelTabs(): Promise<void> {
       throw new Error('Side panel control is obscured: ' + target.outerHTML)
     }
     await window.smoke.pointer('mouseMove', x, y)
-    await window.smoke.pointer('mouseDown', x, y)
-    await window.smoke.pointer('mouseUp', x, y)
+    await window.smoke.pointer('mouseDown', x, y, pointerButton)
+    await window.smoke.pointer('mouseUp', x, y, pointerButton)
   }
   const button = (label: string) => [...document.querySelectorAll('button')].find((item) => (item.getAttribute('aria-label') === label || item.textContent?.trim() === label) && item.getBoundingClientRect().height)
   const tab = (id: string) => document.getElementById(`panel-tab-${id}`)
@@ -162,19 +162,25 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     const response = await window.jaz!.browserCommand({ webContentsId: view.getWebContentsId(), method: 'Runtime.evaluate', params: { expression, returnByValue: true } }) as { result: { value: unknown } }
     return response.result.value
   }
-  const ready = async (id: string) => {
+  const ready = async (id: string, condition = 'true') => {
     const view = webview(id)
     if (!view) {
       return false
     }
     try {
-      return await evaluate(view, 'document.readyState === "complete"') === true
+      return await evaluate(view, `document.readyState === "complete" && (${condition})`) === true
     } catch (error) {
       if (!isPreviewWebviewPending(error) && !(error instanceof Error && error.message.includes('Cannot find default execution context'))) {
         throw error
       }
       return false
     }
+  }
+  const tabMenu = async (id: string, label: string) => {
+    await click(tab(id), 'right')
+    await until(() => Boolean(button(label)))
+    await click(button(label)!)
+    await until(() => !button(label))
   }
   const add = async (label: string) => {
     await click(element.querySelector('[aria-label="New tab"]'))
@@ -320,6 +326,21 @@ export async function exerciseSidePanelTabs(): Promise<void> {
     if (webview('tabs').getWebContentsId() !== firstID || await evaluate(first, 'window.retainedTabValue') !== 41 || await evaluate(first, '[innerWidth,innerHeight].join(",")') !== firstSize) {
       throw new Error('Switching tabs replaced or resized the retained browser')
     }
+    await tabMenu('tabs', 'Reload')
+    await until(() => ready('tabs', 'window.retainedTabValue === undefined'))
+    if (webview('tabs').getWebContentsId() !== firstID) {
+      throw new Error('Reloading a tab replaced its browser')
+    }
+    const tabCount = panel.tabs.length
+    await tabMenu('tabs', 'Duplicate')
+    await until(() => panel.tabs.length === tabCount + 1)
+    const copy = panel.tabs[panel.tabs.findIndex((entry) => entry.id === 'tabs') + 1]
+    await until(() => ready(copy.id))
+    if (panel.activeTab?.id !== copy.id || webview(copy.id).getWebContentsId() === firstID || await evaluate(webview(copy.id), 'location.href') !== await evaluate(first, 'location.href')) {
+      throw new Error('Duplicate did not open the same page in a new browser beside its source')
+    }
+    await tabMenu(copy.id, 'Close')
+    await until(() => panel.tabs.length === tabCount)
     const toolbar = document.querySelector('[data-browser-session="tabs"] form')!
     const browserBounds = toolbar.getBoundingClientRect()
     const headerBounds = element.querySelector('header')!.getBoundingClientRect()

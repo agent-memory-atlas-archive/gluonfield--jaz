@@ -118,13 +118,9 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   useSessionPreview(sessionId, showPreview)
 
   const addTab = useCallback((kind: SidePanelTab['kind'], after?: string) => {
-    if (kind === 'preview') {
-      openTab({ id: browsers.openTab(sessionId), kind }, after)
-    } else if (kind === 'file') {
-      openTab({ id: 'file', kind, file: null }, after)
-    } else {
-      openTab({ id: kind, kind }, after)
-    }
+    openTab(kind === 'preview' ? { id: browsers.openTab(sessionId), kind }
+      : kind === 'file' ? { id: 'file', kind, file: null }
+        : { id: kind, kind }, after)
   }, [browsers, openTab, sessionId])
   const duplicateTab = useCallback((id: string) => {
     openTab({ id: browsers.duplicate(sessionId, id), kind: 'preview' }, id)
