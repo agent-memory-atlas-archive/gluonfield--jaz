@@ -92,9 +92,9 @@ export function useCommandPaletteItems({
     [experimentalEnabled, onOpenChange, onOpenSettings],
   )
 
-  // Archived chats stay searchable; the backend ranks them below active ones
-  // and each result carries an `archived` flag for the UI badge. The key must
-  // carry the same flag so it never collides with a non-archived search.
+  // Archived chats stay searchable and get their own section after the active
+  // ones. The key must carry the same flag so it never collides with a
+  // non-archived search.
   const threadSearch = useQuery({
     queryKey: keys.threadSearch(debouncedQuery, true),
     queryFn: ({ signal }) =>
@@ -108,16 +108,16 @@ export function useCommandPaletteItems({
     staleTime: 15_000,
   })
 
-  // The two sections are kept as their own typed lists (rendering consumes them
-  // directly) plus a flat `items` whose order — commands first, then threads —
-  // is the index space for keyboard navigation.
-  const { commandItems, threadItems, items } = useMemo(() => {
+  // Each section is its own typed list (rendering consumes them directly) plus
+  // a flat `items` whose order — commands, threads, archived threads — is the
+  // index space for keyboard navigation.
+  const { commandItems, threadItems, archivedItems, items } = useMemo(() => {
     const baseItems = commands.filter((item) => commandMatches(item, query))
     const sectionItems = query.trim()
       ? settingsCommands.filter((item) => commandMatches(item, query))
       : []
     const commandItems = [...baseItems, ...sectionItems]
-    const threadItems: PaletteThread[] =
+    const threads: PaletteThread[] =
       searchEnabled && threadSearch.data
         ? threadSearch.data.map((result) => ({
             id: `thread-${result.thread_id}-${result.message_seq ?? 0}`,
@@ -125,7 +125,14 @@ export function useCommandPaletteItems({
             result,
           }))
         : []
-    return { commandItems, threadItems, items: [...commandItems, ...threadItems] }
+    const threadItems = threads.filter((item) => !item.result.archived)
+    const archivedItems = threads.filter((item) => item.result.archived)
+    return {
+      commandItems,
+      threadItems,
+      archivedItems,
+      items: [...commandItems, ...threadItems, ...archivedItems],
+    }
   }, [commands, settingsCommands, query, searchEnabled, threadSearch.data])
 
   return {
@@ -133,6 +140,7 @@ export function useCommandPaletteItems({
     items,
     commandItems,
     threadItems,
+    archivedItems,
     searchEnabled,
     threadSearch,
   }
