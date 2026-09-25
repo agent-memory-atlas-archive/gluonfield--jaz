@@ -8,7 +8,7 @@ export const OVERVIEW_PANEL_WIDTH = 300
 
 export type SidePanelTabs = { tabs: SidePanelTab[]; activeId: string | null }
 export type SidePanelTabAction =
-  | { type: 'open'; tab: SidePanelTab }
+  | { type: 'open'; tab: SidePanelTab; after?: string }
   | { type: 'select' | 'close'; id: string }
   | { type: 'reorder'; ids: string[] }
 
@@ -25,8 +25,9 @@ export function sidePanelTabs(state: SidePanelTabs, action: SidePanelTabAction):
       ? state.tabs.filter((tab) => tab.kind !== 'file' || tab.file)
       : state.tabs
     const existing = tabs.some((tab) => tab.id === action.tab.id)
+    const after = tabs.findIndex((tab) => tab.id === action.after)
     return {
-      tabs: existing ? tabs.map((tab) => tab.id === action.tab.id ? action.tab : tab) : [...tabs, action.tab],
+      tabs: existing ? tabs.map((tab) => tab.id === action.tab.id ? action.tab : tab) : tabs.toSpliced(after < 0 ? tabs.length : after + 1, 0, action.tab),
       activeId: action.tab.id,
     }
   }

@@ -1,11 +1,12 @@
-import { FileSpreadsheet, FileText, FolderGit2, Globe, MessageCirclePlus, Plus, Terminal, X } from 'lucide-react'
+import { Copy, FileSpreadsheet, FileText, FolderGit2, Globe, MessageCirclePlus, Plus, RotateCw, Terminal, X, type LucideIcon } from 'lucide-react'
 import { motion, Reorder } from 'motion/react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { IconButton } from '@/components/ui/IconButton'
-import { Popover } from '@/components/ui/Popover'
+import { ContextMenu, MenuRow, Popover } from '@/components/ui/Popover'
 import { Favicon } from '@/components/ui/Favicon'
 import { isSpreadsheetPath } from '@shared/fileReader'
 import { useBrowserSessions } from '@/lib/browserSessions'
+import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
 import type { SidePanelTab } from '@/lib/sidePanelTabs'
 
 const TAB_TYPES = {
@@ -49,18 +50,22 @@ export function SidePanelTabMenu({ sideChatAvailable, onAdd, empty = false }: {
   )
 }
 
-export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onReorder, onClose, onAdd }: {
+export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onReorder, onClose, onAdd, onDuplicate }: {
   tabs: SidePanelTab[]
   activeId?: string
   sideChatAvailable: boolean
   onSelect: (id: string) => void
   onReorder: (ids: string[]) => void
   onClose: (id: string) => void
-  onAdd: (kind: SidePanelTab['kind']) => void
+  onAdd: (kind: SidePanelTab['kind'], after?: string) => void
+  onDuplicate: (id: string) => void
 }) {
   const sessions = useBrowserSessions()
   const browsers = useSyncExternalStore(sessions.subscribe, sessions.getSnapshot)
   const list = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<{ point: { x: number; y: number }; id: string | null } | null>(null)
+  const menuTriggers = useContextMenuTrigger((point, target) => setMenu({ point, id: target.getAttribute('data-tab-id') }))
+  const menuTab = tabs.find((tab) => tab.id === menu?.id)
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.parentElement?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [activeId])
@@ -68,14 +73,25 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
     onSelect(id)
     requestAnimationFrame(() => document.getElementById(`panel-tab-${id}`)?.focus())
   }
-  const closeTab = (id: string) => {
-    onClose(id)
+  const closeTabs = (closing: SidePanelTab[]) => {
+    closing.forEach((tab) => onClose(tab.id))
     requestAnimationFrame(() => {
       const selected = list.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]')
       const target = selected ?? list.current?.parentElement?.querySelector<HTMLButtonElement>('[aria-label="New tab"]')
       target?.focus()
     })
   }
+  const menuRow = (Icon: LucideIcon, label: string, action: () => void, disabled = false) => (
+    <MenuRow disabled={disabled} onClick={() => {
+      setMenu(null)
+      action()
+    }}>
+      <span className="flex items-center gap-2">
+        <Icon size={13} />
+        {label}
+      </span>
+    </MenuRow>
+  )
   return (
     <div className="flex h-9 min-w-0 flex-1 items-center gap-1 px-1 pointer-coarse:h-11">
       <Reorder.Group as="div" axis="x" values={tabs.map((tab) => tab.id)} onReorder={onReorder} layoutScroll ref={list} role="tablist" aria-label="Side panel tabs" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-app-region:no-drag]">
@@ -85,7 +101,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
           const title = tab.kind === 'file' ? tab.file?.path.split('/').pop() || label : target?.title || target?.displayUrl || label
           const active = activeId === tab.id
           return (
-            <Reorder.Item as="div" value={tab.id} key={tab.id} layout="position" transition={{ layout: { duration: 0 } }} dragMomentum={false} className={`group relative flex h-7 min-w-0 max-w-full shrink-0 select-none items-center rounded-lg pointer-coarse:h-10 ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface-2'}`}>
+            <Reorder.Item as="div" value={tab.id} key={tab.id} data-tab-id={tab.id} {...menuTriggers} layout="position" transition={{ layout: { duration: 0 } }} dragMomentum={false} className={`group relative flex h-7 min-w-0 max-w-full shrink-0 select-none items-center rounded-lg pointer-coarse:h-10 ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface-2'}`}>
               <motion.button
                 id={`panel-tab-${tab.id}`}
                 type="button"
@@ -116,7 +132,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
                     focusTab(tabs[next].id)
                   } else if (event.key === 'Delete') {
                     event.preventDefault()
-                    closeTab(tab.id)
+                    closeTabs([tab])
                   } else if (event.key === ' ') {
                     event.preventDefault()
                     onSelect(tab.id)
@@ -129,7 +145,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
                     : <Icon size={14} className="shrink-0 text-ink-3" aria-hidden />}
                 <span className="truncate">{title}</span>
               </motion.button>
-              <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onPointerDownCapture={(event) => event.stopPropagation()} onClick={() => closeTab(tab.id)} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
+              <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onPointerDownCapture={(event) => event.stopPropagation()} onClick={() => closeTabs([tab])} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">
                 <X size={12} />
               </button>
             </Reorder.Item>
@@ -137,6 +153,19 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
         })}
       </Reorder.Group>
       <SidePanelTabMenu sideChatAvailable={sideChatAvailable} onAdd={onAdd} />
+      {menu && menuTab ? (
+        <ContextMenu point={menu.point} onClose={() => setMenu(null)}>
+          {menuTab.kind === 'preview' ? <>
+            {menuRow(Plus, 'New tab to the right', () => onAdd('preview', menuTab.id))}
+            {menuRow(RotateCw, 'Reload', () => sessions.reload(menuTab.id), !browsers.find((browser) => browser.id === menuTab.id)?.target.sourceUrl)}
+            {menuRow(Copy, 'Duplicate', () => onDuplicate(menuTab.id))}
+            <div className="my-1 h-px bg-border/70" />
+          </> : null}
+          {menuRow(X, 'Close', () => closeTabs([menuTab]))}
+          {menuRow(X, 'Close other tabs', () => closeTabs(tabs.filter((tab) => tab !== menuTab)), tabs.length < 2)}
+          {menuRow(X, 'Close tabs to the right', () => closeTabs(tabs.slice(tabs.indexOf(menuTab) + 1)), menuTab === tabs.at(-1))}
+        </ContextMenu>
+      ) : null}
     </div>
   )
 }

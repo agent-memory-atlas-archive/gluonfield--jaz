@@ -111,3 +111,17 @@ test('opening a tab preserves the existing agent browser and creates distinct ta
   ])
   expect(sessions.getSnapshot().every((entry) => entry.ownerId === 'chat')).toBe(true)
 })
+
+test('duplicating the agent browser opens a separate page in the same conversation and reload targets only existing tabs', () => {
+  const sessions = new BrowserSessions()
+  sessions.open('chat', 'https://example.com/agent')
+  const copy = sessions.duplicate('chat', 'chat')
+  const [agent, duplicate] = sessions.getSnapshot()
+  expect(duplicate.id).toBe(copy)
+  expect(copy).not.toBe('chat')
+  expect(duplicate.ownerId).toBe('chat')
+  expect(duplicate.target).toBe(agent.target)
+  sessions.reload(copy)
+  sessions.reload('missing')
+  expect(sessions.getSnapshot().map((entry) => [entry.id, entry.reloads])).toEqual([['chat', undefined], [copy, 1]])
+})

@@ -7,7 +7,7 @@ type Point = { x: number; y: number }
 
 // Opens a contextual menu via right-click or press-and-hold (touch has no
 // right-click) and swallows the lift-off tap. Spread onto the target element.
-export function useContextMenuTrigger(onOpen: (point: Point) => void) {
+export function useContextMenuTrigger(onOpen: (point: Point, target: Element) => void) {
   const timer = useRef<number | null>(null)
   const origin = useRef<Point | null>(null)
   const suppressClick = useRef(false)
@@ -22,19 +22,20 @@ export function useContextMenuTrigger(onOpen: (point: Point) => void) {
   return {
     onContextMenu: (e: MouseEvent) => {
       e.preventDefault()
-      onOpen({ x: e.clientX, y: e.clientY })
+      onOpen({ x: e.clientX, y: e.clientY }, e.currentTarget)
     },
     onTouchStart: (e: TouchEvent) => {
       const t = e.touches[0]
       if (!t) return
       const { clientX: x, clientY: y } = t
+      const target = e.currentTarget
       suppressClick.current = false
       origin.current = { x, y }
       cancel()
       timer.current = window.setTimeout(() => {
         timer.current = null
         suppressClick.current = true
-        onOpen({ x, y })
+        onOpen({ x, y }, target)
       }, LONG_PRESS_MS)
     },
     onTouchMove: (e: TouchEvent) => {

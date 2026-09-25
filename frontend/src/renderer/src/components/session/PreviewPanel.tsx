@@ -9,7 +9,7 @@ import {
   SquareStop,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { IconButton } from '@/components/ui/IconButton'
 import { previewDisplayUrl, resolvePreviewSource } from '@/lib/api/preview'
 import type { Attachment } from '@/lib/api/types'
@@ -41,6 +41,7 @@ export function PreviewPanel({
   visible = true,
   browserControl,
   target,
+  reloads,
   onTargetChange,
   onAddBrowserAnnotation,
   onUploadAttachment,
@@ -50,6 +51,7 @@ export function PreviewPanel({
   visible?: boolean
   browserControl?: SideBrowser
   target: PreviewTarget
+  reloads?: number
   onTargetChange: (target: PreviewTarget) => void
   onAddBrowserAnnotation?: (annotation: BrowserAnnotation, screenshot?: Attachment) => void
   onUploadAttachment?: (file: File) => Promise<Attachment>
@@ -285,6 +287,13 @@ export function PreviewPanel({
     setLoading(Boolean(resolvedSourceUrl))
     setIframeKey((key) => key + 1)
   }
+  const requestReload = useEffectEvent(reload)
+  const handledReloads = useRef(reloads)
+  useEffect(() => {
+    if (reloads === handledReloads.current) return
+    handledReloads.current = reloads
+    requestReload()
+  }, [reloads])
 
   const canAnnotate = canUseWebview && !!onAddBrowserAnnotation
 

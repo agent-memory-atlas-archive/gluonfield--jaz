@@ -61,6 +61,7 @@ function BrowserSessionPanel({ entry, idleMs }: { entry: BrowserSession; idleMs:
       {resident && <PreviewPanel
         browserControl={browser}
         target={entry.target}
+        reloads={entry.reloads}
         onTargetChange={update}
         visible={visible}
         onClose={entry.presentation?.onClose}
@@ -83,7 +84,7 @@ export function BrowserPanelSlot({ sessionId, visible, ...presentation }: Browse
     return sessions.present(sessionId, { onClose, onAddBrowserAnnotation, onUploadAttachment, embedded })
   }, [sessions, sessionId, visible, onClose, onAddBrowserAnnotation, onUploadAttachment, embedded])
   if (!clientRuntime.capabilities.previewWebview) {
-    return entry ? <PreviewPanel {...presentation} visible={visible} target={entry.target} onTargetChange={update} /> : null
+    return entry ? <PreviewPanel {...presentation} visible={visible} target={entry.target} reloads={entry.reloads} onTargetChange={update} /> : null
   }
   return <div className="h-full max-sm:w-full!" style={{ anchorName: '--jaz-browser-panel', width: `var(--side-panel-width, ${PREVIEW_PANEL_WIDTH}px)` }} />
 }

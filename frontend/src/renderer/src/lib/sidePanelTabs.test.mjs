@@ -49,3 +49,14 @@ test('reordering retains selection, file locations, and hidden tabs', () => {
   expect(state.tabs.map((tab) => tab.id)).toEqual(['file', 'side-chat', 'browser'])
   expect(sidePanelTabs(reordered, { type: 'close', id: 'browser' }).activeId).toBe('file')
 })
+
+test('tabs opened beside another tab land to its right and fall back to the end', () => {
+  let state = empty
+  for (const id of ['one', 'two', 'three']) {
+    state = open(state, { id, kind: 'preview' })
+  }
+  state = sidePanelTabs(state, { type: 'open', tab: { id: 'copy', kind: 'preview' }, after: 'one' })
+  state = sidePanelTabs(state, { type: 'open', tab: { id: 'orphan', kind: 'preview' }, after: 'closed' })
+  expect(state.tabs.map((tab) => tab.id)).toEqual(['one', 'copy', 'two', 'three', 'orphan'])
+  expect(state.activeId).toBe('orphan')
+})

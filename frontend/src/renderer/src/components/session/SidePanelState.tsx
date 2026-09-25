@@ -105,8 +105,8 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     showTabs()
   }, [showTabs])
   const reorderTabs = useCallback((ids: string[]) => dispatch({ type: 'reorder', ids }), [])
-  const openTab = useCallback((tab: SidePanelTab) => {
-    dispatch({ type: 'open', tab })
+  const openTab = useCallback((tab: SidePanelTab, after?: string) => {
+    dispatch({ type: 'open', tab, after })
     showTabs()
   }, [showTabs])
   const showPreview = useCallback(async () => {
@@ -117,14 +117,17 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   }, [openTab, sessionId])
   useSessionPreview(sessionId, showPreview)
 
-  const addTab = useCallback((kind: SidePanelTab['kind']) => {
+  const addTab = useCallback((kind: SidePanelTab['kind'], after?: string) => {
     if (kind === 'preview') {
-      openTab({ id: browsers.openTab(sessionId), kind })
+      openTab({ id: browsers.openTab(sessionId), kind }, after)
     } else if (kind === 'file') {
-      openTab({ id: 'file', kind, file: null })
+      openTab({ id: 'file', kind, file: null }, after)
     } else {
-      openTab({ id: kind, kind })
+      openTab({ id: kind, kind }, after)
     }
+  }, [browsers, openTab, sessionId])
+  const duplicateTab = useCallback((id: string) => {
+    openTab({ id: browsers.duplicate(sessionId, id), kind: 'preview' }, id)
   }, [browsers, openTab, sessionId])
   const closeTab = useCallback((id: string) => {
     browsers.close(id)
@@ -189,7 +192,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     containerRef, open, mode, tabs, activeTab,
     resize, resizing, setResizing, width, widthStyle, minWidth, maxWidth,
     resizable: mode === 'tabs',
-    toggleMode, close, selectTab, reorderTabs, addTab, closeTab, openFile, openPreview,
+    toggleMode, close, selectTab, reorderTabs, addTab, duplicateTab, closeTab, openFile, openPreview,
   }
 }
 

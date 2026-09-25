@@ -13,6 +13,7 @@ export type BrowserSession = {
   id: string
   ownerId?: string
   generation?: number
+  reloads?: number
   embedded?: boolean
   target: PreviewTarget
   presentation?: BrowserPresentation
@@ -60,6 +61,19 @@ export class BrowserSessions {
     const id = primary?.ownerId ? crypto.randomUUID() : ownerId
     this.update(id, { ownerId, target: { displayUrl: url, sourceUrl: url } })
     return id
+  }
+
+  duplicate(ownerId: string, id: string): string {
+    const copy = crypto.randomUUID()
+    this.update(copy, { ownerId, target: this.sessions.find((session) => session.id === id)?.target ?? EMPTY_TARGET })
+    return copy
+  }
+
+  reload(id: string): void {
+    const entry = this.sessions.find((session) => session.id === id)
+    if (entry) {
+      this.update(id, { reloads: (entry.reloads ?? 0) + 1 })
+    }
   }
 
   update(id: string, patch: Partial<Omit<BrowserSession, 'id'>>): void {
