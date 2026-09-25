@@ -8,8 +8,6 @@ export type ThemePref = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
 
 const KEY = 'jaz.theme'
-const LIGHT_BG = 'oklch(0.99 0.002 264)'
-const DARK_BG = 'oklch(0.195 0.005 264)'
 
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 const listeners = new Set<() => void>()
@@ -42,11 +40,6 @@ function apply(p: ThemePref) {
   const root = document.documentElement
   root.classList.toggle('dark', resolved === 'dark')
   root.style.colorScheme = resolved
-  root.style.background = root.classList.contains('vibrant')
-    ? 'transparent'
-    : resolved === 'dark'
-      ? DARK_BG
-      : LIGHT_BG
   // keep the native window chrome (macOS traffic lights, scrollbars) in step
   clientRuntime.setNativeTheme?.(p)
 }
@@ -92,7 +85,10 @@ window.addEventListener('storage', (event) => {
 })
 
 // Run once at import so nativeTheme is synced even though the inline FOUC
-// script already set the class for first paint.
+// script already set the class for first paint. That script also painted the
+// stock ground inline for the frame before CSS; from here body's --color-bg,
+// which follows custom schemes, owns the canvas.
+document.documentElement.style.removeProperty('background')
 apply(pref)
 
 export function useTheme() {

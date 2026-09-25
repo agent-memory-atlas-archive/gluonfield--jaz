@@ -28,25 +28,6 @@ const THEME_VARS = [
   '--radius-card',
 ]
 
-const FALLBACKS: Record<string, string> = {
-  '--color-bg': 'oklch(0.99 0.002 264)',
-  '--color-surface': 'oklch(0.965 0.004 264)',
-  '--color-surface-2': 'oklch(0.935 0.006 264)',
-  '--color-ink': 'oklch(0.23 0.012 264)',
-  '--color-ink-2': 'oklch(0.46 0.012 264)',
-  '--color-ink-3': 'oklch(0.55 0.01 264)',
-  '--color-primary': 'oklch(0.53 0.17 264)',
-  '--color-primary-strong': 'oklch(0.46 0.17 264)',
-  '--color-primary-soft': 'oklch(0.95 0.028 264)',
-  '--color-border': 'oklch(0.905 0.006 264)',
-  '--color-danger': 'oklch(0.55 0.17 25)',
-  '--color-danger-soft': 'oklch(0.94 0.035 25)',
-  '--font-sans': '"Anthropic Sans", ui-sans-serif, system-ui, sans-serif',
-  '--font-mono': '"JetBrains Mono", ui-monospace, SFMono-Regular, monospace',
-  '--radius-control': '10px',
-  '--radius-card': '12px',
-}
-
 const RAMPS = {
   purple: ['#EEEDFE', '#534AB7', '#26215C', '#3C3489', '#CECBF6'],
   teal: ['#E1F5EE', '#0F6E56', '#04342C', '#085041', '#9FE1CB'],
@@ -166,12 +147,9 @@ export function artifactInputFromEvent(artifact?: ArtifactEvent): ArtifactInput 
 }
 
 export function buildArtifactThemeCSS(darkOverride?: boolean): string {
-  if (typeof window === 'undefined') return themeCSS(FALLBACKS, darkOverride ?? false)
   const root = document.documentElement
   const style = getComputedStyle(root)
-  const values = Object.fromEntries(
-    THEME_VARS.map((name) => [name, style.getPropertyValue(name).trim() || FALLBACKS[name]]),
-  )
+  const values = Object.fromEntries(THEME_VARS.map((name) => [name, style.getPropertyValue(name).trim()]))
   return themeCSS(values, darkOverride ?? root.classList.contains('dark'))
 }
 
