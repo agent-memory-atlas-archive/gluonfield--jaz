@@ -1,4 +1,3 @@
-import { Archive } from 'lucide-react'
 import { motion, type Transition } from 'motion/react'
 import type { ReactNode } from 'react'
 import { AgentAvatar } from '@/components/acp/AgentAvatar'
@@ -54,10 +53,7 @@ function HighlightedSnippet({ text }: { text: string }) {
     <>
       {snippetSegments(text).map((segment, index) =>
         segment.highlighted ? (
-          <mark
-            key={`${segment.text}-${index}`}
-            className="rounded-[3px] bg-primary-soft px-0.5 text-primary-strong"
-          >
+          <mark key={`${segment.text}-${index}`} className="bg-transparent font-medium text-ink">
             {segment.text}
           </mark>
         ) : (
@@ -69,15 +65,14 @@ function HighlightedSnippet({ text }: { text: string }) {
 }
 
 // Shared shell for every palette row: the enter animation, press feedback,
-// active/hover styling, and keyboard-nav hooks all live here so the two row
-// kinds only differ in their content and layout (height/alignment) classes.
+// active styling, and keyboard-nav hooks all live here so the two row kinds
+// only differ in their content.
 type PaletteRowProps = {
   active: boolean
   index: number
   reduceMotion: boolean
   onActive: () => void
   onSelect: () => void
-  className: string
   children: ReactNode
 }
 
@@ -87,7 +82,6 @@ function PaletteRow({
   reduceMotion,
   onActive,
   onSelect,
-  className,
   children,
 }: PaletteRowProps) {
   return (
@@ -104,13 +98,11 @@ function PaletteRow({
       // under the pointer, which would yank the highlight off the top result.
       // `mousemove` only fires when the mouse actually moves.
       onMouseMove={onActive}
-      // Selection must snap on keypress, so the highlight has no color
-      // transition — fading it would make arrow-nav read as laggy. Hover keeps
-      // a hair of fade since the pointer moves continuously.
-      className={`group flex w-full gap-2 rounded-[6px] px-2.5 text-left ${className} ${
-        active
-          ? 'bg-surface text-ink'
-          : 'text-ink transition-colors duration-100 hover:bg-surface/70'
+      // Pointer movement activates the row, so the active highlight is the only
+      // highlight. It has no color transition — fading it would make arrow-nav
+      // read as laggy.
+      className={`flex min-h-8 w-full items-center gap-3 rounded-[10px] px-3 py-1.5 text-left text-[14px] text-ink ${
+        active ? 'bg-list-hover' : ''
       }`}
     >
       {children}
@@ -124,19 +116,12 @@ export function CommandRow({
   ...row
 }: {
   item: PaletteCommand
-} & Omit<PaletteRowProps, 'className' | 'children'>) {
+} & Omit<PaletteRowProps, 'children'>) {
   const Icon = item.icon
   return (
-    <PaletteRow {...row} active={active} className="min-h-[34px] items-center py-1.5">
-      {Icon ? (
-        <Icon
-          size={16}
-          className={`shrink-0 transition-colors group-hover:text-ink-2 ${
-            active ? 'text-ink-2' : 'text-ink-3'
-          }`}
-        />
-      ) : null}
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink">{item.title}</span>
+    <PaletteRow {...row} active={active}>
+      {Icon ? <Icon size={16} strokeWidth={1.75} className="shrink-0 text-ink-2" /> : null}
+      <span className="min-w-0 flex-1 truncate">{item.title}</span>
       {item.shortcut ? (
         <KeyboardShortcut value={item.shortcut} className="border-transparent bg-surface-2" />
       ) : null}
@@ -149,34 +134,23 @@ export function ThreadRow({
   ...row
 }: {
   result: ThreadSearchResult
-} & Omit<PaletteRowProps, 'className' | 'children'>) {
-  const snippet = result.snippet || ''
+} & Omit<PaletteRowProps, 'children'>) {
+  // A title hit's snippet is just the title again; only a message hit adds
+  // an excerpt worth a second line.
+  const excerpt = result.message_seq ? result.snippet : ''
   return (
-    <PaletteRow {...row} className="min-h-[44px] items-center py-2">
+    <PaletteRow {...row}>
+      <AgentAvatar agent={result.thread_agent} size={16} className="opacity-60" />
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <AgentAvatar agent={result.thread_agent} size={16} />
-          {result.archived ? (
-            <span
-              title="Archived"
-              className="grid size-[18px] shrink-0 place-items-center rounded-[4px] bg-surface text-ink-3"
-            >
-              <Archive size={11} aria-label="Archived" />
-            </span>
-          ) : null}
-          <span
-            className={`truncate text-[13px] font-medium ${result.archived ? 'text-ink-2' : 'text-ink'}`}
-          >
-            {threadSearchTitle(result)}
-          </span>
-        </span>
-        {snippet ? (
-          <span className="mt-0.5 line-clamp-1 text-[12px] leading-5 text-ink-2">
-            <HighlightedSnippet text={snippet} />
+        <span className={`block truncate ${result.archived ? 'text-ink-2' : ''}`}>{threadSearchTitle(result)}</span>
+        {excerpt ? (
+          <span className="block truncate text-[13px] text-ink-3">
+            <HighlightedSnippet text={excerpt} />
           </span>
         ) : null}
       </span>
-      <span className="shrink-0 text-[11px] tabular-nums text-ink-3">
+      <span className="shrink-0 text-[13px] tabular-nums text-ink-3">
+        {result.archived ? 'Archived · ' : ''}
         {relativeTime(result.last_attention_at || result.updated_at)}
       </span>
     </PaletteRow>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Server, Settings2, SquarePen } from 'lucide-react'
+import { Server, Settings, SquarePen } from 'lucide-react'
 import { useMemo } from 'react'
 import { useDebouncedValue } from '@/lib/hooks/useDebouncedValue'
 import {
@@ -63,7 +63,7 @@ export function useCommandPaletteItems({
         id: 'settings',
         kind: 'command',
         title: 'Settings',
-        icon: Settings2,
+        icon: Settings,
         shortcut: ',',
         run: () => {
           onOpenChange(false)
