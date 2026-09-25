@@ -144,7 +144,7 @@ export function ThreadRow({
     <PaletteRow {...row}>
       {showModelIcons ? <AgentAvatar agent={result.thread_agent} size={16} className="opacity-60" /> : null}
       <span className="min-w-0 flex-1">
-        <span className={`block truncate ${result.archived ? 'text-ink-2' : ''}`}>{threadSearchTitle(result)}</span>
+        <span className="block truncate">{threadSearchTitle(result)}</span>
         {excerpt ? (
           <span className="block truncate text-[13px] text-ink-3">
             <HighlightedSnippet text={excerpt} />
@@ -152,7 +152,6 @@ export function ThreadRow({
         ) : null}
       </span>
       <span className="shrink-0 text-[13px] tabular-nums text-ink-3">
-        {result.archived ? 'Archived · ' : ''}
         {relativeTime(result.last_attention_at || result.updated_at)}
       </span>
     </PaletteRow>

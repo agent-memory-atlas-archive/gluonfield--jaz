@@ -2,6 +2,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { X } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion, type Transition } from 'motion/react'
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -36,7 +37,7 @@ export function CommandPalette({
   const listRef = useRef<HTMLDivElement>(null)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
-  const { debouncedQuery, items, commandItems, threadItems, searchEnabled, threadSearch } =
+  const { debouncedQuery, items, commandItems, threadItems, archivedItems, searchEnabled, threadSearch } =
     useCommandPaletteItems({
       open,
       query,
@@ -125,7 +126,7 @@ export function CommandPalette({
     }
   }
 
-  const showSkeleton = threadSearch.isFetching && searchEnabled && threadItems.length === 0
+  const showSkeleton = threadSearch.isFetching && searchEnabled && items.length === commandItems.length
   const showNoMatches = !threadSearch.isFetching && searchEnabled && items.length === 0
   const showEmpty = !searchEnabled && items.length === 0
 
@@ -193,30 +194,37 @@ export function CommandPalette({
                 />
               ))}
 
-              {threadItems.length ? (
-                <motion.div
-                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={LABEL_TRANSITION}
-                  className="px-3 pb-1 pt-3 text-[13px] text-ink-3"
-                >
-                  Threads
-                </motion.div>
-              ) : null}
-              {threadItems.map((item, index) => {
-                const itemIndex = commandItems.length + index
-                return (
-                  <ThreadRow
-                    key={item.id}
-                    result={item.result}
-                    active={itemIndex === activeIndex}
-                    index={itemIndex}
-                    reduceMotion={Boolean(reduceMotion)}
-                    onActive={() => setActiveIndex(itemIndex)}
-                    onSelect={() => selectItem(item)}
-                  />
-                )
-              })}
+              {[
+                { label: 'Threads', sectionItems: threadItems },
+                { label: 'Archived', sectionItems: archivedItems },
+              ].map(({ label, sectionItems }) =>
+                sectionItems.length ? (
+                  <Fragment key={label}>
+                    <motion.div
+                      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={LABEL_TRANSITION}
+                      className="px-3 pb-1 pt-3 text-[13px] text-ink-3"
+                    >
+                      {label}
+                    </motion.div>
+                    {sectionItems.map((item) => {
+                      const itemIndex = items.indexOf(item)
+                      return (
+                        <ThreadRow
+                          key={item.id}
+                          result={item.result}
+                          active={itemIndex === activeIndex}
+                          index={itemIndex}
+                          reduceMotion={Boolean(reduceMotion)}
+                          onActive={() => setActiveIndex(itemIndex)}
+                          onSelect={() => selectItem(item)}
+                        />
+                      )
+                    })}
+                  </Fragment>
+                ) : null,
+              )}
 
               {showSkeleton ? (
                 <div className="flex flex-col gap-1 px-0.5 pb-1 pt-1.5">
