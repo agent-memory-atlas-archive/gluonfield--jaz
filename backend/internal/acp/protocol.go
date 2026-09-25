@@ -134,14 +134,14 @@ func (m *Manager) applyUpdate(acpSessionID string, raw json.RawMessage) {
 	switch event := update.(type) {
 	case acpschema.AgentMessageChunkUpdate:
 		messageChunk = contentText(event.Content)
-		messageID = event.MessageID
+		messageID = upstreamMessageID(event.MessageID)
 		job.appendAssistantLocked(messageChunk)
 		if messageChunk != "" {
 			job.savedAssistantLen = len(job.Assistant)
 		}
 	case acpschema.AgentThoughtChunkUpdate:
 		thoughtChunk = contentText(event.Content)
-		thoughtMessageID = event.MessageID
+		thoughtMessageID = upstreamMessageID(event.MessageID)
 		job.appendThoughtLocked(thoughtChunk)
 	case acpschema.ToolCallSessionUpdate:
 		recordTool(toolUpdateSnapshot(toolUpdateFields{
@@ -269,4 +269,11 @@ func sortedToolCalls(in map[string]sessionevents.ACPToolCall) []sessionevents.AC
 
 func toolUpdateCanMaterialize(call sessionevents.ACPToolCall) bool {
 	return len(call.Content) > 0 || len(call.RawInput) > 0 || len(call.RawOutput) > 0 || len(call.Locations) > 0
+}
+
+func upstreamMessageID(id *acpschema.MessageID) string {
+	if id == nil {
+		return ""
+	}
+	return string(*id)
 }

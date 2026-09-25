@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
 	"github.com/gluonfield/acp-transport/stdio"
 	"github.com/gluonfield/acp-transport/streamhttp"
@@ -515,7 +516,7 @@ func withGrokModelArg(args []string, model string) []string {
 }
 
 func withGrokAlwaysApproveArg(args []string) []string {
-	if hasFlag(args, "--always-approve") || hasFlag(args, "--permission-mode") {
+	if hasFlag(args, "--always-approve") {
 		return args
 	}
 	return insertBeforeArg(args, "stdio", "--always-approve")
@@ -564,7 +565,7 @@ func normalizeEnv(env map[string]string, canonical, alias string) {
 	}
 }
 
-func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (string, []string) {
+func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (acpschema.AuthMethodID, []string) {
 	var init struct {
 		AuthMethods []agentAuthMethod `json:"authMethods"`
 	}
@@ -629,14 +630,14 @@ func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (s
 }
 
 type agentAuthMethod struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
+	Type string                 `json:"type"`
+	ID   acpschema.AuthMethodID `json:"id"`
 	Vars []struct {
 		Name string `json:"name"`
 	} `json:"vars"`
 }
 
-func configuredEnvAuthMethod(methods []agentAuthMethod, env map[string]string) string {
+func configuredEnvAuthMethod(methods []agentAuthMethod, env map[string]string) acpschema.AuthMethodID {
 	for _, method := range methods {
 		if method.Type != "env_var" && len(method.Vars) == 0 {
 			continue

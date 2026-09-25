@@ -28,7 +28,7 @@ func TestACPTransportDecodesChunkMessageID(t *testing.T) {
 	if !ok {
 		t.Fatalf("decoded %T, want AgentMessageChunkUpdate", update)
 	}
-	if got := message.MessageID; got != "provider-message-1" {
+	if got := upstreamMessageID(message.MessageID); got != "provider-message-1" {
 		t.Fatalf("messageId = %q, want provider-message-1", got)
 	}
 }

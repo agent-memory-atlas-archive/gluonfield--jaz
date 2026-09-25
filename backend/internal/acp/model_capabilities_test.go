@@ -78,24 +78,25 @@ func TestCodexUltraModelsUseExplicitAllowlist(t *testing.T) {
 func TestModelCapabilitiesUsesAgentScopedGrokEfforts(t *testing.T) {
 	capabilities := ModelCapabilities{Catalog: modelcatalog.NewService(nil)}
 	models := capabilities.AgentModels(AgentGrok)
-	if len(models) != 3 || models[0].Reasoning.Status != modelcatalog.ReasoningReady {
+	if len(models) != 5 || models[0].Reasoning.Status != modelcatalog.ReasoningReady {
 		t.Fatalf("models = %#v", models)
 	}
-	for _, model := range models[:2] {
-		if got := strings.Join(model.Reasoning.Efforts, ","); got != "low,medium,high" {
-			t.Fatalf("%s reasoning efforts = %q", model.Value, got)
+	for i, want := range []string{"low,medium,high,xhigh", "low,medium,high,xhigh", "low,medium,high,xhigh", "low,medium,high"} {
+		model := models[i]
+		if got := strings.Join(model.Reasoning.Efforts, ","); got != want {
+			t.Fatalf("%s reasoning efforts = %q, want %q", model.Value, got, want)
 		}
 		if model.Reasoning.Scope != ReasoningScopeAgent || model.Reasoning.DefaultEffort != defaultGrokReasoningEffort {
 			t.Fatalf("%s reasoning scope = %q", model.Value, model.Reasoning.Scope)
 		}
 	}
-	if models[2].Value != modelcatalog.GrokComposerModel || models[2].Reasoning.Status != modelcatalog.ReasoningReady || len(models[2].Reasoning.Efforts) != 0 {
-		t.Fatalf("composer reasoning = %#v", models[2])
+	if models[4].Value != modelcatalog.GrokComposerModel || models[4].Reasoning.Status != modelcatalog.ReasoningReady || len(models[4].Reasoning.Efforts) != 0 {
+		t.Fatalf("composer reasoning = %#v", models[4])
 	}
-	if err := capabilities.ValidateReasoningEffort(AgentGrok, "", modelcatalog.DefaultGrokModel, "high"); err != nil {
+	if err := capabilities.ValidateReasoningEffort(AgentGrok, "", modelcatalog.DefaultGrokModel, "xhigh"); err != nil {
 		t.Fatal(err)
 	}
-	for model, effort := range map[string]string{modelcatalog.DefaultGrokModel: "xhigh", modelcatalog.GrokComposerModel: "high"} {
+	for model, effort := range map[string]string{modelcatalog.GrokLegacyModel: "xhigh", modelcatalog.GrokComposerModel: "high"} {
 		if err := capabilities.ValidateReasoningEffort(AgentGrok, "", model, effort); err == nil {
 			t.Fatalf("expected %s reasoning effort %q to fail", model, effort)
 		}

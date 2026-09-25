@@ -393,6 +393,8 @@ func TestServiceAgentModelsIncludesCurrentGrokModels(t *testing.T) {
 	}
 	want := []string{
 		DefaultGrokModel,
+		GrokFastModel,
+		GrokPreviousModel,
 		GrokLegacyModel,
 		GrokComposerModel,
 	}

@@ -224,7 +224,10 @@ func agentReasoningCapabilities(agent string, model modelcatalog.Model, supporte
 		return capabilities
 	}
 	switch model.Value {
-	case modelcatalog.DefaultGrokModel, modelcatalog.GrokLegacyModel:
+	case modelcatalog.DefaultGrokModel, modelcatalog.GrokFastModel, modelcatalog.GrokPreviousModel:
+		capabilities.Efforts = []string{"low", "medium", defaultGrokReasoningEffort, "xhigh"}
+		capabilities.DefaultEffort = defaultGrokReasoningEffort
+	case modelcatalog.GrokLegacyModel:
 		capabilities.Efforts = []string{"low", "medium", defaultGrokReasoningEffort}
 		capabilities.DefaultEffort = defaultGrokReasoningEffort
 	case modelcatalog.GrokComposerModel:
@@ -240,9 +243,11 @@ func isCodexUltraModel(model modelcatalog.Model) bool {
 	}
 	switch id {
 	case provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Astra,
+		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Sol,
 		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Sol,
 		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Terra,
 		provider.OpenAIModelGPT6Astra,
+		provider.OpenAIModelGPT6Sol,
 		provider.OpenAIModelGPT56Sol,
 		provider.OpenAIModelGPT56Terra:
 		return true

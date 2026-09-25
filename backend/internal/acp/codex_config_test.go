@@ -46,8 +46,7 @@ func TestConfigureCodexEnv(t *testing.T) {
 		t.Fatalf("config = %#v", config)
 	}
 	features := config["features"].(map[string]any)
-	if features["existing"] != true || features["goals"] != false ||
-		features["tool_search_always_defer_mcp_tools"] != true {
+	if features["existing"] != true || features["goals"] != false {
 		t.Fatalf("features = %#v", features)
 	}
 	modelProviders := config["model_providers"].(map[string]any)

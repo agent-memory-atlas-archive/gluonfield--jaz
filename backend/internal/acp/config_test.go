@@ -1331,7 +1331,7 @@ func TestProcessCommandAddsGrokModelArg(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Join(args, " ") != "agent --always-approve --model grok-4.6 stdio" {
+	if strings.Join(args, " ") != "agent --always-approve --model grok-4.7 stdio" {
 		t.Fatalf("args = %#v", args)
 	}
 }
@@ -1357,11 +1357,6 @@ func TestProcessCommandDoesNotDuplicateGrokAlwaysApproveArg(t *testing.T) {
 			name: "already always approve",
 			args: []string{"agent", "--always-approve", "stdio"},
 			want: "agent --always-approve stdio",
-		},
-		{
-			name: "explicit permission mode",
-			args: []string{"agent", "--permission-mode", "ask", "stdio"},
-			want: "agent --permission-mode ask stdio",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
