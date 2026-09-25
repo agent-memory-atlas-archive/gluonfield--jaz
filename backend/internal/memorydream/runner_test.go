@@ -13,7 +13,6 @@ import (
 
 	"github.com/gluonfield/jazmem/pkg/jazmem"
 	"github.com/wins/jaz/backend/internal/acp"
-	"github.com/wins/jaz/backend/internal/modelcatalog"
 	"github.com/wins/jaz/backend/internal/provider"
 	jazsettings "github.com/wins/jaz/backend/internal/settings"
 	"github.com/wins/jaz/backend/internal/sourcequeue"
@@ -83,7 +82,7 @@ func TestRunDreamSpawnsCompatibleWorkerModelAndEffort(t *testing.T) {
 	}{
 		{name: "codex", agent: acp.AgentCodex, model: acp.CodexOpenAIDefaultModel, effort: "xhigh"},
 		{name: "claude", agent: acp.AgentClaude, model: "default", effort: "xhigh"},
-		{name: "grok", agent: acp.AgentGrok, model: modelcatalog.DefaultGrokModel},
+		{name: "grok", agent: acp.AgentGrok},
 		{name: "opencode-openrouter-style", agent: acp.AgentOpenCode, defaults: jazsettings.AgentDefaults{ACP: map[string]jazsettings.ACPAgentDefaults{
 			acp.AgentOpenCode: {ModelProvider: provider.ProviderOpenRouter},
 		}}, model: "z-ai/glm-5.2", effort: "xhigh"},

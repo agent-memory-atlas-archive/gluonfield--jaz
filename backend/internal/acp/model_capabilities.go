@@ -12,8 +12,6 @@ import (
 
 var ErrReasoningCapabilitiesUnavailable = errors.New("reasoning capabilities are unavailable")
 
-const defaultGrokReasoningEffort = "high"
-
 type ReasoningScope string
 
 const (
@@ -194,7 +192,7 @@ func resolveModelCapabilities(agent string, models []modelcatalog.Model, allowAg
 			}
 		case modelcatalog.ReasoningUnavailable, modelcatalog.ReasoningPending:
 			if allowAgentCapabilities {
-				resolved.Reasoning = agentReasoningCapabilities(agent, model, supported)
+				resolved.Reasoning = agentReasoningCapabilities(supported)
 			}
 		}
 		if resolved.Reasoning.Status == modelcatalog.ReasoningReady {
@@ -214,23 +212,12 @@ func resolveModelCapabilities(agent string, models []modelcatalog.Model, allowAg
 	return out
 }
 
-func agentReasoningCapabilities(agent string, model modelcatalog.Model, supported []string) ReasoningCapabilities {
-	capabilities := ReasoningCapabilities{
+func agentReasoningCapabilities(supported []string) ReasoningCapabilities {
+	return ReasoningCapabilities{
 		Status:  modelcatalog.ReasoningReady,
 		Scope:   ReasoningScopeAgent,
 		Efforts: append([]string(nil), supported...),
 	}
-	if agent != AgentGrok {
-		return capabilities
-	}
-	switch model.Value {
-	case modelcatalog.DefaultGrokModel, modelcatalog.GrokLegacyModel:
-		capabilities.Efforts = []string{"low", "medium", defaultGrokReasoningEffort}
-		capabilities.DefaultEffort = defaultGrokReasoningEffort
-	case modelcatalog.GrokComposerModel:
-		capabilities.Efforts = []string{}
-	}
-	return capabilities
 }
 
 func isCodexUltraModel(model modelcatalog.Model) bool {
@@ -240,9 +227,11 @@ func isCodexUltraModel(model modelcatalog.Model) bool {
 	}
 	switch id {
 	case provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Astra,
+		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Sol,
 		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Sol,
 		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Terra,
 		provider.OpenAIModelGPT6Astra,
+		provider.OpenAIModelGPT6Sol,
 		provider.OpenAIModelGPT56Sol,
 		provider.OpenAIModelGPT56Terra:
 		return true

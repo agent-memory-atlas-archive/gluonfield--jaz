@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/wins/jaz/backend/internal/managedtool"
-	"github.com/wins/jaz/backend/internal/modelcatalog"
 	modelprovider "github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/runtimeenv"
 	"github.com/wins/jaz/backend/internal/sessioncontext"
@@ -209,6 +208,17 @@ func TestCodexSystemPromptIsNotDuplicatedInSessionMeta(t *testing.T) {
 	}
 	if got != nil {
 		t.Fatalf("Codex session metadata = %#v, want launch-only prompt", got)
+	}
+}
+
+func TestSessionMetaSendsGrokModelWithRules(t *testing.T) {
+	manager := &Manager{cfg: Config{SystemPrompt: testPrompt("jaz platform prompt")}}
+	got, err := manager.sessionMeta(context.Background(), AgentGrok, AgentConfig{Model: "grok-4.6"}, "", "", "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got["modelId"] != "grok-4.6" || !strings.Contains(got["rules"].(string), "jaz platform prompt") {
+		t.Fatalf("grok session meta = %#v", got)
 	}
 }
 
@@ -760,9 +770,9 @@ func TestProcessEnvWritesOpenCodeInstructionsWithResolvedCwd(t *testing.T) {
 	}
 }
 
-func TestProcessEnvDoesNotOverrideDefaultOpenCodeProvider(t *testing.T) {
+func TestProcessEnvPinsOpenCodeKeyWithoutOverridingDefaultProvider(t *testing.T) {
 	root := t.TempDir()
-	env, err := NewManager(nil, Config{
+	manager := NewManager(nil, Config{
 		Root: root,
 		Providers: map[string]modelprovider.ModelProviderConfig{
 			"openrouter": {
@@ -772,20 +782,22 @@ func TestProcessEnvDoesNotOverrideDefaultOpenCodeProvider(t *testing.T) {
 			},
 		},
 		SystemPrompt: testPrompt("jaz instructions"),
-	}, nil).processEnvPrepared("opencode", AgentConfig{
-		Model: "openrouter/openai/gpt-5.4-mini",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var content struct {
-		Provider map[string]any `json:"provider"`
-	}
-	if err := json.Unmarshal([]byte(env["OPENCODE_CONFIG_CONTENT"]), &content); err != nil {
-		t.Fatalf("config content = %q: %v", env["OPENCODE_CONFIG_CONTENT"], err)
-	}
-	if len(content.Provider) != 0 {
-		t.Fatalf("default openrouter provider should not be overridden: %#v", content.Provider)
+	}, nil)
+	for _, model := range []string{"openrouter/openai/gpt-5.4-mini", ""} {
+		env, err := manager.processEnvPrepared("opencode", AgentConfig{Model: model})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var content struct {
+			Provider map[string]any `json:"provider"`
+		}
+		if err := json.Unmarshal([]byte(env["OPENCODE_CONFIG_CONTENT"]), &content); err != nil {
+			t.Fatalf("config content = %q: %v", env["OPENCODE_CONFIG_CONTENT"], err)
+		}
+		want := map[string]any{"openrouter": map[string]any{"options": map[string]any{"apiKey": "{env:OPENROUTER_API_KEY}"}}}
+		if !reflect.DeepEqual(content.Provider, want) {
+			t.Fatalf("model %q provider config = %#v, want only the bound key pinned", model, content.Provider)
+		}
 	}
 }
 
@@ -1207,13 +1219,6 @@ func TestProbeReadinessRequiresGrokAuth(t *testing.T) {
 	}
 }
 
-func TestProbeReadinessRejectsURLBackedGrokModelOverride(t *testing.T) {
-	ready := ProbeReadiness(AgentGrok, AgentConfig{URL: "http://127.0.0.1:9999", Model: modelcatalog.DefaultGrokModel}, t.TempDir(), nil)
-	if ready.Available || !strings.Contains(ready.Reason, "URL-backed Grok") {
-		t.Fatalf("ready = %#v", ready)
-	}
-}
-
 func TestAutoAuthMethodSelectsConfiguredEnvVarForGenericAgent(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	method, missing := autoAuthMethod("fake", codexInitializeAuthMethods(), map[string]string{"OPENAI_API_KEY": "key"})
@@ -1305,101 +1310,6 @@ func TestAutoAuthMethodReportsMissingGrokAuth(t *testing.T) {
 
 	if method != "" || strings.Join(missing, ",") != "Grok login at "+filepath.Join(home, ".grok", "auth.json")+" or JAZ_ACP_GROK_API_KEY" {
 		t.Fatalf("method=%q missing=%v", method, missing)
-	}
-}
-
-func TestProcessCommandAddsGrokReasoningEffortArg(t *testing.T) {
-	cfg := BuiltinAgents()[AgentGrok]
-	cfg.Model = ""
-	cfg.ReasoningEffort = "high"
-	_, args, err := processCommand(AgentGrok, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "agent --no-leader --always-approve --reasoning-effort high stdio"
-	if strings.Join(args, " ") != want {
-		t.Fatalf("args = %q, want %q", strings.Join(args, " "), want)
-	}
-}
-
-func TestProcessCommandAddsGrokModelArg(t *testing.T) {
-	_, args, err := processCommand("grok", AgentConfig{
-		Command: "grok",
-		Args:    []string{"agent", "stdio"},
-		Model:   modelcatalog.DefaultGrokModel,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(args, " ") != "agent --always-approve --model grok-4.6 stdio" {
-		t.Fatalf("args = %#v", args)
-	}
-}
-
-func TestProcessCommandRejectsAmbiguousGrokModelArg(t *testing.T) {
-	_, _, err := processCommand("grok", AgentConfig{
-		Command: "grok",
-		Args:    []string{"agent", "--model=custom", "stdio"},
-		Model:   modelcatalog.DefaultGrokModel,
-	})
-	if err == nil || !strings.Contains(err.Error(), "model is ambiguous") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestProcessCommandDoesNotDuplicateGrokAlwaysApproveArg(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		args []string
-		want string
-	}{
-		{
-			name: "already always approve",
-			args: []string{"agent", "--always-approve", "stdio"},
-			want: "agent --always-approve stdio",
-		},
-		{
-			name: "explicit permission mode",
-			args: []string{"agent", "--permission-mode", "ask", "stdio"},
-			want: "agent --permission-mode ask stdio",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, args, err := processCommand("grok", AgentConfig{
-				Command: "grok",
-				Args:    tc.args,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if strings.Join(args, " ") != tc.want {
-				t.Fatalf("args = %q, want %q", strings.Join(args, " "), tc.want)
-			}
-		})
-	}
-}
-
-func TestProcessCommandRejectsAmbiguousGrokReasoningEffortArg(t *testing.T) {
-	_, _, err := processCommand("grok", AgentConfig{
-		Command:         "grok",
-		Args:            []string{"agent", "--reasoning-effort=low", "stdio"},
-		ReasoningEffort: "high",
-	})
-	if err == nil || !strings.Contains(err.Error(), "reasoning effort is ambiguous") {
-		t.Fatalf("error = %v", err)
-	}
-}
-
-func TestProcessCommandLeavesNonGrokCommandAlone(t *testing.T) {
-	_, args, err := processCommand("grok", AgentConfig{
-		Command: os.Args[0],
-		Args:    []string{"-test.run=TestFakeACPAgentProcess"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(args, " ") != "-test.run=TestFakeACPAgentProcess" {
-		t.Fatalf("args = %#v", args)
 	}
 }
 

@@ -10,8 +10,6 @@ import (
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
-
-	"github.com/wins/jaz/backend/internal/provider"
 )
 
 const agentMethodSessionSetModel = "session/set_model"
@@ -63,6 +61,7 @@ const (
 
 type agentPolicy struct {
 	modelConfigID           string
+	modelMetaKey            string
 	effortConfigID          string
 	effortInModelSuffix     bool
 	providerInLaunch        bool
@@ -74,6 +73,7 @@ type agentPolicy struct {
 	resolvesContextTag      bool
 	effortOptions           []ReasoningEffortOption
 	ultracodeSetting        bool
+	systemPromptAppendMeta  bool
 }
 
 var baseReasoningEffortOptions = []ReasoningEffortOption{
@@ -125,10 +125,14 @@ func agentPolicyForAgent(agentName string) agentPolicy {
 		}
 	case AgentKimi:
 		return agentPolicy{
-			modelConfigID: sessionConfigModel,
+			modelConfigID:          sessionConfigModel,
+			systemPromptAppendMeta: true,
 		}
 	case AgentGrok:
+		// Grok rebuilds its system prompt without session rules when the model
+		// changes after session/new, so the model rides session/new instead.
 		return agentPolicy{
+			modelMetaKey:  "modelId",
 			effortOptions: baseReasoningEffortOptions,
 		}
 	case AgentOpenCode:
@@ -217,8 +221,14 @@ func (p agentPolicy) sessionConfigEffort(value string) string {
 	return effort
 }
 
-func (p agentPolicy) mergeSessionMeta(meta map[string]any, effort string) map[string]any {
-	normalized, err := p.normalizeReasoningEffort(effort)
+func (p agentPolicy) mergeSessionMeta(meta map[string]any, cfg AgentConfig) map[string]any {
+	if model := configuredSessionModel(cfg.ProviderQualifiedModel()); p.modelMetaKey != "" && model != "" {
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		meta[p.modelMetaKey] = model
+	}
+	normalized, err := p.normalizeReasoningEffort(cfg.ReasoningEffort)
 	if err != nil || !p.ultracodeSetting || normalized != claudeReasoningEffortUltracode {
 		return meta
 	}
@@ -291,11 +301,7 @@ func (m *Manager) setConfiguredSessionModel(ctx context.Context, peer *jsonrpc.P
 		return nil, nil
 	}
 	if policy.usesModelConfigOption() {
-		raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
-			SessionID: sessionID,
-			ConfigID:  acpschema.SessionConfigID(policy.modelConfigID),
-			Value:     acpschema.SessionConfigValueID(model),
-		})
+		raw, err := setSessionConfigOption(ctx, peer, sessionID, policy.modelConfigID, model)
 		if err == nil {
 			return raw, nil
 		}
@@ -319,6 +325,14 @@ func (m *Manager) setConfiguredSessionModel(ctx context.Context, peer *jsonrpc.P
 	return nil, fmt.Errorf("set acp agent %q model %q: %w", agentName, model, err)
 }
 
+func setSessionConfigOption(ctx context.Context, peer *jsonrpc.Peer, sessionID acpschema.SessionID, configID, value string) (json.RawMessage, error) {
+	return peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
+		SessionID: sessionID,
+		ConfigID:  acpschema.SessionConfigID(configID),
+		Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(value)),
+	})
+}
+
 func (m *Manager) setConfiguredReasoningEffort(ctx context.Context, peer *jsonrpc.Peer, agentName string, sessionID acpschema.SessionID, effort, configID string) (json.RawMessage, error) {
 	if effort == "" {
 		return nil, nil
@@ -333,11 +347,7 @@ func (m *Manager) setConfiguredReasoningEffort(ctx context.Context, peer *jsonrp
 	if strings.TrimSpace(configID) == "" {
 		return nil, nil
 	}
-	raw, err := peer.Call(ctx, acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
-		SessionID: sessionID,
-		ConfigID:  acpschema.SessionConfigID(configID),
-		Value:     acpschema.SessionConfigValueID(effort),
-	})
+	raw, err := setSessionConfigOption(ctx, peer, sessionID, configID, effort)
 	if err == nil {
 		return raw, nil
 	}
@@ -360,13 +370,15 @@ func (m *Manager) configuredModeState(
 	effort := policy.sessionConfigEffort(cfg.ReasoningEffort)
 	model := policy.sessionConfigModel(cfg)
 	modelToSet := model
-	if policy.modelConfiguredAtLaunch {
+	if policy.modelConfiguredAtLaunch || policy.modelMetaKey != "" {
 		modelToSet = ""
 	}
-	if _, handled, err := resolveGrokStartupConfig(agentName, cfg); err != nil {
-		return ModeState{}, err
-	} else if handled {
-		return m.initializeModeState(ctx, peer, agentName, session)
+	// A model sent in session/new _meta cannot be refused by the agent, and
+	// Grok silently falls back to its default for ids it does not offer.
+	if policy.modelMetaKey != "" && model != "" && !session.modelState.empty() {
+		if _, ok := session.modelState.matchAdvertised(model); !ok {
+			return ModeState{}, unadvertisedModelError(agentName, model, session.modelState)
+		}
 	}
 	modelRaw, err := m.setConfiguredSessionModel(ctx, peer, agentName, session.response.SessionID, modelToSet, session.modelState)
 	if err != nil {
@@ -581,10 +593,14 @@ func (p agentPolicy) sessionModelToSend(agentName, rawModel string, state sessio
 	case unadvertisedModelSkipped:
 		return "", nil
 	case unadvertisedModelRejected:
-		return "", fmt.Errorf("configured acp agent %q model %q is not advertised by the agent; available model ids: %s",
-			agentName, model, strings.Join(state.advertisedModels(), ", "))
+		return "", unadvertisedModelError(agentName, model, state)
 	}
 	return model, nil
+}
+
+func unadvertisedModelError(agentName, model string, state sessionModelState) error {
+	return fmt.Errorf("configured acp agent %q model %q is not advertised by the agent; available model ids: %s",
+		agentName, model, strings.Join(state.advertisedModels(), ", "))
 }
 
 func (s *sessionModelState) addExact(model string) {
@@ -672,14 +688,6 @@ func newACPSessionInfo(raw json.RawMessage, session acpschema.NewSessionResponse
 		modelState:    parseSessionModelState(raw),
 		configOptions: parseSessionConfigOptions(raw),
 	}
-}
-
-func configuredReasoningEffort(value string) string {
-	effort, err := provider.NormalizeReasoningEffort(value)
-	if err != nil {
-		return strings.TrimSpace(value)
-	}
-	return effort
 }
 
 func AgentOptionsForConfig(name string, cfg AgentConfig) AgentOptions {

@@ -49,12 +49,6 @@ var reasoningEffortRank = map[string]int{
 	"none": 0, "minimal": 1, "low": 2, "medium": 3, "high": 4, "xhigh": 5, "max": 6, "ultra": 7, "ultracode": 8,
 }
 
-const (
-	DefaultGrokModel  = "grok-4.6"
-	GrokLegacyModel   = "grok-4.5"
-	GrokComposerModel = "grok-composer-2.5-fast"
-)
-
 func sortReasoningEfforts(efforts []string) {
 	sort.SliceStable(efforts, func(i, j int) bool {
 		return reasoningEffortRank[efforts[i]] < reasoningEffortRank[efforts[j]]
@@ -79,6 +73,8 @@ var (
 	agentModels = map[string][]Model{
 		"codex": {
 			openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Most capable for complex work", "openai/gpt-6-astra"),
+			openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work", "openai/gpt-6-sol"),
+			openRouterBackedModel("gpt-6-luna", "GPT-6 Luna", "Fast and affordable for easier tasks", "openai/gpt-6-luna"),
 			openRouterBackedModel(provider.OpenAIModelGPT56Sol, "GPT-5.6 Sol", "Frontier capability", "openai/gpt-5.6-sol"),
 			openRouterBackedModel(provider.OpenAIModelGPT56Terra, "GPT-5.6 Terra", "Balanced capability and cost", "openai/gpt-5.6-terra"),
 			openRouterBackedModel(provider.OpenAIModelGPT56Luna, "GPT-5.6 Luna", "Efficient high-volume workloads", "openai/gpt-5.6-luna"),
@@ -92,13 +88,7 @@ var (
 			openRouterBackedModel("claude-fable-5-1", "Fable 5.1", "Most capable for the hardest tasks", "anthropic/claude-fable-5.1"),
 			openRouterBackedModel("claude-fable-5[1m]", "Fable 5", "Previous Fable model", "anthropic/claude-fable-5"),
 			openRouterBackedModel("sonnet", "Sonnet 5", "Efficient for routine tasks", "anthropic/claude-sonnet-5"),
-			openRouterBackedModel("sonnet[1m]", "Sonnet 5 (1M context)", "Draws from usage credits", "anthropic/claude-sonnet-5"),
 			openRouterBackedModel("haiku", "Haiku 4.5", "Fastest for quick answers", "anthropic/claude-haiku-4.5"),
-		},
-		"grok": {
-			modelWithoutProviderReasoning(DefaultGrokModel, "Grok 4.6", "Default Grok model"),
-			modelWithoutProviderReasoning(GrokLegacyModel, "Grok 4.5", "Previous Grok model"),
-			modelWithoutProviderReasoning(GrokComposerModel, "Composer 2.5", "Cursor's coding model"),
 		},
 		"opencode": {
 			openRouterNativeModel(provider.DefaultOpenRouterModel, "GLM 5.2", "Default OpenRouter coding model"),

@@ -21,6 +21,7 @@ const (
 	OpenAIModelGPT56Terra = "gpt-5.6-terra"
 	OpenAIModelGPT56Luna  = "gpt-5.6-luna"
 	OpenAIModelGPT6Astra  = "gpt-6-astra"
+	OpenAIModelGPT6Sol    = "gpt-6-sol"
 
 	CapabilityJaz             = "jaz"
 	CapabilityChatCompletions = "chat_completions"

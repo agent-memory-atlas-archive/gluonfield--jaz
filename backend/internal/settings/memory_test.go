@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/wins/jaz/backend/internal/acp"
-	"github.com/wins/jaz/backend/internal/modelcatalog"
 	"github.com/wins/jaz/backend/internal/provider"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
 )
@@ -82,7 +81,6 @@ func TestWorkerAgentDefaultsCompatibleWithSupportedModels(t *testing.T) {
 		{
 			name:  "grok",
 			agent: acp.AgentGrok,
-			model: modelcatalog.DefaultGrokModel,
 		},
 		{
 			name:  "kimi",

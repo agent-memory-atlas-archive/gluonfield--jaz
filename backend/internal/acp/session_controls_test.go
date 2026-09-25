@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/gluonfield/acp-transport/jsonrpc"
@@ -338,5 +339,20 @@ func TestProviderModeChangeUpdatesPinnedBaseline(t *testing.T) {
 		if got := baselineModeID(AgentClaude, job.Modes); got != want {
 			t.Fatalf("native mode %s: next-turn baseline = %s, want %s", mode, got, want)
 		}
+	}
+}
+
+func TestSetSessionConfigRefusesMidSessionGrokModelChange(t *testing.T) {
+	manager := NewManager(nil, Config{}, nil)
+	job := &jobState{Job: Job{ID: "grok-session", ACPAgent: AgentGrok}}
+	job.agentSession.ConfigOptions = []sessionevents.AgentConfigOption{
+		{ID: "model", Category: "model", CurrentValue: "grok-4.7", Options: []sessionevents.AgentConfigValue{{Value: "grok-4.7"}, {Value: "grok-4.6"}}},
+		{ID: "reasoning_effort", Category: "thought_level", CurrentValue: "high", Options: []sessionevents.AgentConfigValue{{Value: "high"}, {Value: "xhigh"}}},
+	}
+	if err := manager.setSessionConfig(context.Background(), job, "model", "grok-4.6"); err == nil || !strings.Contains(err.Error(), "new thread") {
+		t.Fatalf("model change error = %v", err)
+	}
+	if err := manager.setSessionConfig(context.Background(), job, "reasoning_effort", "xhigh"); err == nil || !strings.Contains(err.Error(), "connection is unavailable") {
+		t.Fatalf("effort change should pass the model guard: %v", err)
 	}
 }

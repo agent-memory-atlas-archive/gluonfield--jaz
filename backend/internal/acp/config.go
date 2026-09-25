@@ -303,12 +303,10 @@ func BuiltinAgents() AgentCatalog {
 				"--always-approve",
 				"stdio",
 			},
-			Model:           modelcatalog.DefaultGrokModel,
-			ReasoningEffort: DefaultAgentReasoningEffort(AgentGrok),
 		},
 		AgentOpenCode: {
 			Command:                 "npx",
-			Args:                    []string{"-y", "opencode-ai@1.18.30", "acp"},
+			Args:                    []string{"-y", "opencode-ai@1.18.32", "acp"},
 			ProviderMode:            AgentProviderModeAgentDefaults,
 			ModelProviderCapability: provider.CapabilityChatCompletions,
 			ModelProvider:           provider.ProviderOpenRouter,

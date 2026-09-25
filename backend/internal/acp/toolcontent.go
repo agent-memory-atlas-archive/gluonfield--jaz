@@ -87,7 +87,7 @@ func toolUpdateSnapshot(fields toolUpdateFields) sessionevents.ACPToolCall {
 	src := sessionevents.ACPToolCall{
 		ID:        string(fields.ID),
 		Title:     fields.Title,
-		Kind:      kindString(fields.Kind),
+		Kind:      derefString(fields.Kind),
 		ToolName:  toolUpdateName(fields),
 		Content:   normalizeToolContent(fields.Content),
 		Locations: normalizeToolLocations(fields.Locations),
@@ -102,11 +102,11 @@ func toolUpdateSnapshot(fields toolUpdateFields) sessionevents.ACPToolCall {
 	return src
 }
 
-func kindString(kind *acpschema.ToolKind) string {
-	if kind == nil {
+func derefString[T ~string](value *T) string {
+	if value == nil {
 		return ""
 	}
-	return string(*kind)
+	return string(*value)
 }
 
 func boundedRawInput(raw json.RawMessage) map[string]any {

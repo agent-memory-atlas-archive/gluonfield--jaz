@@ -128,7 +128,7 @@ func probeApplyJazSessionConfig(
 			raw := probeCall(t, ctx, conn, "5", acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 				SessionID: sessionID,
 				ConfigID:  acpschema.SessionConfigID(policy.modelConfigID),
-				Value:     acpschema.SessionConfigValueID(model),
+				Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(model)),
 			})
 			options = parseSessionConfigOptions(raw.Result)
 		} else {
@@ -152,7 +152,7 @@ func probeApplyJazSessionConfig(
 		_ = probeCall(t, ctx, conn, "6", acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 			SessionID: sessionID,
 			ConfigID:  acpschema.SessionConfigID(configID),
-			Value:     acpschema.SessionConfigValueID(effort),
+			Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(effort)),
 		})
 		effortDuration = time.Since(started)
 	}

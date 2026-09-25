@@ -92,7 +92,7 @@ func (m *Manager) completePromptCall(done chan struct{}, job *jobState, stopReas
 		return
 	}
 	turn.promptCalls = 0
-	if state == StateIdle && stopReason == StopReasonEndTurn && job.ActiveOperation != ActiveOperationCompact && !hasVisibleTurnResult(job, turn) {
+	if state == StateIdle && stopReason == StopReasonEndTurn && job.ActiveOperation != ActiveOperationCompact && !hasVisibleTurnResult(job) {
 		state = StateFailed
 		errMessage = "Agent ended the turn without producing a message, plan, or tool activity."
 	}
@@ -107,8 +107,8 @@ func (m *Manager) completePromptCall(done chan struct{}, job *jobState, stopReas
 	m.finishTurn(done, job)
 }
 
-func hasVisibleTurnResult(job *jobState, turn *activeTurn) bool {
-	return strings.TrimSpace(job.Assistant) != "" || len(job.ToolCalls) > 0 || len(job.Plan) > 0 || strings.TrimSpace(turn.planDocument) != ""
+func hasVisibleTurnResult(job *jobState) bool {
+	return strings.TrimSpace(job.Assistant) != "" || len(job.ToolCalls) > 0 || len(job.Plan) > 0
 }
 
 func (m *Manager) failPromptCall(done chan struct{}, job *jobState, err error) {
@@ -137,7 +137,7 @@ func shouldCompleteClosedGrokPrompt(job *jobState, turn *activeTurn, err error) 
 	if !jsonrpc.IsClosed(err) && !errors.Is(err, io.EOF) {
 		return false
 	}
-	return hasVisibleTurnResult(job, turn)
+	return hasVisibleTurnResult(job)
 }
 
 func (m *Manager) finishTurn(done chan struct{}, job *jobState) {
@@ -152,7 +152,6 @@ func (m *Manager) finishTurn(done chan struct{}, job *jobState) {
 	job.turn = nil
 	completion := turn.completion
 	planRequested := turn.planRequested
-	planDocument := turn.planDocument
 	parentVisible := job.ParentVisible
 	job.mu.Unlock()
 	m.cancelPendingPermissions(job.ID)
@@ -160,12 +159,6 @@ func (m *Manager) finishTurn(done chan struct{}, job *jobState) {
 	snapshot := job.Snapshot()
 	event := eventViewFromJob(snapshot)
 	if snapshot.State == StateIdle || snapshot.State == StateFailed || snapshot.State == StateCancelled {
-		if snapshot.State == StateIdle && planDocument != "" {
-			m.publishPlanEvent(event, sessionevents.PlanEvent{
-				Explanation:      planDocument,
-				AwaitingApproval: true,
-			})
-		}
 		if snapshot.StopReason != StopReasonServerShutdown {
 			m.touchAttention(surfaceSessionIDs(event)...)
 		}

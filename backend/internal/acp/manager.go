@@ -348,7 +348,7 @@ func (m *Manager) sessionMeta(ctx context.Context, agent string, cfg AgentConfig
 	if err != nil {
 		return nil, err
 	}
-	return agentPolicyForAgent(agent).mergeSessionMeta(meta, cfg.ReasoningEffort), nil
+	return agentPolicyForAgent(agent).mergeSessionMeta(meta, cfg), nil
 }
 
 // An adapter that persists the system prompt in provider history must not
@@ -356,7 +356,7 @@ func (m *Manager) sessionMeta(ctx context.Context, agent string, cfg AgentConfig
 func (m *Manager) sessionRestoreMeta(ctx context.Context, agent string, cfg AgentConfig, cwd, artifactSurface, mcpServerPolicy string, systemPromptExtensions promptmodule.Modules) (map[string]any, error) {
 	policy := agentPolicyForAgent(agent)
 	if policy.promptPersistsOnRestore {
-		return policy.mergeSessionMeta(nil, cfg.ReasoningEffort), nil
+		return policy.mergeSessionMeta(nil, cfg), nil
 	}
 	return m.sessionMeta(ctx, agent, cfg, cwd, artifactSurface, mcpServerPolicy, systemPromptExtensions)
 }

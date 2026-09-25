@@ -83,11 +83,18 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	if schema == nil {
 		return nil, nil
 	}
+	parsed := make(map[string]elicitationField, len(schema.Properties))
+	customFields := map[string]string{}
 	keys := make([]string, 0, len(schema.Properties))
-	for key := range schema.Properties {
-		if strings.HasSuffix(key, "_custom") {
+	for key, property := range schema.Properties {
+		field := readElicitationField(property, message)
+		if field.note {
+			if field.noteFor != "" {
+				customFields[field.noteFor] = key
+			}
 			continue
 		}
+		parsed[key] = field
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -95,11 +102,12 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 	questions := make([]sessionevents.ACPQuestion, 0, len(keys))
 	fields := make(map[string]elicitationAnswerField, len(keys))
 	for _, key := range keys {
+		field := parsed[key]
 		property := schema.Properties[key]
 		options := elicitationOptions(property)
-		questionText := firstNonEmpty(strings.TrimSpace(property.Description), strings.TrimSpace(property.Title), strings.TrimSpace(message), key)
+		questionText := firstNonEmpty(field.question, field.header, field.message, key)
 		if len(keys) == 1 {
-			questionText = firstNonEmpty(strings.TrimSpace(message), questionText)
+			questionText = firstNonEmpty(field.message, questionText)
 		}
 		if questionText == "" {
 			continue
@@ -108,17 +116,13 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 		for _, option := range options {
 			optionSet[option.Label] = true
 		}
-		customKey := key + "_custom"
-		_, hasCustom := schema.Properties[customKey]
-		customField := ""
-		if hasCustom {
-			customField = customKey
-		}
+		customField := customFields[key]
 		questions = append(questions, sessionevents.ACPQuestion{
 			ID:       key,
-			Header:   strings.TrimSpace(property.Title),
+			Header:   field.header,
 			Question: questionText,
-			IsOther:  hasCustom || len(options) == 0,
+			IsOther:  customField != "" || len(options) == 0,
+			IsSecret: field.secret,
 			Options:  options,
 		})
 		fields[key] = elicitationAnswerField{
@@ -129,6 +133,43 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 		}
 	}
 	return questions, fields
+}
+
+type elicitationField struct {
+	header, question, message string
+	note                      bool
+	noteFor                   string
+	secret                    bool
+}
+
+// readElicitationField reads one requested property in its agent's dialect.
+// Claude titles a field with its header, asks a lone question in the form
+// message and marks free text with the neutral _askUserQuestionCustomAnswer.
+// Codex titles a field with the question, describes it with the header, sends a
+// boilerplate form message and marks note fields in _meta.codex.
+func readElicitationField(property acpschema.ElicitationPropertySchema, message string) elicitationField {
+	field := elicitationField{
+		header:   strings.TrimSpace(property.Title),
+		question: strings.TrimSpace(property.Description),
+		message:  strings.TrimSpace(message),
+	}
+	if custom, ok := property.Meta["_askUserQuestionCustomAnswer"].(map[string]any); ok {
+		field.note = true
+		field.noteFor, _ = custom["questionId"].(string)
+		return field
+	}
+	codex, ok := property.Meta[codexMetaKey].(map[string]any)
+	if !ok {
+		return field
+	}
+	if codex["role"] == "user_note" {
+		field.note = true
+		field.noteFor, _ = codex["questionId"].(string)
+		return field
+	}
+	field.header, field.question, field.message = field.question, field.header, ""
+	field.secret = codex["isSecret"] == true
+	return field
 }
 
 func elicitationOptions(property acpschema.ElicitationPropertySchema) []sessionevents.ACPQuestionOption {
@@ -165,10 +206,8 @@ func enumOptions(values []string) []acpschema.EnumOption {
 }
 
 func elicitationOptionDescription(option acpschema.EnumOption) string {
-	if value, ok := option.Meta["_claude/askUserQuestionOption"].(map[string]any); ok {
-		if description, ok := value["description"].(string); ok {
-			return strings.TrimSpace(description)
-		}
+	if description := strings.TrimSpace(option.Description); description != "" {
+		return description
 	}
 	if option.Title == "" || option.Title == option.Const {
 		return ""

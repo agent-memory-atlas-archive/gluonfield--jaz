@@ -50,17 +50,15 @@ func TestCreateElicitationPublishesQuestionsAndReturnsAnswers(t *testing.T) {
 							"title": "Macros type",
 							"oneOf": []map[string]any{
 								{
-									"const": "Nutrition",
-									"title": "Nutrition - Protein, carbs, and fat",
-									"_meta": map[string]any{
-										"_claude/askUserQuestionOption": map[string]any{
-											"description": "Protein, carbs, and fat",
-										},
-									},
+									"const":       "Nutrition",
+									"title":       "Nutrition",
+									"description": "Protein, carbs, and fat",
 								},
 							},
 						},
-						"question_0_custom": map[string]any{"type": "string", "title": "Other"},
+						"question_0_custom": map[string]any{"type": "string", "title": "Other", "_meta": map[string]any{
+							"_askUserQuestionCustomAnswer": map[string]any{"questionId": "question_0", "isCustomAnswer": true},
+						}},
 					},
 				},
 			}),
@@ -251,5 +249,57 @@ func TestCreateElicitationPlainTextAnswerUsesRequestedField(t *testing.T) {
 		t.Fatal(err)
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
+	}
+}
+
+func TestElicitationQuestionsReadCodexUserInputForm(t *testing.T) {
+	const message = "Codex needs your input to continue."
+	var schema acpschema.ElicitationSchema
+	if err := json.Unmarshal([]byte(`{"type":"object","properties":{
+		"migration_strategy":{"type":"string","title":"How should existing rows be migrated?","description":"Migration",
+			"_meta":{"codex":{"isOther":true,"isSecret":false}},
+			"oneOf":[{"const":"Lazy backfill","title":"Lazy backfill","description":"Migrate rows on first read."},
+				{"const":"None of the above","title":"None of the above","description":"Provide a different answer in the note field."}]},
+		"migration_strategy_note":{"type":"string","title":"Additional answer or note",
+			"_meta":{"codex":{"questionId":"migration_strategy","role":"user_note","isSecret":false}}},
+		"ticket":{"type":"string","title":"Which issue should the commit reference?","description":"Ticket",
+			"_meta":{"codex":{"isOther":false,"isSecret":true}}}},
+		"required":["migration_strategy","ticket"]}`), &schema); err != nil {
+		t.Fatal(err)
+	}
+
+	questions, fields := elicitationQuestions(message, &schema)
+	if len(questions) != 2 {
+		t.Fatalf("questions = %#v", questions)
+	}
+	migration := questions[0]
+	if migration.ID != "migration_strategy" || migration.Question != "How should existing rows be migrated?" ||
+		migration.Header != "Migration" || !migration.IsOther || len(migration.Options) != 2 ||
+		migration.Options[0].Description != "Migrate rows on first read." {
+		t.Fatalf("migration question = %#v", migration)
+	}
+	if questions[1].Question != "Which issue should the commit reference?" || questions[1].Header != "Ticket" || !questions[1].IsSecret || migration.IsSecret {
+		t.Fatalf("ticket question = %#v", questions[1])
+	}
+
+	single := acpschema.ElicitationSchema{Properties: map[string]acpschema.ElicitationPropertySchema{"ticket": schema.Properties["ticket"]}}
+	if got, _ := elicitationQuestions(message, &single); got[0].Question != "Which issue should the commit reference?" {
+		t.Fatalf("single codex question = %q", got[0].Question)
+	}
+
+	raw, err := encodeElicitationResponse(fields, map[string]InteractiveAnswerValue{
+		"migration_strategy": {Answers: []string{"Dual-write both columns"}},
+		"ticket":             {Answers: []string{"JAZ-12"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got acpschema.CreateElicitationResponse
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Content) != 2 || string(got.Content["migration_strategy_note"]) != `"Dual-write both columns"` ||
+		string(got.Content["ticket"]) != `"JAZ-12"` {
+		t.Fatalf("elicitation response = %s", raw)
 	}
 }

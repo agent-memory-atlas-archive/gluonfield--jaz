@@ -13,11 +13,6 @@ import (
 	"github.com/wins/jaz/backend/internal/sessionevents"
 )
 
-const (
-	codexPlanKindMetaKey  = "codex.plan_kind"
-	codexPlanKindProposal = "proposal"
-)
-
 func (m *Manager) handleJSONRPC(ctx context.Context, req jsonrpc.Request) (json.RawMessage, *jsonrpc.Error) {
 	switch req.Method {
 	case "_x.ai/session/interjection", "_x.ai/session_notification":
@@ -134,14 +129,14 @@ func (m *Manager) applyUpdate(acpSessionID string, raw json.RawMessage) {
 	switch event := update.(type) {
 	case acpschema.AgentMessageChunkUpdate:
 		messageChunk = contentText(event.Content)
-		messageID = event.MessageID
+		messageID = derefString(event.MessageID)
 		job.appendAssistantLocked(messageChunk)
 		if messageChunk != "" {
 			job.savedAssistantLen = len(job.Assistant)
 		}
 	case acpschema.AgentThoughtChunkUpdate:
 		thoughtChunk = contentText(event.Content)
-		thoughtMessageID = event.MessageID
+		thoughtMessageID = derefString(event.MessageID)
 		job.appendThoughtLocked(thoughtChunk)
 	case acpschema.ToolCallSessionUpdate:
 		recordTool(toolUpdateSnapshot(toolUpdateFields{
@@ -177,21 +172,6 @@ func (m *Manager) applyUpdate(acpSessionID string, raw json.RawMessage) {
 				Status:   string(entry.Status),
 				Priority: string(entry.Priority),
 			})
-		}
-		acceptProposal := job.turn != nil && acceptsACPPlanProposal(job.turn.planRequested, job.ACPAgent)
-		if acceptProposal {
-			job.turn.planDocument = ""
-		}
-		planKind, _ := event.Meta[codexPlanKindMetaKey].(string)
-		if planKind == codexPlanKindProposal {
-			if acceptProposal && len(plan) == 1 {
-				job.turn.planDocument = strings.TrimSpace(plan[0].Content)
-			}
-			if len(job.Plan) > 0 {
-				job.Plan = sessionevents.PlanCleared
-				publishACP = true
-			}
-			break
 		}
 		var ok bool
 		plan, ok = sessionevents.NormalizeProgressEntries(plan)

@@ -2,6 +2,7 @@ package acp
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -23,5 +24,20 @@ func TestSupportedSteerMethod(t *testing.T) {
 				t.Fatalf("supportedSteerMethod() = %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestValidateProcessLifecycleRequiresManagedKimiPromptAppend(t *testing.T) {
+	without := json.RawMessage(`{"protocolVersion":1,"agentCapabilities":{"loadSession":true}}`)
+	with := json.RawMessage(`{"protocolVersion":1,"agentCapabilities":{"loadSession":true},"_meta":{"jaz.dev/systemPromptAppend":true}}`)
+	managed := AgentConfig{ManagedAdapter: AgentKimi}
+	if err := validateProcessLifecycle(AgentKimi, managed, without); err == nil || !strings.Contains(err.Error(), systemPromptAppendMeta) {
+		t.Fatalf("managed kimi without prompt append: %v", err)
+	}
+	if err := validateProcessLifecycle(AgentKimi, managed, with); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateProcessLifecycle(AgentKimi, AgentConfig{Command: "kimi"}, without); err != nil {
+		t.Fatalf("user-configured kimi command: %v", err)
 	}
 }

@@ -27,7 +27,6 @@ func TestEndTurnRequiresVisibleResult(t *testing.T) {
 		{name: "assistant", prepare: func(job *jobState) { job.Assistant = "done" }, wantState: StateIdle},
 		{name: "tool", prepare: func(job *jobState) { job.ToolCalls = []sessionevents.ACPToolCall{{ID: "tool"}} }, wantState: StateIdle},
 		{name: "plan", prepare: func(job *jobState) { job.Plan = []sessionevents.PlanEntry{{Content: "done"}} }, wantState: StateIdle},
-		{name: "plan proposal", prepare: func(job *jobState) { job.turn.planDocument = "proposed plan" }, wantState: StateIdle},
 		{name: "compaction", operation: ActiveOperationCompact, wantState: StateIdle},
 	} {
 		t.Run(test.name, func(t *testing.T) {

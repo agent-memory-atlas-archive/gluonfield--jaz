@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
 	"github.com/gluonfield/acp-transport/stdio"
 	"github.com/gluonfield/acp-transport/streamhttp"
@@ -131,11 +132,7 @@ func (m *Manager) openConn(ctx context.Context, name string, cfg AgentConfig, en
 			return nil, nil, err
 		}
 	}
-	command, args, err := processCommand(name, cfg)
-	if err != nil {
-		return nil, nil, err
-	}
-	command, args = launchCommand(command, args)
+	command, args := launchCommand(cfg.Command, cfg.Args)
 	addCommandDirToPath(env, command)
 	cmd := exec.CommandContext(ctx, command, args...)
 	prepareProcessCommand(cmd)
@@ -404,15 +401,16 @@ func (m *Manager) buildProcessEnv(ctx context.Context, name string, agent AgentC
 		if strings.TrimSpace(env["OPENCODE_CONFIG_DIR"]) == "" {
 			env["OPENCODE_CONFIG_DIR"] = auth.Config.Path
 		}
+		auth.BindAPIKeyEnv(env)
 		if prepare {
 			if err := os.MkdirAll(env["OPENCODE_CONFIG_DIR"], 0o700); err != nil {
 				prepareErr = firstError(prepareErr, fmt.Errorf("prepare opencode profile %s: %w", env["OPENCODE_CONFIG_DIR"], err))
 			}
-			if err := m.prepareOpenCodeConfig(ctx, env, agent, cwd, artifactSurface, mcpServerPolicy, systemPromptExtensions); err != nil {
+			keyEnv, _, _ := auth.APIKeyBinding()
+			if err := m.prepareOpenCodeConfig(ctx, env, agent, keyEnv, cwd, artifactSurface, mcpServerPolicy, systemPromptExtensions); err != nil {
 				prepareErr = firstError(prepareErr, err)
 			}
 		}
-		auth.BindAPIKeyEnv(env)
 	}
 	if name == AgentAntigravity {
 		// Antigravity authenticates through the agy CLI's own keyring, never an
@@ -453,100 +451,6 @@ func (m *Manager) installAgentSkills(agent, root, dst string) {
 	}
 }
 
-func processCommand(name string, cfg AgentConfig) (string, []string, error) {
-	args := append([]string(nil), cfg.Args...)
-	grokCfg, handled, err := resolveGrokStartupConfig(name, cfg)
-	if err != nil {
-		return "", nil, err
-	}
-	if handled && isGrokCommand(cfg.Command) {
-		args = withGrokAlwaysApproveArg(args)
-		args = withGrokModelArg(args, grokCfg.model)
-		args = withGrokReasoningEffortArg(args, grokCfg.effort)
-	}
-	return cfg.Command, args, nil
-}
-
-func isGrokCommand(command string) bool {
-	return filepath.Base(strings.TrimSpace(command)) == "grok"
-}
-
-type grokStartupConfig struct {
-	model  string
-	effort string
-}
-
-func resolveGrokStartupConfig(agentName string, cfg AgentConfig) (grokStartupConfig, bool, error) {
-	if CanonicalAgentName(agentName) != AgentGrok {
-		return grokStartupConfig{}, false, nil
-	}
-	model := configuredSessionModel(cfg.ProviderQualifiedModel())
-	effort := agentPolicyForAgent(agentName).sessionConfigEffort(cfg.ReasoningEffort)
-	if model == "" && effort == "" {
-		return grokStartupConfig{}, true, nil
-	}
-	if cfg.URL != "" {
-		return grokStartupConfig{}, false, fmt.Errorf("configured acp agent %q model or reasoning effort cannot be applied to URL-backed Grok; clear the override or run Grok as a local command", agentName)
-	}
-	if !isGrokCommand(cfg.Command) {
-		return grokStartupConfig{}, false, fmt.Errorf("configured acp agent %q model or reasoning effort requires the local grok command; clear the override or put it directly in the agent args", agentName)
-	}
-	if model != "" && hasFlag(cfg.Args, "--model", "-m") {
-		return grokStartupConfig{}, false, fmt.Errorf("configured acp agent %q model is ambiguous: remove --model from args or clear the model override", agentName)
-	}
-	if effort != "" && hasFlag(cfg.Args, "--reasoning-effort", "--effort") {
-		return grokStartupConfig{}, false, fmt.Errorf("configured acp agent %q reasoning effort is ambiguous: remove --reasoning-effort from args or clear the reasoning effort override", agentName)
-	}
-	return grokStartupConfig{model: model, effort: effort}, true, nil
-}
-
-func withGrokReasoningEffortArg(args []string, effort string) []string {
-	if strings.TrimSpace(effort) == "" || hasFlag(args, "--reasoning-effort", "--effort") {
-		return args
-	}
-	return insertBeforeArg(args, "stdio", "--reasoning-effort", effort)
-}
-
-func withGrokModelArg(args []string, model string) []string {
-	if strings.TrimSpace(model) == "" || hasFlag(args, "--model", "-m") {
-		return args
-	}
-	return insertBeforeArg(args, "stdio", "--model", model)
-}
-
-func withGrokAlwaysApproveArg(args []string) []string {
-	if hasFlag(args, "--always-approve") || hasFlag(args, "--permission-mode") {
-		return args
-	}
-	return insertBeforeArg(args, "stdio", "--always-approve")
-}
-
-func insertBeforeArg(args []string, marker string, values ...string) []string {
-	insertAt := len(args)
-	for i, arg := range args {
-		if arg == marker {
-			insertAt = i
-			break
-		}
-	}
-	next := make([]string, 0, len(args)+len(values))
-	next = append(next, args[:insertAt]...)
-	next = append(next, values...)
-	next = append(next, args[insertAt:]...)
-	return next
-}
-
-func hasFlag(args []string, names ...string) bool {
-	for _, arg := range args {
-		for _, name := range names {
-			if arg == name || strings.HasPrefix(arg, name+"=") {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func firstError(current, next error) error {
 	if current != nil {
 		return current
@@ -564,7 +468,7 @@ func normalizeEnv(env map[string]string, canonical, alias string) {
 	}
 }
 
-func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (string, []string) {
+func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (acpschema.AuthMethodID, []string) {
 	var init struct {
 		AuthMethods []agentAuthMethod `json:"authMethods"`
 	}
@@ -629,14 +533,14 @@ func autoAuthMethod(agent string, raw json.RawMessage, env map[string]string) (s
 }
 
 type agentAuthMethod struct {
-	Type string `json:"type"`
-	ID   string `json:"id"`
+	Type string                 `json:"type"`
+	ID   acpschema.AuthMethodID `json:"id"`
 	Vars []struct {
 		Name string `json:"name"`
 	} `json:"vars"`
 }
 
-func configuredEnvAuthMethod(methods []agentAuthMethod, env map[string]string) string {
+func configuredEnvAuthMethod(methods []agentAuthMethod, env map[string]string) acpschema.AuthMethodID {
 	for _, method := range methods {
 		if method.Type != "env_var" && len(method.Vars) == 0 {
 			continue

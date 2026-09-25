@@ -381,26 +381,6 @@ func TestServiceAgentModelsDoNotMirrorProviderContext(t *testing.T) {
 	}
 }
 
-func TestServiceAgentModelsIncludesCurrentGrokModels(t *testing.T) {
-	service := NewService(nil)
-	models := service.AgentModels("grok")
-	got := make([]string, 0, len(models))
-	for _, model := range models {
-		if model.Reasoning.Status != ReasoningUnavailable {
-			t.Fatalf("grok reasoning status = %q", model.Reasoning.Status)
-		}
-		got = append(got, model.Value)
-	}
-	want := []string{
-		DefaultGrokModel,
-		GrokLegacyModel,
-		GrokComposerModel,
-	}
-	if strings.Join(got, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("grok models = %#v, want %#v", got, want)
-	}
-}
-
 func warmOpenRouterTestService(t *testing.T, body string) *Service {
 	t.Helper()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

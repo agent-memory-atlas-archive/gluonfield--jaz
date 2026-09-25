@@ -7,6 +7,10 @@ import (
 	acpschema "github.com/gluonfield/acp-transport/acp"
 )
 
+// systemPromptAppendMeta is advertised in initialize _meta by Jaz-patched
+// adapters that apply session _meta.systemPrompt.
+const systemPromptAppendMeta = "jaz.dev/systemPromptAppend"
+
 type steerMethod string
 
 const (
@@ -49,10 +53,22 @@ func sessionRestoreMethod(raw json.RawMessage) string {
 }
 
 func validateProcessLifecycle(agent string, cfg AgentConfig, raw json.RawMessage) error {
-	if (cfg.URL == "" && !cfg.Local) && sessionRestoreMethod(raw) == "" {
-		return fmt.Errorf("managed ACP agent %q requires session/resume or session/load support", CanonicalAgentName(agent))
+	if cfg.URL != "" || cfg.Local {
+		return nil
+	}
+	agent = CanonicalAgentName(agent)
+	if sessionRestoreMethod(raw) == "" {
+		return fmt.Errorf("managed ACP agent %q requires session/resume or session/load support", agent)
+	}
+	if cfg.ManagedAdapter != "" && agentPolicyForAgent(agent).systemPromptAppendMeta && !initializeMetaFlag(raw, systemPromptAppendMeta) {
+		return fmt.Errorf("managed ACP agent %q does not advertise %s, so it would drop Jaz's system prompt", agent, systemPromptAppendMeta)
 	}
 	return nil
+}
+
+func initializeMetaFlag(raw json.RawMessage, key string) bool {
+	var resp acpschema.InitializeResponse
+	return json.Unmarshal(raw, &resp) == nil && boolMeta(resp.Meta, key)
 }
 
 func sessionMaterializesOnPrompt(agent string, cfg AgentConfig) bool {

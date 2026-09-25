@@ -23,11 +23,12 @@ type openCodeConfigContent struct {
 }
 
 type openCodeProviderConfig struct {
-	API    string                         `json:"api,omitempty"`
-	Name   string                         `json:"name,omitempty"`
-	Env    []string                       `json:"env,omitempty"`
-	NPM    string                         `json:"npm,omitempty"`
-	Models map[string]openCodeModelConfig `json:"models,omitempty"`
+	API     string                         `json:"api,omitempty"`
+	Name    string                         `json:"name,omitempty"`
+	Env     []string                       `json:"env,omitempty"`
+	NPM     string                         `json:"npm,omitempty"`
+	Options map[string]string              `json:"options,omitempty"`
+	Models  map[string]openCodeModelConfig `json:"models,omitempty"`
 }
 
 type openCodeModelConfig struct {
@@ -43,7 +44,7 @@ type openCodeReasoningConfig struct {
 	Effort string `json:"effort,omitempty"`
 }
 
-func (m *Manager) prepareOpenCodeConfig(ctx context.Context, env map[string]string, agent AgentConfig, cwd, artifactSurface, mcpServerPolicy string, systemPromptExtensions promptmodule.Modules) error {
+func (m *Manager) prepareOpenCodeConfig(ctx context.Context, env map[string]string, agent AgentConfig, keyEnv, cwd, artifactSurface, mcpServerPolicy string, systemPromptExtensions promptmodule.Modules) error {
 	if strings.TrimSpace(env["OPENCODE_CONFIG_CONTENT"]) != "" {
 		return nil
 	}
@@ -63,6 +64,17 @@ func (m *Manager) prepareOpenCodeConfig(ctx context.Context, env map[string]stri
 		if modelprovider.OpenCodeProviderIDFromModel(model) == modelprovider.ProviderOpenRouter {
 			content.SmallModel = model
 		}
+	}
+	if keyEnv != "" {
+		// OpenCode lets a stored `opencode auth` key override the environment,
+		// but options.apiKey outranks both, so the key Jaz binds is the one used.
+		providerID := openCodeProviderID(model)
+		provider := content.Provider[providerID]
+		provider.Options = map[string]string{"apiKey": "{env:" + keyEnv + "}"}
+		if content.Provider == nil {
+			content.Provider = map[string]openCodeProviderConfig{}
+		}
+		content.Provider[providerID] = provider
 	}
 	addOpenCodeReasoningVariant(&content, model, agent.ReasoningEffort)
 	data, err := json.Marshal(content)

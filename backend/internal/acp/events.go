@@ -16,11 +16,6 @@ import (
 	"github.com/wins/jaz/backend/internal/sessionevents"
 )
 
-const (
-	codexRequestUserInputMetaKey  = "codex.request_user_input"
-	userInputResponseOptionPrefix = "__user_input_response__:"
-)
-
 type InteractiveAnswerValue struct {
 	Answers []string `json:"answers"`
 }
@@ -32,10 +27,9 @@ func (m *Manager) awaitPermission(ctx context.Context, job *jobState, req acpsch
 	permission.Status = "pending"
 
 	pending := &pendingPermission{
-		sessionID:     job.ID,
-		request:       permission,
-		encodeAnswers: userInputAnswerEncoder(userInputResponseOptionPrefix),
-		answer:        make(chan string, 1),
+		sessionID: job.ID,
+		request:   permission,
+		answer:    make(chan string, 1),
 	}
 	if !m.registerPendingPermission(job, pending) {
 		return permissionCancelled()
@@ -247,10 +241,6 @@ func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPe
 			Line: location.Line,
 		})
 	}
-	if questions := codexUserInputQuestions(req); len(questions) > 0 {
-		out.Title = firstNonEmpty(req.ToolCall.Title, "Clarifying questions")
-		out.Questions = questions
-	}
 	return out
 }
 
@@ -259,7 +249,7 @@ func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPe
 // rawInput {"plan": ...} and as a text content block; either is the full plan the
 // user is being asked to approve, so the approval surface can render it.
 func permissionPlanContent(call acpschema.ToolCallUpdate) string {
-	if kindString(call.Kind) != string(acpschema.ToolKindSwitchMode) {
+	if derefString(call.Kind) != string(acpschema.ToolKindSwitchMode) {
 		return ""
 	}
 	var in struct {
@@ -283,78 +273,6 @@ func permissionPlanContent(call acpschema.ToolCallUpdate) string {
 	return clampToolText(strings.TrimSpace(b.String()))
 }
 
-type codexUserInputMeta struct {
-	CallID    string                   `json:"call_id"`
-	TurnID    string                   `json:"turn_id"`
-	Questions []codexUserInputQuestion `json:"questions"`
-}
-
-type codexUserInputQuestion struct {
-	ID       string                 `json:"id"`
-	Header   string                 `json:"header"`
-	Question string                 `json:"question"`
-	IsOther  bool                   `json:"isOther"`
-	IsSecret bool                   `json:"isSecret"`
-	Options  []codexUserInputOption `json:"options"`
-}
-
-type codexUserInputOption struct {
-	Label       string `json:"label"`
-	Description string `json:"description"`
-}
-
-func codexUserInputQuestions(req acpschema.RequestPermissionRequest) []sessionevents.ACPQuestion {
-	var meta codexUserInputMeta
-	if !decodeCodexUserInputMeta(req, &meta) {
-		return nil
-	}
-	out := make([]sessionevents.ACPQuestion, 0, len(meta.Questions))
-	for _, question := range meta.Questions {
-		if strings.TrimSpace(question.ID) == "" || strings.TrimSpace(question.Question) == "" {
-			continue
-		}
-		options := make([]sessionevents.ACPQuestionOption, 0, len(question.Options))
-		for _, option := range question.Options {
-			if strings.TrimSpace(option.Label) == "" {
-				continue
-			}
-			options = append(options, sessionevents.ACPQuestionOption{
-				Label:       option.Label,
-				Description: option.Description,
-			})
-		}
-		out = append(out, sessionevents.ACPQuestion{
-			ID:       question.ID,
-			Header:   question.Header,
-			Question: question.Question,
-			IsOther:  question.IsOther,
-			IsSecret: question.IsSecret,
-			Options:  options,
-		})
-	}
-	return out
-}
-
-func decodeCodexUserInputMeta(req acpschema.RequestPermissionRequest, out *codexUserInputMeta) bool {
-	return decodeMeta(req.ToolCall.Meta, codexRequestUserInputMetaKey, out) ||
-		decodeMeta(req.Meta, codexRequestUserInputMetaKey, out)
-}
-
-func decodeMeta(meta map[string]any, key string, out any) bool {
-	if len(meta) == 0 {
-		return false
-	}
-	value, ok := meta[key]
-	if !ok {
-		return false
-	}
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return false
-	}
-	return json.Unmarshal(raw, out) == nil
-}
-
 func permissionOption(options []sessionevents.ACPPermissionOption, optionID string) (sessionevents.ACPPermissionOption, bool) {
 	for _, option := range options {
 		if option.ID == optionID {
@@ -362,23 +280,6 @@ func permissionOption(options []sessionevents.ACPPermissionOption, optionID stri
 		}
 	}
 	return sessionevents.ACPPermissionOption{}, false
-}
-
-func encodeUserInputResponse(answers map[string]InteractiveAnswerValue, optionPrefix string) (string, error) {
-	if optionPrefix == "" {
-		optionPrefix = userInputResponseOptionPrefix
-	}
-	raw, err := json.Marshal(map[string]any{"answers": answers})
-	if err != nil {
-		return "", err
-	}
-	return optionPrefix + string(raw), nil
-}
-
-func userInputAnswerEncoder(optionPrefix string) answerEncoder {
-	return func(answers map[string]InteractiveAnswerValue) (string, error) {
-		return encodeUserInputResponse(answers, optionPrefix)
-	}
 }
 
 func formatPermissionAnswers(permission sessionevents.ACPPermission, answers map[string]InteractiveAnswerValue) string {

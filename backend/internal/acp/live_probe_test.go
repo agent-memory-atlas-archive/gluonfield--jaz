@@ -108,7 +108,7 @@ func TestLiveACPProbe(t *testing.T) {
 		setPlan := probeCall(t, ctx, conn, "5", acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 			SessionID: sessionResp.SessionID,
 			ConfigID:  acpschema.SessionConfigID(options.planConfigID),
-			Value:     acpschema.SessionConfigValueID("plan"),
+			Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID("plan")),
 		})
 		t.Logf("session/set_config_option(%s=plan) result: %s", options.planConfigID, setPlan.Result)
 	} else if modeID := planModeID(availableModes); modeID != "" {
@@ -145,7 +145,7 @@ func probeApplyConfiguredSessionOptions(t *testing.T, ctx context.Context, conn 
 			setModel := probeCall(t, ctx, conn, "10", acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 				SessionID: sessionID,
 				ConfigID:  acpschema.SessionConfigID(policy.modelConfigID),
-				Value:     acpschema.SessionConfigValueID(model),
+				Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(model)),
 			})
 			t.Logf("session/set_config_option(model=%s) result: %s", model, setModel.Result)
 			options = parseSessionConfigOptions(setModel.Result)
@@ -166,7 +166,7 @@ func probeApplyConfiguredSessionOptions(t *testing.T, ctx context.Context, conn 
 		setEffort := probeCall(t, ctx, conn, "11", acpschema.AgentMethodSessionSetConfigOption, acpschema.SetSessionConfigOptionRequest{
 			SessionID: sessionID,
 			ConfigID:  acpschema.SessionConfigID(configID),
-			Value:     acpschema.SessionConfigValueID(effort),
+			Value:     acpschema.EncodeSessionConfigValue(acpschema.SessionConfigValueID(effort)),
 		})
 		t.Logf("session/set_config_option(%s=%s) result: %s", configID, effort, setEffort.Result)
 	}
@@ -245,11 +245,7 @@ func probeOpenConn(t *testing.T, ctx context.Context, agent string, cfg AgentCon
 			t.Fatal(err)
 		}
 	}
-	command, args, err := processCommand(agent, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	command, args = launchCommand(command, args)
+	command, args := launchCommand(cfg.Command, cfg.Args)
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = envList(env)
 	cmd.Dir = cwd
