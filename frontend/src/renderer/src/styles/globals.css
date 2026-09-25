@@ -6,42 +6,45 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* ground + surfaces — cool paper, tinted toward the cobalt brand hue;
+  /* ground + surfaces — near-white paper with a trace of the cobalt hue;
    * surfaces deepen as they come forward */
-  --color-bg: oklch(0.963 0.007 262);
-  --color-surface: oklch(0.94 0.009 262);
-  --color-surface-2: oklch(0.906 0.011 262);
+  --color-bg: oklch(0.99 0.002 264);
+  --color-surface: oklch(0.965 0.004 264);
+  --color-surface-2: oklch(0.935 0.006 264);
   --color-list-hover: color-mix(in oklab, var(--color-ink) 5%, transparent);
   /* Selection has to outrank the pointer: at hover's weight the row you are
    * pointing at and the thread you are actually in look identical. */
   --color-list-active: color-mix(in oklab, var(--color-ink) 11%, transparent);
 
   /* text hierarchy — cool-neutral, same hue as the brand */
-  --color-ink: oklch(0.27 0.01 262);
-  --color-ink-2: oklch(0.5 0.01 262);
-  --color-ink-3: oklch(0.57 0.01 262);
+  --color-ink: oklch(0.23 0.012 264);
+  --color-ink-2: oklch(0.46 0.012 264);
+  --color-ink-3: oklch(0.55 0.01 264);
 
   /* brand — cobalt: the everyday accent (primary actions, selection, links,
    * caret). Rainbow is reserved for live states; clay stays as the warm
    * counterpoint (attention markers, mono syntax). A custom color scheme
    * (Settings → Appearance) overrides this whole family via a generated
    * stylesheet; untouched, these stock values rule. */
-  --color-primary: oklch(0.5 0.13 262);
-  --color-primary-strong: oklch(0.43 0.13 262);
-  --color-primary-soft: oklch(0.92 0.035 262);
+  --color-primary: oklch(0.53 0.17 264);
+  --color-primary-strong: oklch(0.46 0.17 264);
+  --color-primary-soft: oklch(0.95 0.028 264);
   /* text/icons that sit on a primary fill */
   --color-on-primary: oklch(1 0 0);
-  --color-accent: oklch(0.62 0.13 55);
-  --color-accent-strong: oklch(0.52 0.12 55);
-  --color-accent-soft: oklch(0.94 0.035 55);
+  /* A translucent wash so selected text reads the same on every surface
+   * (page, cards, code, the composer's mirrored glyphs). */
+  --color-selection: color-mix(in oklab, var(--color-primary) 24%, transparent);
+  --color-accent: oklch(0.66 0.15 55);
+  --color-accent-strong: oklch(0.55 0.14 55);
+  --color-accent-soft: oklch(0.95 0.03 55);
 
   /* status */
-  --color-running: oklch(0.52 0.12 75);
-  --color-ok: oklch(0.45 0.14 145);
+  --color-running: oklch(0.57 0.14 60);
+  --color-ok: oklch(0.5 0.14 150);
   --color-danger: oklch(0.55 0.19 25);
   --color-danger-soft: oklch(0.95 0.025 25);
 
-  --color-border: oklch(0.853 0.01 262);
+  --color-border: oklch(0.905 0.006 264);
 
   --font-sans: var(--jaz-ui-font, 'Inter Variable'), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--jaz-mono-font, 'JetBrains Mono Variable'), ui-monospace, 'SF Mono', monospace;
@@ -129,37 +132,39 @@
   z-index: var(--z-tooltip);
 }
 
-/* Dark theme — cobalt-tinted charcoal. Surfaces grow *lighter* as they come
- * forward (inverse of the light theme); the primary lifts to a light cobalt
- * with dark on-primary text. :where keeps the defaults below the user's
- * :root.dark Appearance overrides, even when those load first. */
+/* Dark theme — neutral graphite with a trace of cobalt. Surfaces grow
+ * *lighter* as they come forward (inverse of the light theme); the primary
+ * lifts to a clear cobalt with dark on-primary text. :where keeps the
+ * defaults below the user's :root.dark Appearance overrides, even when those
+ * load first. */
 :root:where(.dark) {
   color-scheme: dark;
 
-  --color-bg: oklch(0.208 0.007 262);
-  --color-surface: oklch(0.248 0.008 262);
-  --color-surface-2: oklch(0.298 0.009 262);
+  --color-bg: oklch(0.195 0.005 264);
+  --color-surface: oklch(0.235 0.006 264);
+  --color-surface-2: oklch(0.28 0.008 264);
   --color-list-hover: color-mix(in oklab, var(--color-ink) 8%, transparent);
   --color-list-active: color-mix(in oklab, var(--color-ink) 16%, transparent);
 
-  --color-ink: oklch(0.945 0.004 262);
-  --color-ink-2: oklch(0.76 0.006 262);
-  --color-ink-3: oklch(0.62 0.007 262);
+  --color-ink: oklch(0.95 0.003 264);
+  --color-ink-2: oklch(0.78 0.006 264);
+  --color-ink-3: oklch(0.64 0.008 264);
 
-  --color-primary: oklch(0.79 0.11 262);
-  --color-primary-strong: oklch(0.85 0.11 262);
-  --color-primary-soft: oklch(0.35 0.05 262);
-  --color-on-primary: oklch(0.21 0.03 262);
-  --color-accent: oklch(0.72 0.12 55);
-  --color-accent-strong: oklch(0.78 0.12 55);
-  --color-accent-soft: oklch(0.33 0.05 55);
+  --color-primary: oklch(0.72 0.14 264);
+  --color-primary-strong: oklch(0.8 0.12 264);
+  --color-primary-soft: oklch(0.32 0.06 264);
+  --color-on-primary: oklch(0.2 0.03 264);
+  --color-selection: color-mix(in oklab, var(--color-primary) 38%, transparent);
+  --color-accent: oklch(0.74 0.14 55);
+  --color-accent-strong: oklch(0.8 0.12 55);
+  --color-accent-soft: oklch(0.32 0.05 55);
 
-  --color-running: oklch(0.74 0.13 75);
-  --color-ok: oklch(0.72 0.14 145);
-  --color-danger: oklch(0.68 0.18 25);
-  --color-danger-soft: oklch(0.32 0.07 25);
+  --color-running: oklch(0.76 0.13 75);
+  --color-ok: oklch(0.74 0.15 150);
+  --color-danger: oklch(0.7 0.18 25);
+  --color-danger-soft: oklch(0.31 0.07 25);
 
-  --color-border: oklch(0.325 0.009 262);
+  --color-border: oklch(0.31 0.008 264);
 
   --shadow-raised: 0 18px 46px rgba(0, 0, 0, 0.18);
 
@@ -701,16 +706,17 @@ input {
   caret-color: var(--color-primary);
 }
 
+/* Selected text takes the ink color: accent-colored text (links, mentions)
+ * would otherwise vanish into the accent wash. */
 ::selection {
-  background: var(--color-primary-soft);
+  background: var(--color-selection);
+  color: var(--color-ink);
 }
 
 /* The composer paints its text in a mirror div behind a transparent-text
-   textarea, so an opaque selection background would cover the glyphs; a
-   translucent wash lets them read through. (Un-layered on purpose: the
-   global ::selection above would beat a layered utility.) */
+   textarea; its selected glyphs stay transparent so the mirror shows through. */
 .composer-input::selection {
-  background: color-mix(in oklab, var(--color-primary) 28%, transparent);
+  color: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

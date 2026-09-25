@@ -33,7 +33,7 @@ import { createUpdateController } from './updater'
 
 // Matches --color-bg under :root.dark; used as the window paint color before
 // the renderer mounts so a dark launch doesn't flash white behind the content.
-const DARK_BG = '#1d1f24'
+const DARK_BG = '#141517'
 
 const APP_NAME = 'Jaz'
 
