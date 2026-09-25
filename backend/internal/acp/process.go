@@ -132,7 +132,7 @@ func (m *Manager) openConn(ctx context.Context, name string, cfg AgentConfig, en
 			return nil, nil, err
 		}
 	}
-	command, args := launchCommand(processCommand(name, cfg))
+	command, args := launchCommand(cfg.Command, cfg.Args)
 	addCommandDirToPath(env, command)
 	cmd := exec.CommandContext(ctx, command, args...)
 	prepareProcessCommand(cmd)
@@ -449,47 +449,6 @@ func (m *Manager) installAgentSkills(agent, root, dst string) {
 	if err := skills.InstallTo(root, dst); err != nil {
 		m.log.Warn("install acp skills failed", "agent", agent, "path", dst, "error", err)
 	}
-}
-
-func processCommand(name string, cfg AgentConfig) (string, []string) {
-	args := append([]string(nil), cfg.Args...)
-	if CanonicalAgentName(name) == AgentGrok && filepath.Base(strings.TrimSpace(cfg.Command)) == "grok" {
-		args = withGrokAlwaysApproveArg(args)
-	}
-	return cfg.Command, args
-}
-
-func withGrokAlwaysApproveArg(args []string) []string {
-	if hasFlag(args, "--always-approve") {
-		return args
-	}
-	return insertBeforeArg(args, "stdio", "--always-approve")
-}
-
-func insertBeforeArg(args []string, marker string, values ...string) []string {
-	insertAt := len(args)
-	for i, arg := range args {
-		if arg == marker {
-			insertAt = i
-			break
-		}
-	}
-	next := make([]string, 0, len(args)+len(values))
-	next = append(next, args[:insertAt]...)
-	next = append(next, values...)
-	next = append(next, args[insertAt:]...)
-	return next
-}
-
-func hasFlag(args []string, names ...string) bool {
-	for _, arg := range args {
-		for _, name := range names {
-			if arg == name || strings.HasPrefix(arg, name+"=") {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func firstError(current, next error) error {

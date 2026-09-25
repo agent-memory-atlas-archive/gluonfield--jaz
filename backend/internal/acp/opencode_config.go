@@ -65,9 +65,10 @@ func (m *Manager) prepareOpenCodeConfig(ctx context.Context, env map[string]stri
 			content.SmallModel = model
 		}
 	}
-	if providerID := modelprovider.OpenCodeProviderIDFromModel(model); keyEnv != "" && providerID != "" {
+	if keyEnv != "" {
 		// OpenCode lets a stored `opencode auth` key override the environment,
 		// but options.apiKey outranks both, so the key Jaz binds is the one used.
+		providerID := openCodeProviderID(model)
 		provider := content.Provider[providerID]
 		provider.Options = map[string]string{"apiKey": "{env:" + keyEnv + "}"}
 		if content.Provider == nil {

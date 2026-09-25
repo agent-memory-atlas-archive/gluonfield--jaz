@@ -772,7 +772,7 @@ func TestProcessEnvWritesOpenCodeInstructionsWithResolvedCwd(t *testing.T) {
 
 func TestProcessEnvPinsOpenCodeKeyWithoutOverridingDefaultProvider(t *testing.T) {
 	root := t.TempDir()
-	env, err := NewManager(nil, Config{
+	manager := NewManager(nil, Config{
 		Root: root,
 		Providers: map[string]modelprovider.ModelProviderConfig{
 			"openrouter": {
@@ -782,21 +782,22 @@ func TestProcessEnvPinsOpenCodeKeyWithoutOverridingDefaultProvider(t *testing.T)
 			},
 		},
 		SystemPrompt: testPrompt("jaz instructions"),
-	}, nil).processEnvPrepared("opencode", AgentConfig{
-		Model: "openrouter/openai/gpt-5.4-mini",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var content struct {
-		Provider map[string]any `json:"provider"`
-	}
-	if err := json.Unmarshal([]byte(env["OPENCODE_CONFIG_CONTENT"]), &content); err != nil {
-		t.Fatalf("config content = %q: %v", env["OPENCODE_CONFIG_CONTENT"], err)
-	}
-	want := map[string]any{"openrouter": map[string]any{"options": map[string]any{"apiKey": "{env:OPENROUTER_API_KEY}"}}}
-	if !reflect.DeepEqual(content.Provider, want) {
-		t.Fatalf("provider config = %#v, want only the bound key pinned", content.Provider)
+	}, nil)
+	for _, model := range []string{"openrouter/openai/gpt-5.4-mini", ""} {
+		env, err := manager.processEnvPrepared("opencode", AgentConfig{Model: model})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var content struct {
+			Provider map[string]any `json:"provider"`
+		}
+		if err := json.Unmarshal([]byte(env["OPENCODE_CONFIG_CONTENT"]), &content); err != nil {
+			t.Fatalf("config content = %q: %v", env["OPENCODE_CONFIG_CONTENT"], err)
+		}
+		want := map[string]any{"openrouter": map[string]any{"options": map[string]any{"apiKey": "{env:OPENROUTER_API_KEY}"}}}
+		if !reflect.DeepEqual(content.Provider, want) {
+			t.Fatalf("model %q provider config = %#v, want only the bound key pinned", model, content.Provider)
+		}
 	}
 }
 
@@ -1309,45 +1310,6 @@ func TestAutoAuthMethodReportsMissingGrokAuth(t *testing.T) {
 
 	if method != "" || strings.Join(missing, ",") != "Grok login at "+filepath.Join(home, ".grok", "auth.json")+" or JAZ_ACP_GROK_API_KEY" {
 		t.Fatalf("method=%q missing=%v", method, missing)
-	}
-}
-
-func TestProcessCommandEnsuresGrokAlwaysApproveArg(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		args []string
-		want string
-	}{
-		{
-			name: "missing always approve",
-			args: []string{"agent", "stdio"},
-			want: "agent --always-approve stdio",
-		},
-		{
-			name: "already always approve",
-			args: []string{"agent", "--always-approve", "stdio"},
-			want: "agent --always-approve stdio",
-		},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			_, args := processCommand("grok", AgentConfig{
-				Command: "grok",
-				Args:    tc.args,
-			})
-			if strings.Join(args, " ") != tc.want {
-				t.Fatalf("args = %q, want %q", strings.Join(args, " "), tc.want)
-			}
-		})
-	}
-}
-
-func TestProcessCommandLeavesNonGrokCommandAlone(t *testing.T) {
-	_, args := processCommand("grok", AgentConfig{
-		Command: os.Args[0],
-		Args:    []string{"-test.run=TestFakeACPAgentProcess"},
-	})
-	if strings.Join(args, " ") != "-test.run=TestFakeACPAgentProcess" {
-		t.Fatalf("args = %#v", args)
 	}
 }
 

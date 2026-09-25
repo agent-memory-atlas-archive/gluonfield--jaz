@@ -132,9 +132,8 @@ func agentPolicyForAgent(agentName string) agentPolicy {
 		// Grok rebuilds its system prompt without session rules when the model
 		// changes after session/new, so the model rides session/new instead.
 		return agentPolicy{
-			modelMetaKey:      "modelId",
-			unadvertisedModel: unadvertisedModelRejected,
-			effortOptions:     baseReasoningEffortOptions,
+			modelMetaKey:  "modelId",
+			effortOptions: baseReasoningEffortOptions,
 		}
 	case AgentOpenCode:
 		return agentPolicy{
@@ -374,6 +373,13 @@ func (m *Manager) configuredModeState(
 	if policy.modelConfiguredAtLaunch || policy.modelMetaKey != "" {
 		modelToSet = ""
 	}
+	// A model sent in session/new _meta cannot be refused by the agent, and
+	// Grok silently falls back to its default for ids it does not offer.
+	if policy.modelMetaKey != "" && model != "" && !session.modelState.empty() {
+		if _, ok := session.modelState.matchAdvertised(model); !ok {
+			return ModeState{}, unadvertisedModelError(agentName, model, session.modelState)
+		}
+	}
 	modelRaw, err := m.setConfiguredSessionModel(ctx, peer, agentName, session.response.SessionID, modelToSet, session.modelState)
 	if err != nil {
 		return ModeState{}, err
@@ -587,10 +593,14 @@ func (p agentPolicy) sessionModelToSend(agentName, rawModel string, state sessio
 	case unadvertisedModelSkipped:
 		return "", nil
 	case unadvertisedModelRejected:
-		return "", fmt.Errorf("configured acp agent %q model %q is not advertised by the agent; available model ids: %s",
-			agentName, model, strings.Join(state.advertisedModels(), ", "))
+		return "", unadvertisedModelError(agentName, model, state)
 	}
 	return model, nil
+}
+
+func unadvertisedModelError(agentName, model string, state sessionModelState) error {
+	return fmt.Errorf("configured acp agent %q model %q is not advertised by the agent; available model ids: %s",
+		agentName, model, strings.Join(state.advertisedModels(), ", "))
 }
 
 func (s *sessionModelState) addExact(model string) {

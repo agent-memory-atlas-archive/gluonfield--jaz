@@ -245,7 +245,7 @@ func probeOpenConn(t *testing.T, ctx context.Context, agent string, cfg AgentCon
 			t.Fatal(err)
 		}
 	}
-	command, args := launchCommand(processCommand(agent, cfg))
+	command, args := launchCommand(cfg.Command, cfg.Args)
 	cmd := exec.CommandContext(ctx, command, args...)
 	cmd.Env = envList(env)
 	cmd.Dir = cwd

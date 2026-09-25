@@ -38,7 +38,7 @@ func ProbeReadinessWithProviders(name string, cfg AgentConfig, root string, env 
 		}
 		return Readiness{Available: true}
 	}
-	command, _ := processCommand(name, cfg)
+	command := cfg.Command
 	if strings.TrimSpace(command) == "" {
 		return Readiness{Reason: "command is not configured"}
 	}

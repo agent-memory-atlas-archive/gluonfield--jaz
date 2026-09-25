@@ -215,23 +215,6 @@ func TestMergeAgentDefaultsDropsInvalidGrokAuthProfile(t *testing.T) {
 	}
 }
 
-func TestMergeAgentDefaultsMigratesRetiredGrokBuildModel(t *testing.T) {
-	seed := testAgentDefaultsSeed()
-	stored := AgentDefaults{ACP: map[string]ACPAgentDefaults{}}
-	for name, agent := range seed.ACP {
-		stored.ACP[name] = agent
-	}
-	grok := stored.ACP[acp.AgentGrok]
-	grok.Model = "grok-build"
-	stored.ACP[acp.AgentGrok] = grok
-
-	merged := MergeAgentDefaults(stored, seed, agentNames(seed))
-
-	if merged.ACP[acp.AgentGrok].Model != seed.ACP[acp.AgentGrok].Model {
-		t.Fatalf("grok model = %q, want %q", merged.ACP[acp.AgentGrok].Model, seed.ACP[acp.AgentGrok].Model)
-	}
-}
-
 func TestMergeAgentDefaultsPreservesSelectedCodexModel(t *testing.T) {
 	seed := testAgentDefaultsSeed()
 	stored := testAgentDefaultsSeed()

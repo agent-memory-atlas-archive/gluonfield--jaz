@@ -77,6 +77,7 @@ func TestManagerStartsGrokModelWithRulesAndSetsAdvertisedEffort(t *testing.T) {
 	}
 	var modelID string
 	var configIDs []string
+	sessions := 0
 	for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
 		var request struct {
 			Method string `json:"method"`
@@ -90,6 +91,7 @@ func TestManagerStartsGrokModelWithRulesAndSetsAdvertisedEffort(t *testing.T) {
 		}
 		switch request.Method {
 		case "session/new":
+			sessions++
 			if rules, _ := request.Params.Meta["rules"].(string); strings.Contains(rules, "grok rules marker") {
 				modelID, _ = request.Params.Meta["modelId"].(string)
 			}
@@ -99,8 +101,8 @@ func TestManagerStartsGrokModelWithRulesAndSetsAdvertisedEffort(t *testing.T) {
 			t.Fatal("grok model must not change after session/new")
 		}
 	}
-	if modelID != "grok-4.6" || strings.Join(configIDs, ",") != "reasoning_effort" {
-		t.Fatalf("session/new modelId = %q, set_config_option ids = %v", modelID, configIDs)
+	if sessions != 1 || modelID != "grok-4.6" || strings.Join(configIDs, ",") != "reasoning_effort" {
+		t.Fatalf("session/new count = %d, modelId = %q, set_config_option ids = %v", sessions, modelID, configIDs)
 	}
 	session, err := store.LoadSession(spawned.SessionID)
 	if err != nil {

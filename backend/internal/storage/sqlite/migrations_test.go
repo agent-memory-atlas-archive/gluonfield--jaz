@@ -425,8 +425,10 @@ func TestClearUnappliedGrokModelMigration(t *testing.T) {
 	defer db.Close()
 	for _, stmt := range []string{
 		`CREATE TABLE settings (namespace TEXT NOT NULL, key TEXT NOT NULL, value_json TEXT NOT NULL)`,
+		`CREATE TABLE loops (id TEXT PRIMARY KEY, acp_agent TEXT, model TEXT NOT NULL DEFAULT '')`,
 		`INSERT INTO settings VALUES ('agents', 'defaults', '{"acp":{"grok":{"enabled":true,"model":"grok-4.6","reasoning_effort":"xhigh"},"codex":{"model":"gpt-6-sol"}}}')`,
-		`INSERT INTO settings VALUES ('memory', 'settings', '{"acp":{"grok":{"model":"grok-4.6"}}}')`,
+		`INSERT INTO settings VALUES ('memory', 'settings', '{"enabled":true,"agent":"grok","model":"grok-4.6"}')`,
+		`INSERT INTO loops VALUES ('grok-loop', 'grok', 'grok-4.6'), ('codex-loop', 'codex', 'gpt-6-sol')`,
 	} {
 		if _, err := db.Exec(stmt); err != nil {
 			t.Fatal(err)
@@ -439,17 +441,17 @@ func TestClearUnappliedGrokModelMigration(t *testing.T) {
 	if _, err := db.Exec(strings.SplitN(string(raw), "-- +goose Down", 2)[0]); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{
-		"agents": `{"acp":{"grok":{"enabled":true,"reasoning_effort":"xhigh"},"codex":{"model":"gpt-6-sol"}}}`,
-		"memory": `{"acp":{"grok":{"model":"grok-4.6"}}}`,
-	}
-	for namespace, value := range want {
+	for _, check := range []struct{ query, want string }{
+		{`SELECT value_json FROM settings WHERE namespace = 'agents'`, `{"acp":{"grok":{"enabled":true,"reasoning_effort":"xhigh"},"codex":{"model":"gpt-6-sol"}}}`},
+		{`SELECT value_json FROM settings WHERE namespace = 'memory'`, `{"enabled":true,"agent":"grok"}`},
+		{`SELECT group_concat(id || '=' || model, ',') FROM loops`, `grok-loop=,codex-loop=gpt-6-sol`},
+	} {
 		var got string
-		if err := db.QueryRow(`SELECT value_json FROM settings WHERE namespace = ?`, namespace).Scan(&got); err != nil {
+		if err := db.QueryRow(check.query).Scan(&got); err != nil {
 			t.Fatal(err)
 		}
-		if got != value {
-			t.Fatalf("%s settings = %s, want %s", namespace, got, value)
+		if got != check.want {
+			t.Fatalf("%s = %s, want %s", check.query, got, check.want)
 		}
 	}
 }
