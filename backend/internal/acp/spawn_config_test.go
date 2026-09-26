@@ -288,7 +288,7 @@ func TestSpawnConfigResolvesModelLabelsWithinConfiguredProvider(t *testing.T) {
 func TestSpawnConfigRejectsModelSpecificUnsupportedReasoning(t *testing.T) {
 	for _, input := range []struct{ agent, model string }{
 		{AgentClaude, "sonnet"},
-		{AgentCodex, modelprovider.OpenAIModelGPT56Sol},
+		{AgentCodex, modelprovider.OpenAIModelGPT6Sol},
 	} {
 		manager := &Manager{
 			cfg: Config{ModelCatalog: warmOpenRouterCatalog(t)},

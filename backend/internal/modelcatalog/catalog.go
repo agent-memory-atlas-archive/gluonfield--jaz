@@ -72,16 +72,9 @@ var (
 	}
 	agentModels = map[string][]Model{
 		"codex": {
-			openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Most capable for complex work", "openai/gpt-6-astra"),
+			openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work", "openai/gpt-6-astra"),
 			openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work", "openai/gpt-6-sol"),
 			openRouterBackedModel("gpt-6-luna", "GPT-6 Luna", "Fast and affordable for easier tasks", "openai/gpt-6-luna"),
-			openRouterBackedModel(provider.OpenAIModelGPT56Sol, "GPT-5.6 Sol", "Frontier capability", "openai/gpt-5.6-sol"),
-			openRouterBackedModel(provider.OpenAIModelGPT56Terra, "GPT-5.6 Terra", "Balanced capability and cost", "openai/gpt-5.6-terra"),
-			openRouterBackedModel(provider.OpenAIModelGPT56Luna, "GPT-5.6 Luna", "Efficient high-volume workloads", "openai/gpt-5.6-luna"),
-			modelWithoutProviderReasoning("gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", "Account-gated research preview"),
-			openRouterBackedModel("gpt-5.5", "GPT-5.5", "Previous frontier model", "openai/gpt-5.5"),
-			openRouterBackedModel("gpt-5.4", "GPT-5.4", "Strong coding model", "openai/gpt-5.4"),
-			openRouterBackedModel(provider.DefaultOpenAIModel, "GPT-5.4 Mini", "Fast and inexpensive", "openai/gpt-5.4-mini"),
 		},
 		"claude": {
 			modelWithoutProviderReasoning("opus[1m]", "Opus 5.5", "Recommended"),
@@ -89,6 +82,12 @@ var (
 			openRouterBackedModel("claude-fable-5[1m]", "Fable 5", "Previous Fable model", "anthropic/claude-fable-5"),
 			openRouterBackedModel("sonnet", "Sonnet 5", "Efficient for routine tasks", "anthropic/claude-sonnet-5"),
 			openRouterBackedModel("haiku", "Haiku 4.5", "Fastest for quick answers", "anthropic/claude-haiku-4.5"),
+		},
+		"grok": {
+			modelWithoutProviderReasoning("grok-4.7", "Grok 4.7", "Latest frontier model"),
+			modelWithoutProviderReasoning("grok-4.7-build-fast", "Grok 4.7 Fast", "Fast variant at twice the price"),
+			modelWithoutProviderReasoning("grok-4.6", "Grok 4.6", "Previous Grok model"),
+			modelWithoutProviderReasoning("grok-4.5", "Grok 4.5", "Older Grok model"),
 		},
 		"opencode": {
 			openRouterNativeModel(provider.DefaultOpenRouterModel, "GLM 5.2", "Default OpenRouter coding model"),

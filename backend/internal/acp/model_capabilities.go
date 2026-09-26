@@ -228,12 +228,8 @@ func isCodexUltraModel(model modelcatalog.Model) bool {
 	switch id {
 	case provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Astra,
 		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Sol,
-		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Sol,
-		provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Terra,
 		provider.OpenAIModelGPT6Astra,
-		provider.OpenAIModelGPT6Sol,
-		provider.OpenAIModelGPT56Sol,
-		provider.OpenAIModelGPT56Terra:
+		provider.OpenAIModelGPT6Sol:
 		return true
 	}
 	return false
