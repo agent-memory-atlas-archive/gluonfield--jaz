@@ -11,8 +11,8 @@ import (
 
 func TestModelCapabilitiesAddsCodexUltraWithoutInventingMinimal(t *testing.T) {
 	model := modelcatalog.Model{
-		Value:        provider.OpenAIModelGPT56Sol,
-		OpenRouterID: "openai/gpt-5.6-sol",
+		Value:        provider.OpenAIModelGPT6Sol,
+		OpenRouterID: "openai/gpt-6-sol",
 		Reasoning: modelcatalog.Reasoning{
 			Status:  modelcatalog.ReasoningReady,
 			Efforts: []string{"low", "medium", "high", "xhigh", "max"},
@@ -30,10 +30,10 @@ func TestModelCapabilitiesAddsCodexUltraWithoutInventingMinimal(t *testing.T) {
 	if models[0].Reasoning.Scope != ReasoningScopeProvider {
 		t.Fatalf("reasoning scope = %q", models[0].Reasoning.Scope)
 	}
-	if err := capabilities.ValidateReasoningEffort(AgentCodex, provider.ProviderOpenAI, provider.OpenAIModelGPT56Sol, "minimal"); err == nil {
+	if err := capabilities.ValidateReasoningEffort(AgentCodex, provider.ProviderOpenAI, provider.OpenAIModelGPT6Sol, "minimal"); err == nil {
 		t.Fatal("expected minimal to be rejected")
 	}
-	if err := capabilities.ValidateReasoningEffort(AgentCodex, provider.ProviderOpenAI, provider.OpenAIModelGPT56Sol, "ultra"); err != nil {
+	if err := capabilities.ValidateReasoningEffort(AgentCodex, provider.ProviderOpenAI, provider.OpenAIModelGPT6Sol, "ultra"); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -45,17 +45,17 @@ func TestCodexUltraModelsUseExplicitAllowlist(t *testing.T) {
 	}{
 		{provider.OpenAIModelGPT6Astra, true},
 		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Astra, true},
-		{provider.OpenAIModelGPT56Sol, true},
-		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Terra, true},
-		{provider.OpenAIModelGPT56Luna, false},
-		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT56Luna, false},
+		{provider.OpenAIModelGPT6Sol, true},
+		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Sol, true},
+		{"gpt-6-luna", false},
+		{provider.ProviderOpenAI + "/gpt-6-luna", false},
 	} {
 		if got := isCodexUltraModel(modelcatalog.Model{Value: test.model}); got != test.want {
 			t.Fatalf("isCodexUltraModel(%q) = %v, want %v", test.model, got, test.want)
 		}
 	}
 	luna := modelcatalog.Model{
-		Value: provider.OpenAIModelGPT56Luna,
+		Value: "gpt-6-luna",
 		Reasoning: modelcatalog.Reasoning{
 			Status:  modelcatalog.ReasoningReady,
 			Efforts: []string{"max", "ultra"},
@@ -116,9 +116,9 @@ func TestModelCapabilitiesPopulatesNativeAgentReasoningCapabilities(t *testing.T
 		t.Fatalf("models = %#v", models)
 	}
 	if !containsString(models[0].Reasoning.Efforts, "ultra") {
-		t.Fatalf("gpt-5.6-sol efforts = %#v, want ultra", models[0].Reasoning.Efforts)
+		t.Fatalf("%s efforts = %#v, want ultra", models[0].Value, models[0].Reasoning.Efforts)
 	}
-	if err := capabilities.ValidateReasoningEffort(AgentCodex, "", provider.OpenAIModelGPT56Sol, "ultra"); err != nil {
+	if err := capabilities.ValidateReasoningEffort(AgentCodex, "", provider.OpenAIModelGPT6Sol, "ultra"); err != nil {
 		t.Fatal(err)
 	}
 }

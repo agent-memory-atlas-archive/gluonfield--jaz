@@ -85,6 +85,14 @@ var baseReasoningEffortOptions = []ReasoningEffortOption{
 	{Value: "xhigh", Label: "Extra high"},
 }
 
+var grokReasoningEffortOptions = []ReasoningEffortOption{
+	{Value: "", Label: "Default"},
+	{Value: "low", Label: "Low"},
+	{Value: "medium", Label: "Medium"},
+	{Value: "high", Label: "High"},
+	{Value: "xhigh", Label: "Extra high"},
+}
+
 var claudeReasoningEffortOptions = append(append([]ReasoningEffortOption(nil), baseReasoningEffortOptions...),
 	ReasoningEffortOption{Value: "max", Label: "Max"},
 	ReasoningEffortOption{Value: claudeReasoningEffortUltracode, Label: "Ultracode"},
@@ -133,7 +141,7 @@ func agentPolicyForAgent(agentName string) agentPolicy {
 		// changes after session/new, so the model rides session/new instead.
 		return agentPolicy{
 			modelMetaKey:  "modelId",
-			effortOptions: baseReasoningEffortOptions,
+			effortOptions: grokReasoningEffortOptions,
 		}
 	case AgentOpenCode:
 		return agentPolicy{

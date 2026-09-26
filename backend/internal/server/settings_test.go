@@ -31,6 +31,8 @@ func warmedModelCatalog(t *testing.T) *modelcatalog.Service {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"data":[
 			{"id":"openai/gpt-6-astra","name":"OpenAI: GPT-6 Astra","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
+			{"id":"openai/gpt-6-sol","name":"OpenAI: GPT-6 Sol","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
+			{"id":"openai/gpt-6-luna","name":"OpenAI: GPT-6 Luna","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
 			{"id":"openai/gpt-5.6-sol","name":"OpenAI: GPT-5.6 Sol","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
 			{"id":"openai/gpt-5.6-terra","name":"OpenAI: GPT-5.6 Terra","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
 			{"id":"openai/gpt-5.6-luna","name":"OpenAI: GPT-5.6 Luna","reasoning":{"supported_efforts":["max","xhigh","high","medium","low","none"],"default_effort":"medium"}},
@@ -238,9 +240,9 @@ func TestAgentSettingsAPIControlsEnabledACPAgents(t *testing.T) {
 		t.Fatalf("unexpected codex defaults %#v", got.ACP["codex"])
 	}
 	if !hasModelReasoningEfforts(got.ACPOptions["codex"].Models, provider.OpenAIModelGPT6Astra, "none,low,medium,high,xhigh,max,ultra") ||
-		!hasModelReasoningEfforts(got.ACPOptions["codex"].Models, provider.OpenAIModelGPT56Sol, "none,low,medium,high,xhigh,max,ultra") ||
-		!hasModelReasoningEfforts(got.ACPOptions["codex"].Models, provider.OpenAIModelGPT56Terra, "none,low,medium,high,xhigh,max,ultra") ||
-		!hasModelReasoningEfforts(got.ACPOptions["codex"].Models, provider.OpenAIModelGPT56Luna, "none,low,medium,high,xhigh,max") {
+		!hasModelReasoningEfforts(got.ACPOptions["codex"].Models, provider.OpenAIModelGPT6Sol, "none,low,medium,high,xhigh,max,ultra") ||
+		!hasModelReasoningEfforts(got.ACPOptions["codex"].Models, "gpt-6-luna", "none,low,medium,high,xhigh,max") ||
+		len(got.ACPOptions["codex"].Models) != 3 {
 		t.Fatalf("codex model options missing current OpenAI models %#v", got.ACPOptions["codex"].Models)
 	}
 	if got.ACPOptions["codex"].AuthProviderID != provider.ProviderOpenAI ||

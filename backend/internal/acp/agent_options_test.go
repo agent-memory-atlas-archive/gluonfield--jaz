@@ -178,7 +178,7 @@ func warmOpenRouterCatalog(t *testing.T) *modelcatalog.Service {
 	t.Helper()
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"data":[
-			{"id":"openai/gpt-5.6-sol","name":"OpenAI: GPT-5.6 Sol","reasoning":{"supported_efforts":["max","xhigh","high","medium","low"]}},
+			{"id":"openai/gpt-6-sol","name":"OpenAI: GPT-6 Sol","reasoning":{"supported_efforts":["max","xhigh","high","medium","low"]}},
 			{"id":"z-ai/glm-5.2","name":"Z.AI: GLM 5.2"},
 			{"id":"qwen/qwen3-coder","name":"Qwen: Qwen3 Coder"},
 			{"id":"anthropic/claude-sonnet-5","name":"Anthropic: Claude Sonnet 5","reasoning":{"supported_efforts":["max","high","medium","low"]}}
