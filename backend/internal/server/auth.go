@@ -146,6 +146,7 @@ func queryAuthAllowed(r *http.Request) bool {
 	}
 	return action == "events" ||
 		action == "browser" ||
+		action == "computer" ||
 		action == "terminal" ||
 		strings.HasPrefix(action, "attachments/") ||
 		(action == "file" && rawSessionFileRequested(r))

@@ -105,28 +105,32 @@ func TestAuthMiddlewareAcceptsQueryKeyForBrowserExtension(t *testing.T) {
 	}
 }
 
-func TestDesktopBrowserAuth(t *testing.T) {
+func TestDesktopControlAuth(t *testing.T) {
 	for _, test := range []struct {
+		action string
 		method string
 		key    string
 		status int
 	}{
-		{http.MethodGet, "secret", http.StatusNoContent},
-		{http.MethodGet, "wrong", http.StatusUnauthorized},
-		{http.MethodPost, "secret", http.StatusUnauthorized},
+		{"browser", http.MethodGet, "secret", http.StatusNoContent},
+		{"browser", http.MethodGet, "wrong", http.StatusUnauthorized},
+		{"browser", http.MethodPost, "secret", http.StatusUnauthorized},
+		{"computer", http.MethodGet, "secret", http.StatusNoContent},
+		{"computer", http.MethodGet, "wrong", http.StatusUnauthorized},
+		{"computer", http.MethodPost, "secret", http.StatusUnauthorized},
 	} {
-		req := httptest.NewRequest(test.method, "/v1/sessions/thread/browser?key="+test.key, nil)
+		req := httptest.NewRequest(test.method, "/v1/sessions/thread/"+test.action+"?key="+test.key, nil)
 		res := httptest.NewRecorder()
 		(&Server{AuthKey: "secret"}).withAuth(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		})).ServeHTTP(res, req)
 		if res.Code != test.status {
-			t.Fatalf("%s key=%s status=%d", test.method, test.key, res.Code)
+			t.Fatalf("%s %s key=%s status=%d", test.method, test.action, test.key, res.Code)
 		}
 	}
 }
 
-func TestAuthMiddlewareAcceptsDeviceQueryKeyForSessionAttachmentAfterBootstrap(t *testing.T) {
+func TestAuthMiddlewareAcceptsDeviceQueryKeyForSessionRoutesAfterBootstrap(t *testing.T) {
 	store, err := sqlitestore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -138,13 +142,15 @@ func TestAuthMiddlewareAcceptsDeviceQueryKeyForSessionAttachmentAfterBootstrap(t
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/sessions/session-id/attachments/attachment-id?key="+registered.Token, nil)
-	res := httptest.NewRecorder()
-	(&Server{ModelCatalog: modelcatalog.NewService(nil), AuthKey: "root-key", Devices: devices}).withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})).ServeHTTP(res, req)
-	if res.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+	for _, action := range []string{"attachments/attachment-id", "browser", "computer"} {
+		req := httptest.NewRequest(http.MethodGet, "/v1/sessions/session-id/"+action+"?key="+registered.Token, nil)
+		res := httptest.NewRecorder()
+		(&Server{ModelCatalog: modelcatalog.NewService(nil), AuthKey: "root-key", Devices: devices}).withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})).ServeHTTP(res, req)
+		if res.Code != http.StatusNoContent {
+			t.Fatalf("%s status = %d, body = %s", action, res.Code, res.Body.String())
+		}
 	}
 }
 
