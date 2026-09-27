@@ -66,7 +66,7 @@ It lists apps/windows, then requires the test host's existing macOS grants. With
 
 The implementation branch is `jaz/native-computer-use`, in `/Users/wins/.jaz/workspaces/default/.worktrees/native-computer-use`. The running checkout is `/Users/wins/.jaz/workspaces/default/jaz`; work in the isolated checkout does not activate it.
 
-After finishing this conversation, stop the running development app/backend, integrate the branch into the running checkout, install the pinned dependencies there and restart the desktop/backend using the normal development command. Then enable Computer Use and grant permissions from its settings. Verify `computer_status` and a native observation before allowing input. Restarting the currently running app during implementation can interrupt the conversation.
+After integrating the branch, install the pinned dependencies in the running checkout with `bun install --frozen-lockfile` from `frontend`. Restart the desktop with `bun run dev`; it also starts its local backend. If using an independently launched backend, restart that process too. Then enable Computer Use and grant permissions from its settings. Verify `computer_status` and a native observation before allowing input. The development watcher may reload Jaz when source files change, so integration belongs at the end of the conversation.
 
 An unsigned macOS ARM64 package can be prepared from `frontend` with:
 
@@ -87,6 +87,8 @@ The output is `frontend/dist/mac-arm64/Jaz.app`. Release signing and notarizatio
 - Real Electron and packaged-library probes list native apps/windows. Native AX, OS screenshots, Calculator input, pointer/focus preservation and the canvas drag remain blocked by missing Accessibility/Screen Recording grants in the test host. Windows execution remains unverified.
 - The rendered Settings component was inspected and exercised with a controlled permission fixture: enabling tools does not request a grant, the permission button refreshes status, and the separate Screen Recording settings action works.
 - Strict maintainability review completed: shared QuickJS extraction, Electron-owned admission/cleanup, transport/domain separation, bounded responses, exact numeric identities and rejected cancelled/malformed requests. No provider model, prompt, context-window or authentication implementation was changed.
+
+The follow-up strict review reproduced and fixed a queued-write cancellation race: a script cancelled while waiting for the socket writer could still be dispatched. Cancellation is now checked after acquiring the writer, and a real WebSocket regression verifies that the cancelled script never arrives while subsequent status calls still work. The connection's stored terminal error now owns its closed state, removing a redundant boolean. Focused Go race checks pass. No further structural blockers were found; native permission-gated acceptance remains outstanding.
 
 ### Interface review
 

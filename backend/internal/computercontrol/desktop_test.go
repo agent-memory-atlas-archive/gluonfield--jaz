@@ -163,3 +163,54 @@ func TestAlreadyCancelledScriptNeverReachesDesktop(t *testing.T) {
 		t.Fatal("cancelled request was dispatched")
 	}
 }
+
+func TestScriptCancelledWhileWaitingToWriteNeverReachesDesktop(t *testing.T) {
+	backend := NewDesktopBackend()
+	defer backend.Close()
+	peer := desktopPeer(t, backend, "thread")
+	backend.mu.Lock()
+	connection := backend.connections["thread"]
+	backend.mu.Unlock()
+	connection.writeMu.Lock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	completed := make(chan error, 1)
+	go func() {
+		_, err := backend.Call(ctx, ActionInput{Session: "thread", Action: ActionScript})
+		completed <- err
+	}()
+	for deadline := time.Now().Add(time.Second); ; {
+		connection.mu.Lock()
+		reserved := connection.nextID > 0
+		connection.mu.Unlock()
+		if reserved {
+			break
+		}
+		if time.Now().After(deadline) {
+			connection.writeMu.Unlock()
+			t.Fatal("script did not reach the write queue")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	connection.writeMu.Unlock()
+	if err := <-completed; !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled call error=%v", err)
+	}
+	statusCtx, statusCancel := context.WithTimeout(context.Background(), time.Second)
+	defer statusCancel()
+	go func() {
+		_, err := backend.Call(statusCtx, ActionInput{Session: "thread", Action: ActionStatus})
+		completed <- err
+	}()
+	var request rpcMessage
+	if err := peer.ReadJSON(&request); err != nil || request.Method != "Jaz.status" {
+		t.Fatalf("cancelled script was dispatched: %+v error=%v", request, err)
+	}
+	if err := peer.WriteJSON(rpcMessage{ID: request.ID, Result: json.RawMessage(`{"status":"connected"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-completed; err != nil {
+		t.Fatal(err)
+	}
+}

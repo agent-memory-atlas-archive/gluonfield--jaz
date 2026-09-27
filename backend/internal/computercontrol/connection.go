@@ -18,7 +18,6 @@ type desktopConn struct {
 	nextID  int64
 	pending map[int64]chan rpcReply
 	done    chan struct{}
-	closed  bool
 	err     error
 }
 
@@ -63,7 +62,7 @@ func (c *desktopConn) Call(ctx context.Context, method string, params any, outpu
 	if err != nil {
 		return err
 	}
-	if err := c.write(rpcMessage{ID: id, Method: method, Params: params}); err != nil {
+	if err := c.write(ctx, rpcMessage{ID: id, Method: method, Params: params}); err != nil {
 		c.drop(id)
 		return err
 	}
@@ -81,7 +80,7 @@ func (c *desktopConn) Call(ctx context.Context, method string, params any, outpu
 		return nil
 	case <-ctx.Done():
 		c.drop(id)
-		_ = c.write(rpcMessage{Method: "Jaz.cancel", Params: map[string]any{"id": id}})
+		_ = c.write(context.Background(), rpcMessage{Method: "Jaz.cancel", Params: map[string]any{"id": id}})
 		return ctx.Err()
 	}
 }
@@ -89,11 +88,8 @@ func (c *desktopConn) Call(ctx context.Context, method string, params any, outpu
 func (c *desktopConn) reserve() (int64, chan rpcReply, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.closed {
-		if c.err != nil {
-			return 0, nil, c.err
-		}
-		return 0, nil, errors.New("computer connection is closed")
+	if c.err != nil {
+		return 0, nil, c.err
 	}
 	c.nextID++
 	reply := make(chan rpcReply, 1)
@@ -107,9 +103,12 @@ func (c *desktopConn) drop(id int64) {
 	c.mu.Unlock()
 }
 
-func (c *desktopConn) write(message rpcMessage) error {
+func (c *desktopConn) write(ctx context.Context, message rpcMessage) error {
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := c.ws.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		return err
 	}
@@ -138,11 +137,10 @@ func (c *desktopConn) readLoop() {
 
 func (c *desktopConn) fail(err error) {
 	c.mu.Lock()
-	if c.closed {
+	if c.err != nil {
 		c.mu.Unlock()
 		return
 	}
-	c.closed = true
 	c.err = err
 	close(c.done)
 	pending := c.pending
