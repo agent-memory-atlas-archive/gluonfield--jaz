@@ -276,11 +276,11 @@ func TestSpawnConfigResolvesModelLabelsWithinConfiguredProvider(t *testing.T) {
 		},
 	}
 
-	_, cfg, _, err := manager.spawnConfig(SpawnRequest{ACPAgent: AgentOpenCode, Model: "GPT-5.6 Terra"})
+	_, cfg, _, err := manager.spawnConfig(SpawnRequest{ACPAgent: AgentOpenCode, Model: "GPT-6 Sol"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Model != modelprovider.OpenAIModelGPT56Terra {
+	if cfg.Model != modelprovider.OpenAIModelGPT6Sol {
 		t.Fatalf("model label resolved outside configured provider: %#v", cfg)
 	}
 }

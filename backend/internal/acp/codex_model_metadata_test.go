@@ -56,7 +56,7 @@ func TestResolveCodexCustomProviderModelMetadataPreservesNativeCatalog(t *testin
 		metadata, err := manager.resolveCodexCustomProviderModelMetadata(AgentCodex, AgentConfig{
 			ProviderMode:  AgentProviderModeAgentDefaults,
 			ModelProvider: providerID,
-			Model:         provider.OpenAIModelGPT56Sol,
+			Model:         provider.OpenAIModelGPT6Sol,
 		})
 		if err != nil || metadata != "" || catalog.calls != 0 {
 			t.Fatalf("provider %q: metadata = %q, error = %v, catalog calls = %d", providerID, metadata, err, catalog.calls)

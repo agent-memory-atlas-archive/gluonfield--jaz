@@ -62,20 +62,12 @@ var (
 		},
 	}
 	openAIModels = []Model{
-		openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Most capable for complex work", "openai/gpt-6-astra"),
-		openRouterBackedModel(provider.OpenAIModelGPT56Sol, "GPT-5.6 Sol", "Frontier capability", "openai/gpt-5.6-sol"),
-		openRouterBackedModel(provider.OpenAIModelGPT56Terra, "GPT-5.6 Terra", "Balanced capability and cost", "openai/gpt-5.6-terra"),
-		openRouterBackedModel(provider.OpenAIModelGPT56Luna, "GPT-5.6 Luna", "Efficient high-volume workloads", "openai/gpt-5.6-luna"),
-		openRouterBackedModel("gpt-5.5", "GPT-5.5", "Previous frontier model", "openai/gpt-5.5"),
-		openRouterBackedModel(provider.DefaultOpenAIModel, "GPT-5.4 Mini", "Fast and inexpensive", "openai/gpt-5.4-mini"),
-		modelWithoutProviderReasoning("gpt-5.3-codex-spark", "GPT-5.3 Codex Spark", "Tuned for coding"),
+		openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work", "openai/gpt-6-astra"),
+		openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work", "openai/gpt-6-sol"),
+		openRouterBackedModel(provider.DefaultOpenAIModel, "GPT-6 Luna", "Fast and affordable for easier tasks", "openai/gpt-6-luna"),
 	}
 	agentModels = map[string][]Model{
-		"codex": {
-			openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work", "openai/gpt-6-astra"),
-			openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work", "openai/gpt-6-sol"),
-			openRouterBackedModel("gpt-6-luna", "GPT-6 Luna", "Fast and affordable for easier tasks", "openai/gpt-6-luna"),
-		},
+		"codex": openAIModels,
 		"claude": {
 			modelWithoutProviderReasoning("opus[1m]", "Opus 5.5", "Recommended"),
 			openRouterBackedModel("claude-fable-5-1", "Fable 5.1", "Most capable for the hardest tasks", "anthropic/claude-fable-5.1"),
@@ -91,12 +83,9 @@ var (
 		},
 		"opencode": {
 			openRouterNativeModel(provider.DefaultOpenRouterModel, "GLM 5.2", "Default OpenRouter coding model"),
-			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Most capable for complex work"),
-			openRouterNativeModel("openai/"+provider.OpenAIModelGPT56Terra, "GPT-5.6 Terra", "Balanced capability and cost"),
-			openRouterNativeModel("openai/"+provider.OpenAIModelGPT56Sol, "GPT-5.6 Sol", "Frontier capability"),
-			openRouterNativeModel("openai/"+provider.OpenAIModelGPT56Luna, "GPT-5.6 Luna", "Efficient high-volume workloads"),
-			openRouterNativeModel("openai/gpt-5.4-mini", "GPT-5.4 Mini", "Fast and inexpensive"),
-			openRouterNativeModel("openai/gpt-5.5", "GPT-5.5", "Previous frontier model"),
+			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work"),
+			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work"),
+			openRouterNativeModel("openai/"+provider.DefaultOpenAIModel, "GPT-6 Luna", "Fast and affordable for easier tasks"),
 			openRouterNativeModel("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "Popular OpenRouter coding model"),
 			openRouterNativeModel("xiaomi/mimo-v2.5", "MiMo-V2.5", "Popular OpenRouter coding model"),
 			openRouterNativeModel("minimax/minimax-m3", "MiniMax M3", "Popular OpenRouter coding model"),

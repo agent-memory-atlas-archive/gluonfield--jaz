@@ -67,7 +67,7 @@ func TestConfigureCodexEnvKeepsOpenAIAccountAuthNative(t *testing.T) {
 	env := map[string]string{"CODEX_CONFIG": "null"}
 	if err := configureCodexEnv(env, AgentConfig{
 		ModelProvider: modelprovider.ProviderOpenAI,
-		Model:         modelprovider.OpenAIModelGPT56Sol,
+		Model:         modelprovider.OpenAIModelGPT6Sol,
 	}, nil, "instructions"); err != nil {
 		t.Fatal(err)
 	}
