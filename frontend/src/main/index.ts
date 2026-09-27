@@ -23,6 +23,7 @@ import { registerDictation } from './dictation'
 import { canGrantAppPermission } from './permissions'
 import { createThreadNotificationMonitor } from './notifications'
 import { attachPreviewFindShortcuts } from './previewFind'
+import { installComputerControl } from '@main/computerControl'
 import { installBrowserControl } from '@main/browserControl'
 import { installBrowserProfileImport } from '@main/browserProfileImport'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
@@ -41,6 +42,7 @@ app.setName(APP_NAME)
 app.setAppUserModelId('dev.wins.jaz')
 installMainDiagnostics()
 installBrowserControl()
+installComputerControl()
 installBrowserProfileImport()
 installBrowserPasswords()
 

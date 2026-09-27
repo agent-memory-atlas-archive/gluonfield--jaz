@@ -11,13 +11,7 @@ export type BrowserAction = {
   amount?: number
 } | ({ action: 'cdp' } & BrowserCommand)
 
-export type BrowserActionResult = {
-  status: string
-  text?: string
-  data?: unknown
-  image_base64?: string
-  image_mime_type?: string
-}
+export type { ScriptResult as BrowserActionResult } from '@shared/script'
 
 export const BROWSER_DOCUMENTATION = `# Jaz browser JavaScript
 The tab binding controls this conversation's side browser. Active work survives switching chats or hiding the browser. Hidden browser sessions may unload after five minutes without browser activity when their agent is idle; the next use reloads the saved URL when present. Top-level declarations preserve JavaScript scope until cancellation, disconnection or idle unloading. Observe with getAXState() after resuming and derive fresh targets. Use const for stable bindings and let for values you will reassign. Reuse bindings instead of redeclaring them. Imports and host filesystem access are unavailable.

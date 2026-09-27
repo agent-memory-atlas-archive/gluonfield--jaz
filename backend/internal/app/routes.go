@@ -5,11 +5,13 @@ import (
 	"strings"
 
 	"github.com/wins/jaz/backend/internal/browsercontrol"
+	"github.com/wins/jaz/backend/internal/computercontrol"
 	"github.com/wins/jaz/backend/internal/connections"
 	"github.com/wins/jaz/backend/internal/deviceauth"
 	feedcore "github.com/wins/jaz/backend/internal/feed"
 	agentsessionsapi "github.com/wins/jaz/backend/internal/httpapi/agentsessions"
 	browserapi "github.com/wins/jaz/backend/internal/httpapi/browser"
+	computerapi "github.com/wins/jaz/backend/internal/httpapi/computer"
 	connectionsapi "github.com/wins/jaz/backend/internal/httpapi/connections"
 	deviceapi "github.com/wins/jaz/backend/internal/httpapi/devices"
 	feedapi "github.com/wins/jaz/backend/internal/httpapi/feed"
@@ -31,27 +33,29 @@ import (
 type routeDeps struct {
 	fx.In
 
-	Usage           usagecore.Service
-	Feed            feedcore.Service
-	ModelCatalog    *modelcatalog.Service `optional:"true"`
-	Jaz             Config
-	Devices         *deviceauth.Service `optional:"true"`
-	Store           storage.Store
-	AuthKey         RuntimeAuthKey
-	Config          serverconfig.Config               `optional:"true"`
-	Browser         *browsercontrol.ConfiguredBackend `optional:"true"`
-	BrowserSettings *BrowserSettingsHandler           `optional:"true"`
-	Connections     *connections.Service              `optional:"true"`
-	ConnectionStart *connections.ConnectService       `optional:"true"`
-	ConnectionOAuth *connections.OAuthService         `optional:"true"`
-	ConnectionQR    *connections.QRService            `optional:"true"`
-	MCP             *mcpruntime.Manager               `optional:"true"`
-	Preview         *previewapi.Handler
-	SessionMessages *sessionsapi.MessagesHandler
-	SessionOverview *sessionsapi.OverviewHandler
-	SessionGoal     *sessionsapi.GoalHandler
-	AgentSession    *agentsessionsapi.Handler
-	Voice           *voiceapi.Handler
+	Usage            usagecore.Service
+	Feed             feedcore.Service
+	ModelCatalog     *modelcatalog.Service `optional:"true"`
+	Jaz              Config
+	Devices          *deviceauth.Service `optional:"true"`
+	Store            storage.Store
+	AuthKey          RuntimeAuthKey
+	Config           serverconfig.Config               `optional:"true"`
+	Browser          *browsercontrol.ConfiguredBackend `optional:"true"`
+	Computer         *computercontrol.DesktopBackend   `optional:"true"`
+	ComputerSettings *ComputerSettingsHandler          `optional:"true"`
+	BrowserSettings  *BrowserSettingsHandler           `optional:"true"`
+	Connections      *connections.Service              `optional:"true"`
+	ConnectionStart  *connections.ConnectService       `optional:"true"`
+	ConnectionOAuth  *connections.OAuthService         `optional:"true"`
+	ConnectionQR     *connections.QRService            `optional:"true"`
+	MCP              *mcpruntime.Manager               `optional:"true"`
+	Preview          *previewapi.Handler
+	SessionMessages  *sessionsapi.MessagesHandler
+	SessionOverview  *sessionsapi.OverviewHandler
+	SessionGoal      *sessionsapi.GoalHandler
+	AgentSession     *agentsessionsapi.Handler
+	Voice            *voiceapi.Handler
 }
 
 func NewRoutes(deps routeDeps) server.Routes {
@@ -74,6 +78,13 @@ func NewRoutes(deps routeDeps) server.Routes {
 	routes = append(routes, modelCapabilityRoutes(deps.ModelCatalog)...)
 	routes = appendConnectionRoutes(routes, deps.Connections, deps.ConnectionStart, deps.ConnectionOAuth, deps.ConnectionQR, deps.MCP, deps.Config)
 	routes = appendDeviceRoutes(routes, deps.Devices, deps.Store, deps.Config, string(deps.AuthKey), deps.Jaz.Devices.DisablePairing)
+	if deps.Computer != nil && deps.ComputerSettings != nil {
+		routes = append(routes,
+			server.Route{Pattern: "GET /v1/computer", Handler: deps.ComputerSettings},
+			server.Route{Pattern: "PUT /v1/computer", Handler: deps.ComputerSettings},
+			server.Route{Pattern: "GET /v1/sessions/{session}/computer", Handler: computerapi.DesktopHandler{Backend: deps.Computer, Store: deps.Store}},
+		)
+	}
 	routes = appendBrowserRoutes(routes, deps.BrowserSettings, deps.Browser, deps.Store)
 	return append(routes, server.Route{Pattern: "/v1/preview/", Handler: deps.Preview})
 }

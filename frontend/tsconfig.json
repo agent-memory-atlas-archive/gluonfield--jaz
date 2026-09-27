@@ -2,6 +2,7 @@
   "compilerOptions": {
     "paths": {
       "@shared/*": ["./src/shared/*"],
+      "@main/*": ["./src/main/*"],
       "@/*": ["./src/renderer/src/*"]
     }
   },

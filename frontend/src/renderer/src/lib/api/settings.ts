@@ -109,6 +109,15 @@ export const agentSettingsQuery = queryOptions({
   queryFn: async () => normalizeAgentSettings(await get<AgentSettings>('/v1/settings/agents')),
 })
 
+export const computerSettingsQuery = queryOptions({
+  queryKey: keys.computerSettings,
+  queryFn: () => get<{ enabled: boolean }>('/v1/computer'),
+})
+
+export function updateComputerSettings(enabled: boolean): Promise<{ enabled: boolean }> {
+  return put('/v1/computer', { enabled })
+}
+
 export const browserSettingsQuery = queryOptions({
   queryKey: keys.browserSettings,
   queryFn: () => get<BrowserStatus>('/v1/browser'),

@@ -24,6 +24,7 @@ export type SettingsSection =
   | 'memory'
   | 'connections'
   | 'browser'
+  | 'computer'
   | 'usage'
   | 'devices'
   | 'keyboard'
@@ -48,6 +49,7 @@ export const SETTINGS_SECTIONS: SettingsNavItem[] = [
   { id: 'memory', label: 'Memory', icon: Brain },
   { id: 'connections', label: 'Connections', icon: Link2, experimental: true },
   { id: 'browser', label: 'Browser', icon: Globe },
+  { id: 'computer', label: 'Computer Use', icon: MonitorSmartphone },
   { id: 'usage', label: 'Usage', icon: ChartNoAxesColumn },
   { id: 'devices', label: 'Devices', icon: MonitorSmartphone },
   { id: 'keyboard', label: 'Keyboard shortcuts', icon: Keyboard },

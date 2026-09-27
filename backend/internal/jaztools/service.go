@@ -9,6 +9,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/browsercontrol"
+	"github.com/wins/jaz/backend/internal/computercontrol"
 	"github.com/wins/jaz/backend/internal/connections"
 	"github.com/wins/jaz/backend/internal/loops"
 	mcpconfig "github.com/wins/jaz/backend/internal/mcpconfig"
@@ -53,9 +54,11 @@ func ServerConfig(url string) mcpconfig.Server {
 }
 
 type Service struct {
-	Memory          *memoryservice.Service
-	browserSettings storage.SettingsStorage
-	browserBackend  browsercontrol.Backend
+	Memory           *memoryservice.Service
+	browserSettings  storage.SettingsStorage
+	browserBackend   browsercontrol.Backend
+	computerSettings storage.SettingsStorage
+	computerBackend  computercontrol.Backend
 
 	loopTools       *loops.MCPTools
 	agentTools      *acp.MCPTools
@@ -97,12 +100,13 @@ type surfaceSlot struct {
 }
 
 type serverSlot struct {
-	once         sync.Once
-	server       *mcp.Server
-	memoryTools  bool
-	agentTools   bool
-	browserTools bool
-	threadTools  bool
+	once          sync.Once
+	server        *mcp.Server
+	memoryTools   bool
+	agentTools    bool
+	browserTools  bool
+	computerTools bool
+	threadTools   bool
 }
 
 type sessionSource interface {
@@ -199,6 +203,7 @@ func (s *Service) server(surface toolSurface) *mcp.Server {
 		s.syncThreadToolsFor(slot, surface)
 		s.syncMemoryToolsFor(slot, surface)
 		s.syncBrowserToolsFor(slot, surface)
+		s.syncComputerToolsFor(slot, surface)
 		s.mu.Unlock()
 	})
 	return slot.server
@@ -263,6 +268,9 @@ func (s *Service) Sync() {
 	s.syncAgentTools()
 	s.syncMemoryTools()
 	s.syncBrowserTools()
+	for _, current := range s.slots() {
+		s.syncComputerToolsFor(current.slot, current.surface)
+	}
 }
 
 func (s *Service) Handler() http.Handler {

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { COMPUTER_CHANNEL, type ComputerAPI } from '@shared/computerControl'
 import { browserPasswords } from '@preload/browserPasswords'
 import { installBrowserPasswordCapture } from '@preload/browser'
 import { BROWSER_PRELOAD_ARGUMENT } from '@shared/preview'
@@ -32,6 +33,15 @@ if (process.argv.includes(BROWSER_PRELOAD_ARGUMENT)) {
 } else {
   contextBridge.exposeInMainWorld('jaz', {
     browserPasswords,
+    computer: {
+      status: () => ipcRenderer.invoke(COMPUTER_CHANNEL + 'status'),
+      requestPermissions: () => ipcRenderer.invoke(COMPUTER_CHANNEL + 'permissions'),
+      openScreenRecordingSettings: () => ipcRenderer.invoke(COMPUTER_CHANNEL + 'screen-settings'),
+      begin: (id, session) => ipcRenderer.invoke(COMPUTER_CHANNEL + 'begin', id, session),
+      call: (id, action) => ipcRenderer.invoke(COMPUTER_CHANNEL + 'call', id, action),
+      end: (id) => ipcRenderer.invoke(COMPUTER_CHANNEL + 'end', id),
+      cancel: (id) => ipcRenderer.invoke(COMPUTER_CHANNEL + 'cancel', id),
+    } satisfies ComputerAPI,
     voiceOverlay: {
       drag: (point) => ipcRenderer.send('jaz:voice:drag', point),
       publish: (state) => ipcRenderer.send('jaz:voice:publish', state),

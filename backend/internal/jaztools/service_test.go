@@ -14,6 +14,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/browsercontrol"
+	"github.com/wins/jaz/backend/internal/computercontrol"
 	"github.com/wins/jaz/backend/internal/connections"
 	"github.com/wins/jaz/backend/internal/connectors/telegram"
 	"github.com/wins/jaz/backend/internal/connectors/whatsapp"
@@ -56,6 +57,12 @@ func (f *fakeExecutor) StartLoopRun(_ context.Context, execution loops.Execution
 
 type fakeACPService struct {
 	spawned chan acp.SpawnRequest
+}
+
+type fakeComputerBackend struct{}
+
+func (fakeComputerBackend) Call(context.Context, computercontrol.ActionInput) (computercontrol.ActionOutput, error) {
+	return computercontrol.ActionOutput{Status: "ok"}, nil
 }
 
 type fakeBrowserBackend struct{}
@@ -853,10 +860,14 @@ func TestBrowserToolsUseDirectThreadSurface(t *testing.T) {
 	)
 	service.SetLoops(loops.NewService(store, &fakeExecutor{started: make(chan loops.Run, 1)}, nil))
 	service.SetBrowser(store, fakeBrowserBackend{})
+	if _, err := jazsettings.SaveComputerSettings(store, jazsettings.ComputerSettings{Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	service.SetComputer(store, fakeComputerBackend{})
 
 	session, closeSession := connectClient(t, service.Server())
 	defer closeSession()
-	for _, name := range browsercontrol.MCPToolNames() {
+	for _, name := range append(browsercontrol.MCPToolNames(), computercontrol.MCPToolNames()...) {
 		if !hasTool(t, session, name) {
 			t.Fatalf("ordinary server missing %s", name)
 		}
@@ -888,7 +899,7 @@ func TestBrowserToolsUseDirectThreadSurface(t *testing.T) {
 
 	widgetSession, closeWidget := connectClient(t, service.server(widgetSurface))
 	defer closeWidget()
-	for _, name := range browsercontrol.MCPToolNames() {
+	for _, name := range append(browsercontrol.MCPToolNames(), computercontrol.MCPToolNames()...) {
 		if !hasTool(t, widgetSession, name) {
 			t.Fatalf("widget server missing %s", name)
 		}
@@ -897,8 +908,11 @@ func TestBrowserToolsUseDirectThreadSurface(t *testing.T) {
 	if _, err := jazsettings.SaveBrowserSettings(store, jazsettings.BrowserSettings{Enabled: false}); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := jazsettings.SaveComputerSettings(store, jazsettings.ComputerSettings{Enabled: false}); err != nil {
+		t.Fatal(err)
+	}
 	service.Sync()
-	for _, name := range browsercontrol.MCPToolNames() {
+	for _, name := range append(browsercontrol.MCPToolNames(), computercontrol.MCPToolNames()...) {
 		if hasTool(t, session, name) {
 			t.Fatalf("ordinary server still advertised %s after browser tools were disabled", name)
 		}

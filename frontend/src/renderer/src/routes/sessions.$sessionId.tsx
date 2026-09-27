@@ -1,3 +1,4 @@
+import { useComputerControl } from '@/lib/hooks/useComputerControl'
 import { usePrefetchQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useLocation, useNavigate } from '@tanstack/react-router'
 import { ArrowDown, Play } from 'lucide-react'
@@ -134,6 +135,7 @@ function SessionPage({
   const reportHistoryError = useCallback((message: string) => {
     toast(`Couldn't load earlier history: ${message}`, 'danger')
   }, [toast])
+  useComputerControl(sessionId)
   const detail = useSessionHistory(sessionId, reportHistoryError)
   const voice = useVoiceMode(sessionId)
   const { start: startVoiceConversation } = voice

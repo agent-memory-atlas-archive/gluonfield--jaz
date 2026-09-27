@@ -16,6 +16,7 @@ import { ACPAgentsSettings } from './ACPAgentsSettings'
 import { AgentProvidersSettings } from './AgentProvidersSettings'
 import { AppearanceSettings } from './AppearanceSettings'
 import { ArchivedThreadsSettings } from './ArchivedThreadsSettings'
+import { ComputerSettings } from '@/components/settings/ComputerSettings'
 import { BrowserSettings } from './BrowserSettings'
 import { ConnectionsSettings } from './ConnectionsSettings'
 import { DevicesSettings } from './DevicesSettings'
@@ -246,6 +247,8 @@ function SectionContent({
       return <MemorySettings />
     case 'connections':
       return <ConnectionsSettings />
+    case 'computer':
+      return <ComputerSettings />
     case 'browser':
       return <BrowserSettings />
     case 'usage':

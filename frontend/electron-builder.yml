@@ -4,6 +4,9 @@ directories:
   output: dist
 files:
   - out/**
+asarUnpack:
+  - node_modules/@trycua/**
+  - node_modules/@ubjs/**
 extraResources:
   - from: resources/bin
     to: bin
@@ -21,6 +24,7 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
+    NSScreenCaptureUsageDescription: Jaz uses screen capture to let your agents see and control desktop apps.
     NSMicrophoneUsageDescription: Jaz uses the microphone for voice input.
 win:
   icon: src/assets/jaz.ico

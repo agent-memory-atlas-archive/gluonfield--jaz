@@ -1,5 +1,7 @@
 export {}
 
+import type { ComputerAPI } from '@shared/computerControl'
+
 import type { BrowserNavigationDirection } from '../shared/browserNavigation'
 import type { ThreadNotificationConfig } from '../shared/notifications'
 import type { UpdateStatus } from '../shared/update'
@@ -12,6 +14,7 @@ import type { VoiceOverlayAPI } from '@shared/voice'
 declare global {
   interface Window {
     jaz?: {
+      computer: ComputerAPI
       voiceOverlay: VoiceOverlayAPI
       dictation: DictationAPI
       browserProfiles: BrowserProfileAPI

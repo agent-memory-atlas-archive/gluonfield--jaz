@@ -17,6 +17,7 @@ import (
 	"github.com/wins/jaz/backend/internal/acpadapter"
 	"github.com/wins/jaz/backend/internal/agent"
 	"github.com/wins/jaz/backend/internal/app"
+	"github.com/wins/jaz/backend/internal/computercontrol"
 	configloader "github.com/wins/jaz/backend/internal/config"
 	"github.com/wins/jaz/backend/internal/connections"
 	"github.com/wins/jaz/backend/internal/coordinator"
@@ -116,6 +117,8 @@ func serveOptions(args []string) []fx.Option {
 			app.NewWidgetService,
 			app.NewWidgetSessionPublisher,
 			app.NewToolRegistry,
+			computercontrol.NewDesktopBackend,
+			app.NewComputerSettingsHandler,
 			app.NewBrowserBackend,
 			app.NewBrowserSettingsHandler,
 			app.NewMCPManager,
@@ -131,6 +134,8 @@ func serveOptions(args []string) []fx.Option {
 			app.StartStorageMaintenance,
 			app.ConfigureMemoryDreamRunner,
 			app.ConfigureMemorySearch,
+			app.ConfigureComputerTools,
+			app.CloseComputerBackend,
 			app.ConfigureBrowserTools,
 			app.CloseBrowserBackend,
 			app.StartMemoryScheduler,
