@@ -161,12 +161,12 @@ func TestModelCapabilitiesPreservesAutomaticProviderReasoning(t *testing.T) {
 func TestModelCapabilitiesAddsCuratedAliasesToProviderModels(t *testing.T) {
 	catalog := capabilityCatalog{
 		agents: map[string][]modelcatalog.Model{AgentCodex: {{
-			Value:        provider.OpenAIModelGPT56Sol,
-			Label:        "GPT-5.6 Sol",
-			OpenRouterID: "openai/gpt-5.6-sol",
+			Value:        provider.OpenAIModelGPT6Sol,
+			Label:        "GPT-6 Sol",
+			OpenRouterID: "openai/gpt-6-sol",
 		}}},
 		providers: map[string][]modelcatalog.Model{provider.ProviderOpenRouter: {{
-			Value: "openai/gpt-5.6-sol",
+			Value: "openai/gpt-6-sol",
 			Reasoning: modelcatalog.Reasoning{
 				Status:  modelcatalog.ReasoningReady,
 				Efforts: []string{"high"},
@@ -177,10 +177,10 @@ func TestModelCapabilitiesAddsCuratedAliasesToProviderModels(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(models) != 1 || strings.Join(models[0].Aliases, ",") != "gpt-5.6-sol,GPT-5.6 Sol" {
+	if len(models) != 1 || strings.Join(models[0].Aliases, ",") != "gpt-6-sol,GPT-6 Sol" {
 		t.Fatalf("models = %#v", models)
 	}
-	if err := (ModelCapabilities{Catalog: catalog}).ValidateReasoningEffort(AgentCodex, provider.ProviderOpenRouter, provider.OpenAIModelGPT56Sol, "high"); err != nil {
+	if err := (ModelCapabilities{Catalog: catalog}).ValidateReasoningEffort(AgentCodex, provider.ProviderOpenRouter, provider.OpenAIModelGPT6Sol, "high"); err != nil {
 		t.Fatal(err)
 	}
 }

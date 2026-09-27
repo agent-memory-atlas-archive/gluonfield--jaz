@@ -184,19 +184,19 @@ func TestMemoryAgentSetting(t *testing.T) {
 	}
 
 	res = httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPut, "/v1/memory", strings.NewReader(`{"model":"gpt-5.5","reasoning_effort":"high"}`)))
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPut, "/v1/memory", strings.NewReader(`{"model":"gpt-6-astra","reasoning_effort":"high"}`)))
 	if res.Code != http.StatusOK {
 		t.Fatalf("set memory model = %d, body = %s", res.Code, res.Body.String())
 	}
 	if err := json.Unmarshal(res.Body.Bytes(), &status); err != nil {
 		t.Fatal(err)
 	}
-	if status.Model != "gpt-5.5" || status.ReasoningEffort != "high" {
+	if status.Model != "gpt-6-astra" || status.ReasoningEffort != "high" {
 		t.Fatalf("unexpected memory model status %#v", status)
 	}
 
 	res = httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPut, "/v1/memory", strings.NewReader(`{"reasoning_effort":"max"}`)))
+	handler.ServeHTTP(res, httptest.NewRequest(http.MethodPut, "/v1/memory", strings.NewReader(`{"reasoning_effort":"minimal"}`)))
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf("unsupported codex effort should 400, got %d body = %s", res.Code, res.Body.String())
 	}

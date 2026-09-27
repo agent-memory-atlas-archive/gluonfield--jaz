@@ -15,13 +15,10 @@ const (
 	ProviderMock       = "mock"
 
 	DefaultOpenRouterModel = "z-ai/glm-5.2"
-	DefaultOpenAIModel     = "gpt-5.4-mini"
+	DefaultOpenAIModel     = "gpt-6-luna"
 
-	OpenAIModelGPT56Sol   = "gpt-5.6-sol"
-	OpenAIModelGPT56Terra = "gpt-5.6-terra"
-	OpenAIModelGPT56Luna  = "gpt-5.6-luna"
-	OpenAIModelGPT6Astra  = "gpt-6-astra"
-	OpenAIModelGPT6Sol    = "gpt-6-sol"
+	OpenAIModelGPT6Astra = "gpt-6-astra"
+	OpenAIModelGPT6Sol   = "gpt-6-sol"
 
 	CapabilityJaz             = "jaz"
 	CapabilityChatCompletions = "chat_completions"

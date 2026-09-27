@@ -148,7 +148,7 @@ func (c ModelCapabilities) ValidateReasoningEffort(agent, providerID, model, eff
 		return err
 	}
 	found, ok := findCapabilityModel(models, model)
-	if !ok && strings.TrimSpace(providerID) == "" && agentPolicyForAgent(agent).supportsReasoningEffort(effort) {
+	if !ok && agentOwnsModelMetadata(agent, providerID) && agentPolicyForAgent(agent).supportsReasoningEffort(effort) {
 		return nil
 	}
 	if !ok || found.Reasoning.Status == modelcatalog.ReasoningUnavailable {

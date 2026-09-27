@@ -219,12 +219,12 @@ func TestMergeAgentDefaultsPreservesSelectedCodexModel(t *testing.T) {
 	seed := testAgentDefaultsSeed()
 	stored := testAgentDefaultsSeed()
 	codex := stored.ACP[acp.AgentCodex]
-	codex.Model = provider.OpenAIModelGPT56Sol
+	codex.Model = provider.OpenAIModelGPT6Sol
 	stored.ACP[acp.AgentCodex] = codex
 
 	merged := MergeAgentDefaults(stored, seed, agentNames(seed))
 
-	if merged.ACP[acp.AgentCodex].Model != provider.OpenAIModelGPT56Sol {
+	if merged.ACP[acp.AgentCodex].Model != provider.OpenAIModelGPT6Sol {
 		t.Fatalf("codex model = %q, want selected model preserved", merged.ACP[acp.AgentCodex].Model)
 	}
 }

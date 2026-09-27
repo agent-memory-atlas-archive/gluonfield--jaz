@@ -88,7 +88,7 @@ func TestRunDreamSpawnsCompatibleWorkerModelAndEffort(t *testing.T) {
 		}}, model: "z-ai/glm-5.2", effort: "xhigh"},
 		{name: "opencode-openai", agent: acp.AgentOpenCode, defaults: jazsettings.AgentDefaults{ACP: map[string]jazsettings.ACPAgentDefaults{
 			acp.AgentOpenCode: {ModelProvider: provider.ProviderOpenAI},
-		}}, model: "gpt-5.4-mini", effort: "xhigh"},
+		}}, model: provider.DefaultOpenAIModel, effort: "xhigh"},
 		{name: "opencode-ollama", agent: acp.AgentOpenCode, defaults: jazsettings.AgentDefaults{ACP: map[string]jazsettings.ACPAgentDefaults{
 			acp.AgentOpenCode: {ModelProvider: provider.ProviderOllama},
 		}}},
