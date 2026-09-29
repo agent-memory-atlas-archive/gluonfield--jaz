@@ -18,7 +18,6 @@ import {
   exportCodexThemeString,
   parseCodexThemeString,
 } from '@/lib/codexTheme'
-import { HOME_LOGO_URL_MAX_LENGTH } from '@/lib/homeWordmark'
 import { FontPicker } from './FontPicker'
 import { SettingsCard } from './SettingsCard'
 import { ThemeConfigPreview } from './ThemeConfigPreview'
@@ -333,12 +332,11 @@ export function AppearanceSettings() {
         </Row>
         <Row
           title="Logo Name or URL"
-          description="A name appears above the new-thread composer as dithered text. Paste an image URL to use the image. Leave blank for “jaz”."
+          description="Enter a name for dithered text, or paste a direct image URL. Leave blank for “jaz”."
         >
           <input
             type="text"
             value={homeWordmark}
-            maxLength={HOME_LOGO_URL_MAX_LENGTH}
             placeholder="jaz"
             aria-label="Logo Name or URL"
             onChange={(event) => {
