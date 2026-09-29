@@ -22,15 +22,16 @@ type providerSubagentUpdate struct {
 
 // providerSubagentFromUpdate publishes subagent panel records and decides which
 // updates to keep out of the main transcript.
-func providerSubagentFromUpdate(agent string, update acpschema.DecodedSessionUpdate) providerSubagentUpdate {
+func providerSubagentFromUpdate(job *jobState, update acpschema.DecodedSessionUpdate) providerSubagentUpdate {
+	agent := job.ACPAgent
 	switch event := update.(type) {
 	case acpschema.SessionInfoSessionUpdate:
 		subagents := providerSubagentsFromMeta(agent, event.Meta, providerSubagentHint{})
 		return providerSubagentUpdate{subagents: subagents, consume: len(subagents) > 0}
 	case acpschema.ToolCallSessionUpdate:
-		return toolCallSubagent(agent, event.Meta)
+		return job.toolCallSubagent(event.ToolCallID, event.Meta)
 	case acpschema.ToolCallUpdateSessionUpdate:
-		return toolCallSubagent(agent, event.Meta)
+		return job.toolCallSubagent(event.ToolCallID, event.Meta)
 	case acpschema.AgentMessageChunkUpdate:
 		return providerSubagentUpdate{subagents: providerSubagentsFromMeta(agent, event.Meta, providerSubagentHint{summary: "Subagent message", status: "running"})}
 	case acpschema.AgentThoughtChunkUpdate:
@@ -40,22 +41,24 @@ func providerSubagentFromUpdate(agent string, update acpschema.DecodedSessionUpd
 	}
 }
 
-func toolCallSubagent(agent string, meta map[string]any) providerSubagentUpdate {
+// toolCallSubagent publishes a tool call's subagent record and keeps a Claude
+// subagent's own tool calls out of the main transcript. Claude marks only a
+// call's first report with claudeCode.parentToolUseId, so the job remembers the id.
+func (j *jobState) toolCallSubagent(id acpschema.ToolCallID, meta map[string]any) providerSubagentUpdate {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	claudeCode, _ := mapValue(meta["claudeCode"])
+	if strings.TrimSpace(stringValue(claudeCode["parentToolUseId"])) != "" {
+		if j.subagentToolIDs == nil {
+			j.subagentToolIDs = make(map[string]struct{})
+		}
+		j.subagentToolIDs[string(id)] = struct{}{}
+	}
+	_, nested := j.subagentToolIDs[string(id)]
 	return providerSubagentUpdate{
-		subagents: providerSubagentsFromMeta(agent, meta, providerSubagentHint{status: "running"}),
-		consume:   subagentInternalToolCall(meta),
+		subagents: providerSubagentsFromMeta(j.ACPAgent, meta, providerSubagentHint{status: "running"}),
+		consume:   nested,
 	}
-}
-
-// subagentInternalToolCall reports whether a tool call is a Claude subagent's
-// own nested call (claudeCode.parentToolUseId), which Jaz keeps out of the main
-// transcript regardless of whether it also carried a panel record.
-func subagentInternalToolCall(meta map[string]any) bool {
-	claudeCode, ok := mapValue(meta["claudeCode"])
-	if !ok {
-		return false
-	}
-	return strings.TrimSpace(stringValue(claudeCode["parentToolUseId"])) != ""
 }
 
 func providerSubagentsFromMeta(agent string, meta map[string]any, hint providerSubagentHint) []sessionevents.ProviderSubagentEvent {

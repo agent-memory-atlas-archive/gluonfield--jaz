@@ -73,6 +73,10 @@ func (m *Manager) publishACPStatus(job eventView) {
 }
 
 func (m *Manager) publishACPTool(job eventView, call sessionevents.ACPToolCall) {
+	m.publishOrderedACPEvents(job, acpToolEvents(job, call)...)
+}
+
+func acpToolEvents(job eventView, call sessionevents.ACPToolCall) []sessionevents.Event {
 	acp := acpEventEnvelope(job)
 	acp.ToolCalls = CloneToolCalls([]sessionevents.ACPToolCall{call})
 	events := make([]sessionevents.Event, 0, len(childSessionIDs(job)))
@@ -84,7 +88,45 @@ func (m *Manager) publishACPTool(job eventView, call sessionevents.ACPToolCall) 
 			At:        time.Now().UTC(),
 		})
 	}
-	m.publishOrderedACPEvents(job, events...)
+	return events
+}
+
+// terminalOutputOnly reports whether next differs from prev only in its
+// terminal output.
+func terminalOutputOnly(prev, next sessionevents.ACPToolCall) bool {
+	prev.Runtime.TerminalOutput = next.Runtime.TerminalOutput
+	return prev.EqualTranscript(next)
+}
+
+// deferToolPublishLocked coalesces output-only tool updates, which Codex streams
+// per chunk, into one publish per transcript flush interval. The transcript
+// buffer it creates gives the deferred publish and every later one a shared
+// barrier.
+func (m *Manager) deferToolPublishLocked(job *jobState, id string) {
+	if job.deferredToolIDs == nil {
+		job.deferredToolIDs = make(map[string]struct{})
+		m.transcriptBuffers.get(job.ID, true)
+		time.AfterFunc(acpTranscriptFlushInterval, func() { m.publishDeferredTools(job) })
+	}
+	job.deferredToolIDs[id] = struct{}{}
+}
+
+// publishDeferredTools reads the tool calls inside the transcript barrier, so an
+// update published meanwhile is never overwritten by an older snapshot.
+func (m *Manager) publishDeferredTools(job *jobState) {
+	view := job.eventView()
+	m.withACPTranscriptBarrier(view, func() {
+		job.mu.Lock()
+		var events []sessionevents.Event
+		for id := range job.deferredToolIDs {
+			if call, ok := job.toolByID[id]; ok {
+				events = append(events, acpToolEvents(view, call)...)
+			}
+		}
+		job.deferredToolIDs = nil
+		job.mu.Unlock()
+		m.recordAndPublishEventListDirect(events)
+	})
 }
 
 func (m *Manager) publishProviderSubagents(job eventView, subagents []sessionevents.ProviderSubagentEvent) {

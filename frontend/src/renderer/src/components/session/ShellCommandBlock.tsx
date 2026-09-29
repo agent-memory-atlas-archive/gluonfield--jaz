@@ -1,6 +1,6 @@
 import { LoaderCircle } from 'lucide-react'
 import { memo } from 'react'
-import type { ACPToolCall, ACPToolContent } from '@/lib/api/types'
+import type { ACPToolCall } from '@/lib/api/types'
 import { isRunningToolStatus, toolCallCategory, toolCallPresentation } from './toolPresentation'
 import { normalized } from './TranscriptUtils'
 
@@ -15,16 +15,6 @@ function stripWrappingFence(text: string): string {
   return trimmed.replace(/^```[^\n]*\n/, '').replace(/\n?```\s*$/, '')
 }
 
-function outputText(content?: ACPToolContent[]): string {
-  if (!content?.length) return ''
-  const joined = content
-    .filter((block): block is ACPToolContent & { text: string } => block.type === 'text' && !!block.text)
-    .map((block) => block.text)
-    .join('\n')
-    .replace(/\s+$/, '')
-  return stripWrappingFence(joined)
-}
-
 export const ShellCommandBlock = memo(function ShellCommandBlock({
   call,
   active = false,
@@ -35,7 +25,8 @@ export const ShellCommandBlock = memo(function ShellCommandBlock({
   const presentation = toolCallPresentation(call)
   const command = presentation.command || (call.title ?? '').trim()
   const description = presentation.description
-  const output = outputText(call.content)
+  const output =
+    typeof presentation.output === 'string' ? stripWrappingFence(presentation.output).replace(/\s+$/, '') : ''
   const exitCode = call.runtime?.terminal_exit_code
   const failed = normalized(call.status) === 'failed' || (exitCode !== undefined && exitCode !== 0)
   const running = active && isRunningToolStatus(call.status)

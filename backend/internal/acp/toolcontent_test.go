@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -56,15 +55,14 @@ func TestToolUpdateMergeSemantics(t *testing.T) {
 	kind := acpschema.ToolKindFetch
 	completed := acpschema.ToolCallStatusCompleted
 	call := sessionevents.ACPToolCall{ID: "t1", Title: "\"query\"", Status: "completed"}
-	now := time.Now().UTC()
 
 	// First update carries everything.
-	mergeToolCall(&call, toolUpdateSnapshot(toolUpdateFields{
-		ID:      "t1",
-		Title:   "\"query\"",
-		Status:  &completed,
-		Kind:    &kind,
-		Content: rawContent(t, `{"type":"content","content":{"type":"text","text":"Result (https://x.com)"}}`),
+	mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{
+		ToolCallID: "t1",
+		Title:      "\"query\"",
+		Status:     &completed,
+		Kind:       &kind,
+		Content:    rawContent(t, `{"type":"content","content":{"type":"text","text":"Result (https://x.com)"}}`),
 		Locations: []acpschema.ToolCallLocation{{
 			Path: "results.json",
 			Line: 3,
@@ -72,7 +70,6 @@ func TestToolUpdateMergeSemantics(t *testing.T) {
 		RawInput:  json.RawMessage(`{"query":"q"}`),
 		RawOutput: json.RawMessage(`{"content":"ok","authorization":"Bearer ya29.visible"}`),
 		Meta:      map[string]any{"claudeCode": map[string]any{"toolName": "WebSearch"}},
-		At:        now,
 	}))
 	if call.Kind != "fetch" || call.ToolName != "WebSearch" {
 		t.Fatalf("kind/toolName not captured: %+v", call)
@@ -88,7 +85,7 @@ func TestToolUpdateMergeSemantics(t *testing.T) {
 	}
 
 	// A sparse follow-up (id only) must NOT clear the captured content/kind.
-	mergeToolCall(&call, toolUpdateSnapshot(toolUpdateFields{ID: "t1", At: now}))
+	mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "t1"}))
 	if call.Kind != "fetch" || call.ToolName != "WebSearch" || len(call.Content) != 1 || len(call.Locations) != 1 || len(call.RawOutput) == 0 {
 		t.Fatalf("sparse update wrongly cleared fields: %+v", call)
 	}
@@ -105,26 +102,26 @@ func TestToolUpdateNormalizesCodexWebToolNames(t *testing.T) {
 		{`{"action":{"type":"find_in_page"}}`, "WebFetch"},
 		{`{}`, "WebFetch"},
 	} {
-		call := toolUpdateSnapshot(toolUpdateFields{Kind: &fetch, RawInput: json.RawMessage(test.raw)})
+		call := toolUpdateSnapshot(acpschema.ToolCallUpdate{Kind: &fetch, RawInput: json.RawMessage(test.raw)})
 		if call.ToolName != test.want {
 			t.Fatalf("tool name for %s = %q, want %q", test.raw, call.ToolName, test.want)
 		}
 	}
 	search := acpschema.ToolKindSearch
-	call := toolUpdateSnapshot(toolUpdateFields{Kind: &search, RawInput: json.RawMessage(`{"action":{"type":"search"}}`)})
+	call := toolUpdateSnapshot(acpschema.ToolCallUpdate{Kind: &search, RawInput: json.RawMessage(`{"action":{"type":"search"}}`)})
 	if call.ToolName != "" {
 		t.Fatalf("filesystem search tool name = %q, want empty", call.ToolName)
 	}
 }
 
 func TestToolUpdateNormalizesProviderToolPresentation(t *testing.T) {
-	call := toolUpdateSnapshot(toolUpdateFields{
-		ID:       "search-1",
-		Title:    "X Search",
-		RawInput: json.RawMessage(`{"variant":"XSearch"}`),
+	call := toolUpdateSnapshot(acpschema.ToolCallUpdate{
+		ToolCallID: "search-1",
+		Title:      "X Search",
+		RawInput:   json.RawMessage(`{"variant":"XSearch"}`),
 	})
-	mergeToolCall(&call, toolUpdateSnapshot(toolUpdateFields{
-		ID: "search-1",
+	mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{
+		ToolCallID: "search-1",
 		RawOutput: json.RawMessage(`{
 			"action": {
 				"query": "typed tool presentation",
@@ -155,7 +152,7 @@ func TestToolUpdateNormalizesProviderToolPresentation(t *testing.T) {
 		"ReadFile": "Read",
 		"WebFetch": "WebFetch",
 	} {
-		got := toolUpdateSnapshot(toolUpdateFields{RawInput: json.RawMessage(`{"variant":"` + variant + `"}`)})
+		got := toolUpdateSnapshot(acpschema.ToolCallUpdate{RawInput: json.RawMessage(`{"variant":"` + variant + `"}`)})
 		if got.ToolName != want {
 			t.Errorf("variant %q normalized to %q, want %q", variant, got.ToolName, want)
 		}
@@ -163,43 +160,67 @@ func TestToolUpdateNormalizesProviderToolPresentation(t *testing.T) {
 }
 
 func TestToolUpdateCapturesRuntimeMetadata(t *testing.T) {
-	now := time.Now().UTC()
 	status := acpschema.ToolCallStatusInProgress
-	call := toolUpdateSnapshot(toolUpdateFields{
-		ID:     "bash-1",
-		Title:  "Run tests",
-		Status: &status,
+	call := toolUpdateSnapshot(acpschema.ToolCallUpdate{
+		ToolCallID: "bash-1",
+		Title:      "Run tests",
+		Status:     &status,
 		Meta: map[string]any{
 			"terminal_info": map[string]any{"terminal_id": "term-1", "cwd": "/repo"},
 			"claudeCode": map[string]any{
-				"toolName":        "Bash",
-				"parentToolUseId": "task-1",
-				"toolResponse":    map[string]any{"elapsedTimeSeconds": 12.5},
+				"toolName":     "Bash",
+				"toolResponse": map[string]any{"elapsedTimeSeconds": 12.5},
 			},
 		},
-		At: now,
 	})
-	if call.ToolName != "Bash" || call.Runtime.TerminalID != "term-1" || call.Runtime.TerminalCwd != "/repo" {
+	if call.ToolName != "Bash" || call.Runtime.TerminalID != "term-1" || call.Runtime.TerminalCwd != "/repo" || call.Runtime.ElapsedTimeSeconds != 12.5 {
 		t.Fatalf("runtime metadata not captured: %+v", call)
 	}
-	if call.Runtime.ParentToolUseID != "task-1" || call.Runtime.ElapsedTimeSeconds != 12.5 {
-		t.Fatalf("claude metadata not captured: %+v", call.Runtime)
-	}
+}
 
-	exit := toolUpdateSnapshot(toolUpdateFields{
-		ID: "bash-1",
-		Meta: map[string]any{
-			"terminal_output": map[string]any{"terminal_id": "term-1", "data": "ok"},
-			"terminal_exit":   map[string]any{"terminal_id": "term-1", "exit_code": 0},
+// Codex 2.0 streams command output as terminal_output_delta appends, and its
+// last chunk can ride with terminal_exit (recorded from the adapter's
+// command-approval scenario). A token split across chunks stays redacted.
+func TestToolUpdateAppendsTerminalOutput(t *testing.T) {
+	call := toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "cmd-a", Meta: map[string]any{
+		"terminal_info": map[string]any{"terminal_id": "cmd-a"},
+	}})
+	for _, meta := range []map[string]any{
+		{"terminal_output_delta": map[string]any{"terminal_id": "cmd-a", "data": "added 1 package\nAuthorization: Bearer abc"}},
+		{
+			"terminal_output_delta": map[string]any{"terminal_id": "cmd-a", "data": "SECRETTAIL.xyz\n"},
+			"terminal_exit":         map[string]any{"terminal_id": "cmd-a", "exit_code": 0, "signal": nil},
 		},
-		At: now,
-	})
-	mergeToolCall(&call, exit)
-	if call.Runtime.TerminalOutputAt.IsZero() {
-		t.Fatalf("terminal output timestamp not captured: %+v", call.Runtime)
+	} {
+		mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "cmd-a", Meta: meta}))
+	}
+	if call.Runtime.TerminalOutput != "added 1 package\nAuthorization: Bearer [REDACTED]\n" {
+		t.Fatalf("terminal output = %q", call.Runtime.TerminalOutput)
 	}
 	if call.Runtime.TerminalExitCode == nil || *call.Runtime.TerminalExitCode != 0 {
 		t.Fatalf("terminal exit not captured: %+v", call.Runtime)
+	}
+	mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "cmd-a", Meta: map[string]any{
+		"terminal_output_delta": map[string]any{"data": strings.Repeat("x", maxToolContentText) + "tail"},
+	}}))
+	if got := []rune(call.Runtime.TerminalOutput); len(got) != maxToolContentText+1 || !strings.HasSuffix(string(got), "xtail") {
+		t.Fatalf("terminal output not bounded to its tail: %d runes", len(got))
+	}
+}
+
+// Codex sends a command's whole output as a rawOutput string when its chunks
+// missed the start; a long text keeps its tail instead of being dropped.
+func TestBoundedRawOutputKeepsTextTail(t *testing.T) {
+	long, _ := json.Marshal(strings.Repeat("line\n", 3000) + "done\n")
+	var text string
+	if err := json.Unmarshal(boundedRawOutput(long), &text); err != nil || !strings.HasSuffix(text, "line\ndone\n") || len([]rune(text)) != maxToolContentText+1 {
+		t.Fatalf("long text output = %d runes, %v", len([]rune(text)), err)
+	}
+	if got := boundedRawOutput(json.RawMessage(`""`)); got != nil {
+		t.Fatalf("empty text output = %s", got)
+	}
+	if got := boundedRawOutput(json.RawMessage(`{"x":"` + strings.Repeat("y", maxToolRawOutputBytes) + `"}`)); got != nil {
+		t.Fatalf("oversized structured output kept: %d bytes", len(got))
 	}
 }
 
@@ -225,31 +246,31 @@ func TestCodexAgentIdentitySurvivesBoundedInputAndSparseUpdates(t *testing.T) {
 	}
 	for _, action := range []string{"spawnAgent", "sendInput", "resumeAgent", "wait", "closeAgent"} {
 		t.Run(action, func(t *testing.T) {
-			call := toolUpdateSnapshot(toolUpdateFields{
-				ID:       "agent-action",
-				Title:    action,
-				Meta:     meta,
-				RawInput: json.RawMessage(`{"prompt":"` + strings.Repeat("x", maxToolRawInputBytes) + `","senderThreadId":"parent","receiverThreadIds":["child"]}`),
+			call := toolUpdateSnapshot(acpschema.ToolCallUpdate{
+				ToolCallID: "agent-action",
+				Title:      action,
+				Meta:       meta,
+				RawInput:   json.RawMessage(`{"prompt":"` + strings.Repeat("x", maxToolRawInputBytes) + `","senderThreadId":"parent","receiverThreadIds":["child"]}`),
 			})
 			status := acpschema.ToolCallStatusCompleted
-			mergeToolCall(&call, toolUpdateSnapshot(toolUpdateFields{ID: "agent-action", Status: &status}))
+			mergeToolCall(&call, toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "agent-action", Status: &status}))
 			if call.ToolName != "codex."+action || call.RawInput != nil || call.Status != "completed" {
 				t.Fatalf("agent identity/status lost or oversized input retained: %+v", call)
 			}
 		})
 	}
 	for _, action := range []string{"started", "interacted", "interrupted", "completed"} {
-		call := toolUpdateSnapshot(toolUpdateFields{
-			ID:       "agent-activity",
-			Meta:     meta,
-			RawInput: json.RawMessage(`{"activityKind":"` + action + `","agentThreadId":"child"}`),
+		call := toolUpdateSnapshot(acpschema.ToolCallUpdate{
+			ToolCallID: "agent-activity",
+			Meta:       meta,
+			RawInput:   json.RawMessage(`{"activityKind":"` + action + `","agentThreadId":"child"}`),
 		})
 		if call.ToolName != "codex."+action {
 			t.Fatalf("activity %q identity = %q", action, call.ToolName)
 		}
 	}
 	for _, otherMeta := range []map[string]any{nil, {"codex": map[string]any{}}} {
-		call := toolUpdateSnapshot(toolUpdateFields{ID: "wait", Title: "wait", Meta: otherMeta})
+		call := toolUpdateSnapshot(acpschema.ToolCallUpdate{ToolCallID: "wait", Title: "wait", Meta: otherMeta})
 		if call.ToolName != "" {
 			t.Fatalf("unrelated wait classified as agent action: %q", call.ToolName)
 		}

@@ -225,7 +225,7 @@ function previewText(content?: ACPToolContent[]): string {
 }
 
 function rawOutput(call: ACPToolCall): unknown {
-  return call.raw_output ?? (previewText(call.content) || undefined)
+  return call.raw_output ?? (call.runtime?.terminal_output || previewText(call.content) || undefined)
 }
 
 function inputHint(call: ACPToolCall): string {

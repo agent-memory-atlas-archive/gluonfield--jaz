@@ -38,7 +38,7 @@ func TestProviderSubagentPluralMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := providerSubagentFromUpdate(AgentCodex, update).subagents
+	got := providerSubagentFromUpdate(&jobState{Job: Job{ACPAgent: AgentCodex}}, update).subagents
 	want := []sessionevents.ProviderSubagentEvent{
 		{
 			Provider: AgentCodex, ID: "child", ThreadID: "child", ParentID: "parent",
@@ -70,7 +70,7 @@ func TestProviderSubagentPluralMetadataRejectsPartialBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := providerSubagentFromUpdate(AgentCodex, update).subagents; got != nil {
+	if got := providerSubagentFromUpdate(&jobState{Job: Job{ACPAgent: AgentCodex}}, update).subagents; got != nil {
 		t.Fatalf("subagents = %#v", got)
 	}
 }
@@ -406,9 +406,10 @@ func TestClaudeSubagentChildPublishesActivityAndIsConsumed(t *testing.T) {
 	}
 }
 
-// A nested subagent tool call without a panel record (e.g. terminal output) is
-// still kept out of the main transcript.
-func TestClaudeSubagentInternalToolConsumedWithoutRecord(t *testing.T) {
+// Claude 0.84 marks a subagent's tool call with parentToolUseId only on its
+// first report; the later reports (recorded from the adapter's Task scenario)
+// must stay out of the main transcript too.
+func TestClaudeSubagentToolStaysNestedAfterFirstReport(t *testing.T) {
 	store, err := jsonstore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -417,38 +418,25 @@ func TestClaudeSubagentInternalToolConsumedWithoutRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events := sessionevents.New()
 	manager := NewManager(store, Config{}, nil)
-	manager.Events = events
+	manager.Events = sessionevents.New()
 	manager.jobsByID[session.ID] = &jobState{Job: Job{ID: session.ID, Slug: session.Slug, ACPAgent: AgentClaude, ACPSession: "acp-session"}, toolByID: map[string]sessionevents.ACPToolCall{}}
 	manager.jobsByACP["acp-session"] = manager.jobsByID[session.ID]
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, rpcErr := manager.handleJSONRPC(ctx, jsonrpc.Request{
-		Method: acpschema.ClientMethodSessionUpdate,
-		Params: mustJSON(t, map[string]any{
-			"sessionId": "acp-session",
-			"update": map[string]any{
-				"sessionUpdate": "tool_call_update",
-				"toolCallId":    "nested-tool",
-				"_meta":         map[string]any{"claudeCode": map[string]any{"parentToolUseId": "task-parent"}},
-			},
-		}),
-	})
-	if rpcErr != nil {
-		t.Fatal(rpcErr)
+	for _, update := range []string{
+		`{"sessionUpdate":"tool_call","toolCallId":"toolu_task","title":"Task","kind":"think","status":"pending","content":[],"_meta":{"claudeCode":{"toolName":"Task"}}}`,
+		`{"sessionUpdate":"tool_call","toolCallId":"toolu_sub_read","title":"Read File","kind":"read","status":"pending","content":[],"locations":[],"_meta":{"claudeCode":{"parentToolUseId":"toolu_task","toolName":"Read"}}}`,
+		`{"sessionUpdate":"tool_call_update","toolCallId":"toolu_sub_read","title":"Read /x.ts","locations":[{"line":1,"path":"/x.ts"}],"rawInput":{"file_path":"/x.ts"}}`,
+		`{"sessionUpdate":"tool_call_update","toolCallId":"toolu_sub_read","status":"completed"}`,
+	} {
+		if _, rpcErr := manager.handleJSONRPC(context.Background(), jsonrpc.Request{
+			Method: acpschema.ClientMethodSessionUpdate,
+			Params: json.RawMessage(`{"sessionId":"acp-session","update":` + update + `}`),
+		}); rpcErr != nil {
+			t.Fatal(rpcErr)
+		}
 	}
-
-	if got := manager.jobsByID[session.ID].ToolCalls; len(got) != 0 {
-		t.Fatalf("nested Claude tool leaked into main transcript: %#v", got)
-	}
-	stored, err := store.LoadSessionEvents(session.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(stored) != 0 {
-		t.Fatalf("expected no published events, got %#v", stored)
+	if got := manager.jobsByID[session.ID].ToolCalls; len(got) != 1 || got[0].ID != "toolu_task" {
+		t.Fatalf("main transcript tools = %#v, want only the Task call", got)
 	}
 }

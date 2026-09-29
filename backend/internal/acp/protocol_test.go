@@ -1099,6 +1099,14 @@ func TestClaudeStylePlanExitPermissionPublishesRequest(t *testing.T) {
 		},
 	}
 	manager.jobsByACP["acp-session"] = manager.jobsByID[session.ID]
+	// Claude 0.84 names the kind only in the tool_call; its permission request
+	// leaves unchanged fields out.
+	if _, rpcErr := manager.handleJSONRPC(context.Background(), jsonrpc.Request{
+		Method: acpschema.ClientMethodSessionUpdate,
+		Params: json.RawMessage(`{"sessionId":"acp-session","update":{"sessionUpdate":"tool_call","toolCallId":"toolu-plan-exit","title":"Approve Plan","kind":"switch_mode","status":"pending","content":[]}}`),
+	}); rpcErr != nil {
+		t.Fatal(rpcErr)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1118,9 +1126,8 @@ func TestClaudeStylePlanExitPermissionPublishesRequest(t *testing.T) {
 					{OptionID: "plan", Name: "No, keep planning", Kind: acpschema.PermissionOptionKindRejectOnce},
 				},
 				ToolCall: acpschema.ToolCallUpdate{
-					Kind:       ptr(acpschema.ToolKindSwitchMode),
 					ToolCallID: "toolu-plan-exit",
-					Title:      "Ready to code?",
+					Title:      "Approve Plan",
 					RawInput:   mustJSON(t, map[string]string{"plan": "1. Inspect the provider path.\n2. Add the flag."}),
 				},
 			}),
@@ -1182,4 +1189,65 @@ func mustJSON(t *testing.T, value any) json.RawMessage {
 
 func ptr[T any](value T) *T {
 	return &value
+}
+
+// Codex streams command output per chunk; output-only updates are coalesced
+// into one deferred publish, and a status change still publishes at once.
+func TestTerminalOutputUpdatesAreCoalesced(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.CreateSession(storage.CreateSession{Slug: "coalesced-output", Runtime: storage.RuntimeACP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager(store, Config{}, nil)
+	manager.Events = sessionevents.New()
+	manager.jobsByID[session.ID] = &jobState{Job: Job{ID: session.ID, ACPAgent: AgentCodex, ACPSession: "acp-session"}, toolByID: map[string]sessionevents.ACPToolCall{}}
+	manager.jobsByACP["acp-session"] = manager.jobsByID[session.ID]
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sub := manager.Events.Subscribe(ctx, session.ID)
+	send := func(update string) {
+		if _, rpcErr := manager.handleJSONRPC(ctx, jsonrpc.Request{
+			Method: acpschema.ClientMethodSessionUpdate,
+			Params: json.RawMessage(`{"sessionId":"acp-session","update":` + update + `}`),
+		}); rpcErr != nil {
+			t.Fatal(rpcErr)
+		}
+	}
+	next := func() sessionevents.ACPToolCall {
+		for {
+			select {
+			case event := <-sub:
+				if event.Type == "acp_tool" {
+					return event.ACP.ToolCalls[0]
+				}
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		}
+	}
+	send(`{"sessionUpdate":"tool_call","toolCallId":"cmd-1","title":"npm test","kind":"execute","status":"in_progress","content":[{"type":"terminal","terminalId":"cmd-1"}],"rawInput":{"command":"npm test"},"_meta":{"terminal_info":{"terminal_id":"cmd-1"}}}`)
+	if call := next(); call.Runtime.TerminalOutput != "" {
+		t.Fatalf("started call = %+v", call)
+	}
+	for _, line := range []string{"one", "two", "three"} {
+		send(`{"sessionUpdate":"tool_call_update","toolCallId":"cmd-1","_meta":{"terminal_output_delta":{"terminal_id":"cmd-1","data":"` + line + `\n"}}}`)
+	}
+	if call := next(); call.Runtime.TerminalOutput != "one\ntwo\nthree\n" || call.Status != "in_progress" {
+		t.Fatalf("coalesced call = %+v", call)
+	}
+	send(`{"sessionUpdate":"tool_call_update","toolCallId":"cmd-1","status":"completed","_meta":{"terminal_exit":{"terminal_id":"cmd-1","exit_code":0,"signal":null}}}`)
+	if call := next(); call.Status != "completed" || call.Runtime.TerminalOutput != "one\ntwo\nthree\n" {
+		t.Fatalf("completed call = %+v", call)
+	}
+	select {
+	case event := <-sub:
+		if event.Type == "acp_tool" {
+			t.Fatalf("extra tool publish %+v", event.ACP.ToolCalls[0])
+		}
+	case <-time.After(3 * acpTranscriptFlushInterval):
+	}
 }

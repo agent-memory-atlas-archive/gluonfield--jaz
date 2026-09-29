@@ -21,7 +21,7 @@ type InteractiveAnswerValue struct {
 }
 
 func (m *Manager) awaitPermission(ctx context.Context, job *jobState, req acpschema.RequestPermissionRequest) (json.RawMessage, *jsonrpc.Error) {
-	permission := permissionEvent(req)
+	permission := job.permissionEvent(req)
 	permission.ID = newPermissionID()
 	permission.SessionID = string(req.SessionID)
 	permission.Status = "pending"
@@ -220,13 +220,20 @@ func (m *Manager) sendTextAfterTurn(sessionID, text string, parentVisible, planR
 	})
 }
 
-func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPermission {
+// permissionEvent overlays the request's tool call on the call it updates: an
+// agent can leave out the fields that did not change, such as the kind, title
+// and locations.
+func (j *jobState) permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPermission {
+	j.mu.RLock()
+	call := j.toolByID[string(req.ToolCall.ToolCallID)]
+	j.mu.RUnlock()
+	mergeToolCall(&call, toolUpdateSnapshot(req.ToolCall))
 	out := sessionevents.ACPPermission{
-		Title:      firstNonEmpty(req.ToolCall.Title, "Permission requested"),
+		Title:      firstNonEmpty(call.Title, "Permission requested"),
 		ToolCallID: string(req.ToolCall.ToolCallID),
-		Content:    permissionPlanContent(req.ToolCall),
+		Content:    permissionPlanContent(call.Kind, req.ToolCall.RawInput),
 		Options:    make([]sessionevents.ACPPermissionOption, 0, len(req.Options)),
-		Locations:  make([]sessionevents.ACPPermissionLocation, 0, len(req.ToolCall.Locations)),
+		Locations:  make([]sessionevents.ACPPermissionLocation, 0, len(call.Locations)),
 	}
 	for _, option := range req.Options {
 		out.Options = append(out.Options, sessionevents.ACPPermissionOption{
@@ -235,7 +242,7 @@ func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPe
 			Kind: string(option.Kind),
 		})
 	}
-	for _, location := range req.ToolCall.Locations {
+	for _, location := range call.Locations {
 		out.Locations = append(out.Locations, sessionevents.ACPPermissionLocation{
 			Path: location.Path,
 			Line: location.Line,
@@ -244,33 +251,16 @@ func permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPe
 	return out
 }
 
-// permissionPlanContent returns the proposed-plan markdown carried by a plan-exit
-// (switch_mode) permission. Claude's ExitPlanMode sends the plan both as
-// rawInput {"plan": ...} and as a text content block; either is the full plan the
-// user is being asked to approve, so the approval surface can render it.
-func permissionPlanContent(call acpschema.ToolCallUpdate) string {
-	if derefString(call.Kind) != string(acpschema.ToolKindSwitchMode) {
-		return ""
-	}
+// permissionPlanContent returns the plan a plan-exit (switch_mode) permission
+// asks the user to approve; Claude and Codex both send it as rawInput.plan.
+func permissionPlanContent(kind string, rawInput json.RawMessage) string {
 	var in struct {
 		Plan string `json:"plan"`
 	}
-	if len(call.RawInput) > 0 && json.Unmarshal(call.RawInput, &in) == nil {
-		if plan := strings.TrimSpace(in.Plan); plan != "" {
-			return clampToolText(plan)
-		}
+	if kind != string(acpschema.ToolKindSwitchMode) || json.Unmarshal(rawInput, &in) != nil {
+		return ""
 	}
-	var b strings.Builder
-	for _, block := range normalizeToolContent(call.Content) {
-		if block.Type != "text" || block.Text == "" {
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteString("\n\n")
-		}
-		b.WriteString(block.Text)
-	}
-	return clampToolText(strings.TrimSpace(b.String()))
+	return clampToolText(strings.TrimSpace(in.Plan))
 }
 
 func permissionOption(options []sessionevents.ACPPermissionOption, optionID string) (sessionevents.ACPPermissionOption, bool) {

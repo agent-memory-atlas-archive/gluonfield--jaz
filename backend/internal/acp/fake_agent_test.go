@@ -100,8 +100,8 @@ func TestFakeACPAgentProcess(t *testing.T) {
 						} `json:"elicitation"`
 					} `json:"clientCapabilities"`
 				}
-				if err := json.Unmarshal(msg.Params, &req); err != nil || req.ClientCapabilities.Meta["terminal-auth"] != true {
-					resp, _ := jsonrpc.NewErrorResponse(*msg.ID, jsonrpc.InvalidParams("missing terminal auth capability", nil))
+				if err := json.Unmarshal(msg.Params, &req); err != nil || req.ClientCapabilities.Meta["terminal-auth"] != true || req.ClientCapabilities.Meta["terminal_output_delta"] != true {
+					resp, _ := jsonrpc.NewErrorResponse(*msg.ID, jsonrpc.InvalidParams("missing terminal capabilities", nil))
 					_ = conn.Send(context.Background(), resp)
 					continue
 				}

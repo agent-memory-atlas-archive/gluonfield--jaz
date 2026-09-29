@@ -7,7 +7,7 @@ import (
 )
 
 // EqualTranscript reports whether two tool calls have the same UI-visible
-// state. UpdatedAt and TerminalOutputAt are transport liveness timestamps.
+// state. UpdatedAt is a transport liveness timestamp.
 func (a ACPToolCall) EqualTranscript(b ACPToolCall) bool {
 	return a.ID == b.ID &&
 		a.Title == b.Title &&
@@ -25,8 +25,8 @@ func (a ACPToolCall) EqualTranscript(b ACPToolCall) bool {
 func (a ACPToolRuntime) equalTranscript(b ACPToolRuntime) bool {
 	return a.TerminalID == b.TerminalID &&
 		a.TerminalCwd == b.TerminalCwd &&
-		a.ParentToolUseID == b.ParentToolUseID &&
 		a.ElapsedTimeSeconds == b.ElapsedTimeSeconds &&
+		a.TerminalOutput == b.TerminalOutput &&
 		equalOptional(a.TerminalExitCode, b.TerminalExitCode) &&
 		equalOptional(a.TerminalExitSignal, b.TerminalExitSignal)
 }

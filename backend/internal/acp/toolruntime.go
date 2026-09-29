@@ -3,12 +3,11 @@ package acp
 import (
 	"encoding/json"
 	"strconv"
-	"time"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
 )
 
-func acpToolRuntime(meta map[string]any, at time.Time) sessionevents.ACPToolRuntime {
+func acpToolRuntime(meta map[string]any) sessionevents.ACPToolRuntime {
 	var out sessionevents.ACPToolRuntime
 	if meta == nil {
 		return out
@@ -17,8 +16,8 @@ func acpToolRuntime(meta map[string]any, at time.Time) sessionevents.ACPToolRunt
 		out.TerminalID = metaStringValue(terminalInfo["terminal_id"])
 		out.TerminalCwd = metaStringValue(terminalInfo["cwd"])
 	}
-	if _, ok := meta["terminal_output"]; ok {
-		out.TerminalOutputAt = at
+	if delta, ok := meta["terminal_output_delta"].(map[string]any); ok {
+		out.TerminalOutput = metaStringValue(delta["data"])
 	}
 	if terminalExit, ok := meta["terminal_exit"].(map[string]any); ok {
 		if code, ok := metaIntValue(terminalExit["exit_code"]); ok {
@@ -29,7 +28,6 @@ func acpToolRuntime(meta map[string]any, at time.Time) sessionevents.ACPToolRunt
 		}
 	}
 	if cc, ok := meta["claudeCode"].(map[string]any); ok {
-		out.ParentToolUseID = metaStringValue(cc["parentToolUseId"])
 		if response, ok := cc["toolResponse"].(map[string]any); ok {
 			out.ElapsedTimeSeconds, _ = metaFloatValue(response["elapsedTimeSeconds"])
 		}
@@ -44,14 +42,11 @@ func mergeACPToolRuntime(dst *sessionevents.ACPToolRuntime, src sessionevents.AC
 	if src.TerminalCwd != "" {
 		dst.TerminalCwd = src.TerminalCwd
 	}
-	if src.ParentToolUseID != "" {
-		dst.ParentToolUseID = src.ParentToolUseID
-	}
 	if src.ElapsedTimeSeconds != 0 {
 		dst.ElapsedTimeSeconds = src.ElapsedTimeSeconds
 	}
-	if !src.TerminalOutputAt.IsZero() {
-		dst.TerminalOutputAt = src.TerminalOutputAt
+	if src.TerminalOutput != "" {
+		dst.TerminalOutput = tailToolText(dst.TerminalOutput + src.TerminalOutput)
 	}
 	if src.TerminalExitCode != nil {
 		code := *src.TerminalExitCode

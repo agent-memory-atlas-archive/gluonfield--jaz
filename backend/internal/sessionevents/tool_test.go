@@ -15,16 +15,20 @@ func TestToolCallTranscriptEqualityIgnoresTransportTimestamps(t *testing.T) {
 		Content:   []ACPToolContent{{Type: "text", Text: "working"}},
 		RawInput:  map[string]any{"package": "./..."},
 		RawOutput: json.RawMessage(`{"state":"running"}`),
-		Runtime:   ACPToolRuntime{TerminalID: "term-1", TerminalOutputAt: now},
+		Runtime:   ACPToolRuntime{TerminalID: "term-1", TerminalOutput: "ok"},
 		StartedAt: now,
 		UpdatedAt: now,
 	}
 	b := a
 	b.UpdatedAt = now.Add(time.Second)
-	b.Runtime.TerminalOutputAt = now.Add(time.Second)
 	if !a.EqualTranscript(b) {
 		t.Fatal("transport timestamps changed transcript equality")
 	}
+	b.Runtime.TerminalOutput = "ok\nmore"
+	if a.EqualTranscript(b) {
+		t.Fatal("terminal output change was ignored")
+	}
+	b.Runtime = a.Runtime
 	b.Status = "completed"
 	if a.EqualTranscript(b) {
 		t.Fatal("semantic status change was ignored")
