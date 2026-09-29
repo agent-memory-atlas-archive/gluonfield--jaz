@@ -236,7 +236,7 @@ function createWindow(): void {
     backgroundColor: mac ? '#00000000' : nativeTheme.shouldUseDarkColors ? DARK_BG : '#ffffff',
     ...(mac ? { vibrancy: 'sidebar' as const, visualEffectState: 'followWindow' as const } : {}),
     titleBarStyle: mac ? 'hiddenInset' : 'default',
-    trafficLightPosition: { x: 18, y: 18 },
+    trafficLightPosition: { x: 16, y: 13 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
