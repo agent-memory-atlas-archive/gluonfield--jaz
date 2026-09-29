@@ -1,7 +1,6 @@
 import { ArrowLeft, PanelLeft } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { BackendSwitcher } from '@/components/connection/BackendSwitcher'
 import { SearchField } from '@/components/ui/SearchField'
 import { dismissOnEmptyTap } from '@/lib/dom/drawer'
@@ -93,11 +92,13 @@ export function SettingsOverlay({
     if (open && section && section !== current.id) onSectionChange(current.id, { replace: true })
   }, [current.id, onSectionChange, open, section])
 
-  return createPortal(
+  // Desktop: Settings fills the content card, so the rail and titlebar stay in
+  // reach. Phones have no rail, so it covers the screen.
+  return (
     <AnimatePresence>
       {open ? (
         <motion.div
-          className="fixed inset-0 z-modal flex bg-bg"
+          className="absolute inset-0 z-modal flex bg-bg max-sm:fixed"
           initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.99 }}
@@ -108,17 +109,17 @@ export function SettingsOverlay({
         >
           <aside
             onClick={isMobile ? dismissOnEmptyTap(() => setNavOpen(false)) : undefined}
-            className={`flex w-[272px] shrink-0 flex-col bg-surface max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full max-sm:transition-transform max-sm:duration-300 ${
+            className={`flex w-[272px] shrink-0 flex-col border-r border-border bg-panel max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full max-sm:transition-transform max-sm:duration-300 ${
               navOpen ? '' : 'max-sm:-translate-x-full'
             }`}
           >
-            <div className={`h-[52px] shrink-0 sm:h-10 ${isMobile ? '' : 'titlebar-drag'}`} />
+            <div className="h-[52px] shrink-0 sm:h-3" />
 
             <div className="px-3 pb-1.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex w-full items-center gap-2 rounded-full px-2.5 py-1 text-left text-[13px] text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink max-sm:gap-2.5 max-sm:px-3 max-sm:py-2.5 max-sm:text-[15px]"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-[13px] text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink max-sm:gap-2.5 max-sm:px-3 max-sm:py-2.5 max-sm:text-[15px]"
               >
                 <ArrowLeft size={15} className="text-ink-3 max-sm:size-[18px]" />
                 <span className="flex-1">Back to jaz</span>
@@ -156,7 +157,7 @@ export function SettingsOverlay({
                       onSectionChange(item.id)
                       if (isMobile) setNavOpen(false)
                     }}
-                    className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-left text-[13px] transition-colors duration-150 max-sm:gap-2.5 max-sm:px-3 max-sm:py-2.5 max-sm:text-[15px] ${
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-left text-[13px] transition-colors duration-150 max-sm:gap-2.5 max-sm:px-3 max-sm:py-2.5 max-sm:text-[15px] ${
                       selected
                         ? 'bg-primary-soft font-medium text-ink'
                         : 'text-ink-2 hover:bg-surface-2 hover:text-ink'
@@ -174,7 +175,7 @@ export function SettingsOverlay({
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col bg-bg">
-            <div className={`flex h-[52px] shrink-0 items-center px-3 sm:h-10 ${isMobile ? '' : 'titlebar-drag'}`}>
+            <div className="flex h-[52px] shrink-0 items-center px-3 sm:h-6">
               {isMobile ? (
                 <button
                   type="button"
@@ -212,8 +213,7 @@ export function SettingsOverlay({
           </div>
         </motion.div>
       ) : null}
-    </AnimatePresence>,
-    document.body,
+    </AnimatePresence>
   )
 }
 
