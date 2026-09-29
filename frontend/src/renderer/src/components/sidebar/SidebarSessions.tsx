@@ -37,8 +37,9 @@ import {
 
 const COLLAPSED_PROJECTS_KEY = 'jaz.sidebar.collapsedProjects'
 const MORE_ACTION_CLASS =
-  'flex h-[30px] items-center rounded-full pr-2.5 text-[13px] text-ink-3 opacity-80 transition-[background-color,color,opacity] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 max-sm:h-11 max-sm:pr-3 max-sm:text-[15px]'
-const SECTION_HEADING_CLASS = 'text-[13px] font-semibold text-ink max-sm:text-[15px]'
+  'flex h-[30px] items-center rounded-lg pr-2.5 text-[13px] text-ink-3 opacity-80 transition-[background-color,color,opacity] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 max-sm:h-11 max-sm:pr-3 max-sm:text-[15px]'
+const SECTION_LABEL_CLASS = 'text-[13px] font-medium text-ink-3 max-sm:text-[15px]'
+const GROUP_LABEL_CLASS = 'text-[13px] font-medium text-ink max-sm:text-[15px]'
 const ROW_SPRING: Transition = { type: 'spring', stiffness: 420, damping: 34 }
 
 function storedCollapsedProjects(): Set<string> {
@@ -125,7 +126,7 @@ function PinnedSessions({
   return (
     <div>
       <p
-        className={`flex h-[30px] items-center px-2.5 max-sm:h-11 max-sm:px-3 ${SECTION_HEADING_CLASS}`}
+        className={`flex h-[30px] items-center px-2.5 max-sm:h-11 max-sm:px-3 ${SECTION_LABEL_CLASS}`}
       >
         Pinned
       </p>
@@ -161,19 +162,19 @@ function ProjectGroup({
       dragControls={dragControls}
       onDragEnd={onReorderEnd}
     >
-      <div className="group/project flex h-[30px] items-center justify-between rounded-full pr-1 transition-colors duration-150 hover:bg-list-hover max-sm:h-11">
+      <div className="group/project flex h-[30px] items-center justify-between rounded-lg pr-1 transition-colors duration-150 hover:bg-list-hover max-sm:h-11">
         <motion.button
           type="button"
           onPointerDown={(event) => dragControls.start(event)}
           onTap={onToggle}
           aria-expanded={!collapsed}
           aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${group.label}`}
-          className="flex h-full min-w-0 flex-1 cursor-grab touch-none items-center gap-2 rounded-full px-2.5 text-left outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary/40"
+          className="flex h-full min-w-0 flex-1 cursor-grab touch-none items-center gap-2 rounded-lg px-2.5 text-left outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <span className="grid size-[18px] shrink-0 place-items-center">
             <Folder size={15} className="text-ink-2" />
           </span>
-          <span className={`min-w-0 truncate ${SECTION_HEADING_CLASS}`} title={group.label}>
+          <span className={`min-w-0 truncate ${GROUP_LABEL_CLASS}`} title={group.label}>
             {group.label}
           </span>
           <ChevronDown
@@ -185,7 +186,7 @@ function ProjectGroup({
         <Link
           to="/new"
           search={{ project: group.key }}
-          className={`grid size-6 place-items-center rounded-full text-ink-3 transition-colors duration-150 hover:bg-surface-2 hover:text-ink focus-visible:opacity-100 group-hover/project:opacity-100 [@media(hover:none)]:opacity-100 ${group.items.length ? 'opacity-0' : ''}`}
+          className={`grid size-6 place-items-center rounded-md text-ink-3 transition-colors duration-150 hover:bg-surface-2 hover:text-ink focus-visible:opacity-100 group-hover/project:opacity-100 [@media(hover:none)]:opacity-100 ${group.items.length ? 'opacity-0' : ''}`}
           aria-label={`New task in ${group.label}`}
           title={`New task in ${group.label}`}
         >
@@ -224,7 +225,7 @@ function UngroupedSessions({
       dragListener={false}
     >
       <p
-        className={`flex h-[30px] items-center gap-2 px-2.5 max-sm:h-11 max-sm:gap-2.5 max-sm:px-3 ${SECTION_HEADING_CLASS}`}
+        className={`flex h-[30px] items-center gap-2 px-2.5 max-sm:h-11 max-sm:gap-2.5 max-sm:px-3 ${GROUP_LABEL_CLASS}`}
       >
         <span className="grid size-[18px] shrink-0 place-items-center">
           <Folder size={15} className="text-ink-3" />
