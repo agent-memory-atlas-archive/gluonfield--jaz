@@ -269,7 +269,7 @@ function RootLayout() {
     }
   })
 
-  const slide = resizing ? { duration: 0 } : { type: 'spring' as const, duration: 0.24, bounce: 0 }
+  const slide = resizing ? { duration: 0 } : { duration: 0.2, ease: [0.4, 0, 0.2, 1] as const }
 
   return (
     <TitlebarProvider>
@@ -316,23 +316,30 @@ function RootLayout() {
               }`}
             >
               <motion.div
-                className="flex shrink-0 justify-end overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
+                className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
                 initial={false}
                 animate={drawerSlide({ isMobile, open: panelOpen, side: 'left', width: sidebarWidth })}
                 transition={slide}
               >
-                <Sidebar
-                  open={panelOpen}
-                  width={sidebarWidth}
-                  mobile={isMobile}
-                  onDismiss={() => setSidebarOpen(false)}
-                  resizing={resizing}
-                  onResizeStart={startResize}
-                  onResizeReset={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
-                  onOpenCommandPalette={() => setCommandOpen(true)}
-                  onOpenSettings={() => openSettings()}
-                  onOpenConnect={() => setConnectOpen(true)}
-                />
+                <motion.div
+                  className="h-full"
+                  initial={false}
+                  animate={isMobile || panelOpen ? { opacity: 1, x: 0 } : { opacity: 0, x: -12 }}
+                  transition={slide}
+                >
+                  <Sidebar
+                    open={panelOpen}
+                    width={sidebarWidth}
+                    mobile={isMobile}
+                    onDismiss={() => setSidebarOpen(false)}
+                    resizing={resizing}
+                    onResizeStart={startResize}
+                    onResizeReset={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
+                    onOpenCommandPalette={() => setCommandOpen(true)}
+                    onOpenSettings={() => openSettings()}
+                    onOpenConnect={() => setConnectOpen(true)}
+                  />
+                </motion.div>
               </motion.div>
 
               <main className={`scrollbar-quiet min-w-0 flex-1 overflow-y-auto ${onBoard ? 'bg-surface' : 'bg-bg'}`}>
