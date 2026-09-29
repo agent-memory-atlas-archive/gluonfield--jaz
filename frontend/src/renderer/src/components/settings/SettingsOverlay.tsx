@@ -112,7 +112,7 @@ export function SettingsOverlay({
               navOpen ? '' : 'max-sm:-translate-x-full'
             }`}
           >
-            <div className={`h-[52px] shrink-0 ${isMobile ? '' : 'titlebar-drag'}`} />
+            <div className={`h-[52px] shrink-0 sm:h-10 ${isMobile ? '' : 'titlebar-drag'}`} />
 
             <div className="px-3 pb-1.5">
               <button
@@ -174,7 +174,7 @@ export function SettingsOverlay({
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col bg-bg">
-            <div className={`flex h-[52px] shrink-0 items-center px-3 ${isMobile ? '' : 'titlebar-drag'}`}>
+            <div className={`flex h-[52px] shrink-0 items-center px-3 sm:h-10 ${isMobile ? '' : 'titlebar-drag'}`}>
               {isMobile ? (
                 <button
                   type="button"

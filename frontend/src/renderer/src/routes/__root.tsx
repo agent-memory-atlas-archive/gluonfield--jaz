@@ -271,7 +271,7 @@ function RootLayout() {
     <TitlebarProvider>
       <ToastProvider>
         <div className="app-chrome flex h-full flex-col">
-          <div className="titlebar-drag flex h-[52px] shrink-0 items-center pr-3">
+          <div className="titlebar-drag flex h-[52px] shrink-0 items-center pr-3 sm:h-10">
             {/* The controls' column stretches to the panel edge so the page
                 title starts over the content, not over the thread list. */}
             <motion.div
@@ -299,7 +299,7 @@ function RootLayout() {
 
           <div className="flex min-h-0 flex-1">
             <NavRail onOpenSettings={() => openSettings()} />
-            <div className="relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg sm:rounded-tl-card sm:border-l sm:border-t">
+            <div className="relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg sm:mr-[3px] sm:mb-[3px] sm:rounded-card sm:border">
               <motion.div
                 className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
                 initial={false}
