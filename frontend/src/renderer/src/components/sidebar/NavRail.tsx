@@ -1,11 +1,6 @@
-<<<<<<< HEAD
 import { useQuery } from '@tanstack/react-query'
 import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
-import { LayoutDashboard, MessageSquare, Repeat, Settings } from 'lucide-react'
-=======
-import { Link, useRouterState } from '@tanstack/react-router'
 import { Clock3, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
->>>>>>> main
 import { useState } from 'react'
 import { mcpAppsQuery } from '@/lib/api/mcp'
 import type { MCPApp } from '@/lib/api/types'
