@@ -57,6 +57,7 @@ export function MCPAppFrame({ serverId, name }: { serverId: string; name: string
       ref={frame}
       title={name}
       sandbox="allow-scripts allow-forms allow-popups"
+      allow="clipboard-write"
       className="block size-full border-0 bg-bg"
     />
   )
