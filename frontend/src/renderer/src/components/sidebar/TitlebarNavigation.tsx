@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft, ArrowRight, createLucideIcon } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useSyncExternalStore } from 'react'
 import type { BrowserNavigationDirection } from '@shared/browserNavigation'
 
@@ -34,6 +35,7 @@ export function TitlebarNavigation({
   onNavigate: (direction: BrowserNavigationDirection) => void
 }) {
   useSyncExternalStore(subscribe, () => window.navigation.currentEntry)
+  const reduceMotion = useReducedMotion()
 
   return (
     <div role="group" aria-label="Window navigation" className="flex items-center [&_svg]:stroke-[1.75]">
@@ -46,7 +48,13 @@ export function TitlebarNavigation({
           onClick={onToggleSidebar}
           className={CONTROL_CLASS}
         >
-          <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden />
+          <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden>
+            <motion.path
+              initial={false}
+              animate={{ d: panelOpen ? 'M16 9 13 12 16 15' : 'M14 9 17 12 14 15' }}
+              transition={reduceMotion ? { duration: 0 } : { type: 'spring', duration: 0.3, bounce: 0 }}
+            />
+          </SidebarIcon>
         </button>
       )}
       {!isMobile && (
