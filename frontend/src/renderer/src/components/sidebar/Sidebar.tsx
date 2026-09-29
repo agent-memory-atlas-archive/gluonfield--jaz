@@ -84,7 +84,6 @@ export function Sidebar({
           <Link
             to="/new"
             className={`${NAV_LINK_CLASS} min-w-0 flex-1`}
-            activeProps={{ className: 'bg-list-active!' }}
           >
             <span className="grid size-[18px] shrink-0 place-items-center">
               <SquarePen size={15} className="text-ink-2 max-sm:size-[18px]" />
