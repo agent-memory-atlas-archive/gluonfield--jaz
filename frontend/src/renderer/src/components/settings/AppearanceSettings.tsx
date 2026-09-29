@@ -18,7 +18,7 @@ import {
   exportCodexThemeString,
   parseCodexThemeString,
 } from '@/lib/codexTheme'
-import { HOME_WORDMARK_MAX_LENGTH } from '@/lib/homeWordmark'
+import { HOME_LOGO_URL_MAX_LENGTH } from '@/lib/homeWordmark'
 import { FontPicker } from './FontPicker'
 import { SettingsCard } from './SettingsCard'
 import { ThemeConfigPreview } from './ThemeConfigPreview'
@@ -332,15 +332,15 @@ export function AppearanceSettings() {
           />
         </Row>
         <Row
-          title="Home wordmark"
-          description="Dithered above the composer on the new-thread screen. Leave blank for “jaz”."
+          title="Logo Name or URL"
+          description="A name appears above the new-thread composer as dithered text. Paste an image URL to use the image. Leave blank for “jaz”."
         >
           <input
             type="text"
             value={homeWordmark}
-            maxLength={HOME_WORDMARK_MAX_LENGTH}
+            maxLength={HOME_LOGO_URL_MAX_LENGTH}
             placeholder="jaz"
-            aria-label="Home wordmark"
+            aria-label="Logo Name or URL"
             onChange={(event) => {
               setHomeWordmark(event.currentTarget.value)
               setAppearance({ homeWordmark: event.currentTarget.value })

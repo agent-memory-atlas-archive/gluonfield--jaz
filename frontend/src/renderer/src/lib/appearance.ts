@@ -26,7 +26,7 @@ export interface AppearanceSettings {
   wideLayout: boolean
   /** show ACP agent/model marks in the left sidebar */
   showModelIcons: boolean
-  /** custom dithered wordmark on the new-thread screen; '' keeps "jaz" */
+  /** custom name or image URL on the new-thread screen; '' keeps "jaz" */
   homeWordmark: string
 }
 
