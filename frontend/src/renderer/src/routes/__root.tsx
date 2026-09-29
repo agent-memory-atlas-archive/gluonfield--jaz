@@ -164,13 +164,14 @@ function RootLayout() {
   // Phone: the sidebar is a full-screen drawer (CSS `max-sm:w-full`) that slides
   // over the thread rather than a resizable column, and auto-dismisses on
   // navigation to reveal the thread underneath. On desktop the thread panel
-  // belongs to Chat; the rail's other sections take the full card.
+  // belongs to Chat; the rail's other sections take the full card. Only the
+  // toggle animates the panel: switching tabs hides and restores it instantly.
   const isMobile = useIsMobile()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const tab = railTab(pathname, settingsOpen)
   const hasPanel = isMobile || tab === 'chat'
   const panelOpen = hasPanel && sidebarOpen
-  const panelEdge = !isMobile && panelOpen ? RAIL_WIDTH + sidebarWidth : 0
+  const panelEdge = !isMobile && sidebarOpen ? RAIL_WIDTH + sidebarWidth : 0
   // A specific board paints itself on bg-surface so its tiles blend; match main
   // to surface there too so no bg-bg seam shows around the board.
   const onBoard = /^\/boards\/.+/.test(pathname)
@@ -279,10 +280,10 @@ function RootLayout() {
             {/* The controls' column stretches to the panel edge so the page
                 title starts over the content, not over the thread list. */}
             <motion.div
-              className="flex shrink-0 items-center"
+              className={`flex shrink-0 items-center ${hasPanel ? '' : 'min-w-0!'}`}
               style={{ paddingLeft: isMacDesktop && !isMobile ? 80 : 8 }}
               initial={false}
-              animate={{ minWidth: panelEdge }}
+              animate={{ minWidth: `${panelEdge}px` }}
               transition={slide}
             >
               <TitlebarNavigation
@@ -316,15 +317,15 @@ function RootLayout() {
               }`}
             >
               <motion.div
-                className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
+                className={`shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full! ${hasPanel ? '' : 'hidden'}`}
                 initial={false}
-                animate={drawerSlide({ isMobile, open: panelOpen, side: 'left', width: sidebarWidth })}
+                animate={drawerSlide({ isMobile, open: sidebarOpen, side: 'left', width: sidebarWidth })}
                 transition={slide}
               >
                 <motion.div
                   className="h-full"
                   initial={false}
-                  animate={isMobile || panelOpen ? { opacity: 1, x: 0 } : { opacity: 0, x: -12 }}
+                  animate={isMobile || sidebarOpen ? { opacity: 1, x: 0 } : { opacity: 0, x: -12 }}
                   transition={slide}
                 >
                   <Sidebar
