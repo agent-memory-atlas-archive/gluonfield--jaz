@@ -26,11 +26,14 @@ type App struct {
 }
 
 type serverApp struct {
-	uri  string
-	icon string
+	uri   string
+	icon  string
+	tools map[string]bool
 }
 
-func (c *serverConnection) discoverApp(ctx context.Context) (*serverApp, error) {
+// discoverApp finds the server's app resource; tools are the ones its
+// _meta.ui.visibility lets an app call.
+func (c *serverConnection) discoverApp(ctx context.Context, tools map[string]bool) (*serverApp, error) {
 	init := c.session.InitializeResult()
 	if init == nil || init.Capabilities == nil || init.Capabilities.Resources == nil {
 		return nil, nil
@@ -42,7 +45,7 @@ func (c *serverConnection) discoverApp(ctx context.Context) (*serverApp, error) 
 		if resource.MIMEType != AppMIMEType {
 			continue
 		}
-		app := &serverApp{uri: resource.URI}
+		app := &serverApp{uri: resource.URI, tools: tools}
 		if init.ServerInfo != nil && len(init.ServerInfo.Icons) > 0 {
 			app.icon = init.ServerInfo.Icons[0].Source
 		}
@@ -117,7 +120,7 @@ func (m *Manager) CallAppTool(ctx context.Context, serverID, name string, argume
 	if err != nil {
 		return nil, err
 	}
-	if !session.appTools[name] {
+	if !session.app.tools[name] {
 		return nil, fmt.Errorf("%w: %s", ErrAppToolDenied, name)
 	}
 	return session.callTool(ctx, &mcpsdk.CallToolParams{Name: name, Arguments: arguments})

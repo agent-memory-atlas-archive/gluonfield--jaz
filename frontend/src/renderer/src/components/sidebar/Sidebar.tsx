@@ -1,11 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Search, Settings, SquarePen } from 'lucide-react'
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ConnectionFooterButton } from '@/components/connection/ConnectionFooterButton'
 import { UpdatePanel } from '@/components/update/UpdatePanel'
-import { mcpAppsQuery } from '@/lib/api/mcp'
-import { AppIcon, SECTIONS } from './NavRail'
+import { useRailSections } from './NavRail'
 import { SidebarSessions } from './SidebarSessions'
 
 const NAV_LINK_CLASS =
@@ -35,7 +33,7 @@ export function Sidebar({
   onOpenConnect: () => void
 }) {
   const navRef = useRef<HTMLElement | null>(null)
-  const apps = useQuery(mcpAppsQuery).data ?? []
+  const sections = useRailSections()
   const [navEdge, setNavEdge] = useState({ scrollable: false, scrolled: false })
   const updateNavEdge = useCallback(() => {
     const nav = navRef.current
@@ -122,26 +120,17 @@ export function Sidebar({
         {/* Phones have no rail, so its tabs ride at the top of the drawer. */}
         {mobile && (
           <div className="flex flex-col gap-px">
-            {SECTIONS.map(({ to, label, Icon }) => (
-              <Link key={to} to={to} className={NAV_LINK_CLASS} activeProps={{ className: 'bg-list-active!' }}>
-                <span className="grid size-[18px] shrink-0 place-items-center">
-                  <Icon size={18} className="text-ink-2" />
-                </span>
-                <span className="flex-1">{label}</span>
-              </Link>
-            ))}
-            {apps.map((app) => (
+            {sections.map((section) => (
               <Link
-                key={app.server_id}
-                to="/apps/$serverId"
-                params={{ serverId: app.server_id }}
+                key={section.path}
+                {...section.link}
                 className={NAV_LINK_CLASS}
                 activeProps={{ className: 'bg-list-active!' }}
               >
-                <span className="grid size-[18px] shrink-0 place-items-center text-ink-2">
-                  <AppIcon app={app} />
+                <span className="grid size-[18px] shrink-0 place-items-center text-ink-2 [&_svg]:size-[18px]">
+                  {section.icon}
                 </span>
-                <span className="flex-1">{app.name}</span>
+                <span className="flex-1">{section.label}</span>
               </Link>
             ))}
           </div>

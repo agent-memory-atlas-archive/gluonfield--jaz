@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
 import { LayoutDashboard, MessageSquare, Repeat, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { mcpAppsQuery } from '@/lib/api/mcp'
@@ -24,8 +24,23 @@ export function railTab(pathname: string, settingsOpen: boolean): RailTab {
   return SECTIONS.find(({ to }) => pathname.startsWith(to))?.to ?? 'chat'
 }
 
+// Everything beside Chat takes the whole content card: the built-in sections,
+// then each connected MCP App the user pinned.
+export function useRailSections() {
+  const apps = useQuery(mcpAppsQuery).data ?? []
+  return [
+    ...SECTIONS.map(({ to, label, Icon }) => ({ path: to, label, icon: <Icon aria-hidden />, link: linkOptions({ to }) })),
+    ...apps.map((app) => ({
+      path: `/apps/${app.server_id}`,
+      label: app.name,
+      icon: <AppIcon app={app} />,
+      link: linkOptions({ to: '/apps/$serverId', params: { serverId: app.server_id } }),
+    })),
+  ]
+}
+
 // A server's own icon, or its initial when it publishes none.
-export function AppIcon({ app }: { app: MCPApp }) {
+function AppIcon({ app }: { app: MCPApp }) {
   if (!app.icon) return <span className="text-[13px] font-semibold leading-none">{app.name.slice(0, 1).toUpperCase()}</span>
   return <img src={app.icon} alt="" draggable={false} className="size-[18px] shrink-0 rounded-[5px]" />
 }
@@ -50,7 +65,7 @@ function TabLabel({ children }: { children: string }) {
 
 export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const apps = useQuery(mcpAppsQuery).data ?? []
+  const sections = useRailSections()
 
   // The Chat tab returns to the thread the user left, the way switching apps
   // does; a fresh /new clears it so the tab lands back on the composer.
@@ -70,27 +85,10 @@ export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings:
         <MessageSquare aria-hidden />
         <TabLabel>Chat</TabLabel>
       </Link>
-      {SECTIONS.map(({ to, label, Icon }) => (
-        <Link
-          key={to}
-          to={to}
-          aria-label={label}
-          className={tabClass(tab === to)}
-        >
-          <Icon aria-hidden />
-          <TabLabel>{label}</TabLabel>
-        </Link>
-      ))}
-      {apps.map((app) => (
-        <Link
-          key={app.server_id}
-          to="/apps/$serverId"
-          params={{ serverId: app.server_id }}
-          aria-label={app.name}
-          className={tabClass(tab === `/apps/${app.server_id}`)}
-        >
-          <AppIcon app={app} />
-          <TabLabel>{app.name}</TabLabel>
+      {sections.map((section) => (
+        <Link key={section.path} {...section.link} aria-label={section.label} className={tabClass(tab === section.path)}>
+          {section.icon}
+          <TabLabel>{section.label}</TabLabel>
         </Link>
       ))}
       <button

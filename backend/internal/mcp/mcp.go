@@ -110,10 +110,9 @@ func WithBuiltinServerProvider(server mcpconfig.Server, provider func() *mcpsdk.
 
 type serverSession struct {
 	*serverConnection
-	key      [32]byte
-	tools    []remoteTool
-	app      *serverApp
-	appTools map[string]bool
+	key   [32]byte
+	tools []remoteTool
+	app   *serverApp
 }
 
 type remoteTool struct {
@@ -246,7 +245,7 @@ func (m *Manager) refreshServerList(ctx context.Context, servers []mcpconfig.Ser
 				return
 			}
 			if previous := old[server.ID]; previous != nil && previous.key == key {
-				if updated, err := previous.listTools(sessionCtx, server); err == nil {
+				if updated, err := previous.loadCatalog(sessionCtx, server); err == nil {
 					updated.key = key
 					results[index].session = updated
 					results[index].status = connectedStatus(updated.tools)
@@ -504,7 +503,7 @@ func (m *Manager) connect(ctx context.Context, server mcpconfig.Server, handler 
 		return nil, err
 	}
 	connection := &serverConnection{session: session}
-	ss, err := connection.listTools(ctx, server)
+	ss, err := connection.loadCatalog(ctx, server)
 	if err != nil {
 		connection.close()
 	}
@@ -537,7 +536,7 @@ func (m *Manager) connectLocal(ctx context.Context, server mcpconfig.Server, loc
 		return nil, err
 	}
 	connection := &serverConnection{session: session, localSession: localSession}
-	ss, err := connection.listTools(ctx, server)
+	ss, err := connection.loadCatalog(ctx, server)
 	if err != nil {
 		connection.close()
 	}

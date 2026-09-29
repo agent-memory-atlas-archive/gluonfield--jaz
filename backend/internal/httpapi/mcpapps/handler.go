@@ -22,6 +22,14 @@ type Handler struct {
 	runtime Runtime
 }
 
+type listResponse struct {
+	Apps []mcp.App `json:"apps"`
+}
+
+type resourceResponse struct {
+	HTML string `json:"html"`
+}
+
 type callToolRequest struct {
 	Name      string          `json:"name"`
 	Arguments json.RawMessage `json:"arguments,omitempty"`
@@ -37,7 +45,7 @@ func (h *Handler) List(w http.ResponseWriter, _ *http.Request) {
 		httpapi.WriteError(w, http.StatusInternalServerError, err)
 		return
 	}
-	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"apps": apps})
+	httpapi.WriteJSON(w, http.StatusOK, listResponse{Apps: apps})
 }
 
 func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +54,7 @@ func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteError(w, statusFor(err), err)
 		return
 	}
-	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"html": html})
+	httpapi.WriteJSON(w, http.StatusOK, resourceResponse{HTML: html})
 }
 
 func (h *Handler) CallTool(w http.ResponseWriter, r *http.Request) {

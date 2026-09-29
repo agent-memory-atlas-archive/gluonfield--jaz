@@ -97,7 +97,8 @@ func (m *Manager) connectionKey(ctx context.Context, server mcpconfig.Server) ([
 	return sha256.Sum256(data), err
 }
 
-func (c *serverConnection) listTools(ctx context.Context, server mcpconfig.Server) (*serverSession, error) {
+// loadCatalog reads the server's agent tools and, when it publishes one, its app.
+func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Server) (*serverSession, error) {
 	var items []remoteTool
 	appTools := map[string]bool{}
 	for tool, err := range c.session.Tools(ctx, nil) {
@@ -123,9 +124,9 @@ func (c *serverConnection) listTools(ctx context.Context, server mcpconfig.Serve
 			inputSchema: inputSchema(tool.InputSchema),
 		})
 	}
-	app, err := c.discoverApp(ctx)
+	app, err := c.discoverApp(ctx, appTools)
 	if err != nil {
 		return nil, err
 	}
-	return &serverSession{serverConnection: c, tools: items, app: app, appTools: appTools}, nil
+	return &serverSession{serverConnection: c, tools: items, app: app}, nil
 }
