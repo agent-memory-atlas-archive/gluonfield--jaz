@@ -81,11 +81,13 @@ export const mcpAppsQuery = queryOptions({
   queryFn: async () => (await get<{ apps: MCPApp[] }>('/v1/mcp/apps')).apps,
 })
 
+// Opening the section picks up a new app version; unchanged HTML keeps the
+// running app as it is.
 export function mcpAppQuery(serverId: string) {
   return queryOptions({
     queryKey: keys.mcpApp(serverId),
     queryFn: async () => (await get<{ html: string }>(`/v1/mcp/apps/${serverId}/resource`)).html,
-    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   })
 }
 

@@ -260,7 +260,9 @@ function RootLayout() {
       navigate({ to: '/new' })
     }
     if (key === 'k') {
-      if (!commandOpen && modalDialogOpen()) return
+      // Settings is a rail section, so ⌘K works there unless one of its own
+      // dialogs is open on top.
+      if (!commandOpen && modalDialogOpen(settingsOpen ? 1 : 0)) return
       e.preventDefault()
       setCommandOpen((open) => !open)
     }
