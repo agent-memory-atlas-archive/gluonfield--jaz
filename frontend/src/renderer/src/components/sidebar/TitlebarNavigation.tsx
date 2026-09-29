@@ -49,11 +49,6 @@ export function TitlebarNavigation({
           <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden />
         </button>
       )}
-      {hasPanel && !panelOpen && (
-        <Link to="/new" aria-label="New chat" title="New chat (⌘N)" className={CONTROL_CLASS}>
-          <NewChatIcon className="size-4 max-sm:size-[18px]" aria-hidden />
-        </Link>
-      )}
       {!isMobile && (
         <>
           <button
@@ -77,6 +72,11 @@ export function TitlebarNavigation({
             <ArrowRight size={18} aria-hidden />
           </button>
         </>
+      )}
+      {hasPanel && !panelOpen && (
+        <Link to="/new" aria-label="New chat" title="New chat (⌘N)" className={CONTROL_CLASS}>
+          <NewChatIcon className="size-4 max-sm:size-[18px]" aria-hidden />
+        </Link>
       )}
     </div>
   )
