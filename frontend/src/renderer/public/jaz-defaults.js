@@ -13,6 +13,7 @@ window.__JAZ_DEFAULTS__ = {
   // wideLayout: false,            // wider thread column
   // showModelIcons: true,         // ACP agent/model marks in the left sidebar
   // homeWordmark: 'jaz',          // name or image URL above the new-thread composer
+  // invertHomeLogoInLightMode: false, // darkens white image logos in light mode
   // inlineDiffs: false,           // expand agent file diffs in the transcript
   // inlineShellCommands: false,   // expand agent shell commands in the transcript
 

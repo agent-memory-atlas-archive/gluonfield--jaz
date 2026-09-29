@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { type JazDefaults, jazDefaults } from './jazDefaults'
-import { effectiveHomeWordmark, normalizeHomeWordmark } from './homeWordmark'
+import { normalizeHomeWordmark } from './homeWordmark'
 
 // User-tunable appearance preferences, kept deliberately separate from the
 // light/dark theme (lib/theme.ts). Same mechanics: persisted in localStorage,
@@ -28,6 +28,7 @@ export interface AppearanceSettings {
   showModelIcons: boolean
   /** custom name or image URL on the new-thread screen; '' keeps "jaz" */
   homeWordmark: string
+  invertHomeLogoInLightMode: boolean
 }
 
 export const DEFAULTS: AppearanceSettings = {
@@ -40,6 +41,7 @@ export const DEFAULTS: AppearanceSettings = {
   wideLayout: false,
   showModelIcons: true,
   homeWordmark: '',
+  invertHomeLogoInLightMode: false,
 }
 
 // Whole-UI zoom steps. The chrome is built largely with px sizes, so scaling the
@@ -127,6 +129,10 @@ const FIELDS: { [K in keyof AppearanceSettings]: Field<AppearanceSettings[K]> } 
     'jaz.appearance.homeWordmark',
     (c) => c.homeWordmark,
     normalizeHomeWordmark,
+  ),
+  invertHomeLogoInLightMode: boolField(
+    'jaz.appearance.invertHomeLogoInLightMode',
+    (c) => c.invertHomeLogoInLightMode,
   ),
 }
 
@@ -245,8 +251,4 @@ export function useInlineShellCommands(): boolean {
 
 export function useShowModelIcons(): boolean {
   return useSyncExternalStore(subscribe, () => current.showModelIcons)
-}
-
-export function useHomeWordmark(): string {
-  return useSyncExternalStore(subscribe, () => effectiveHomeWordmark(current.homeWordmark))
 }

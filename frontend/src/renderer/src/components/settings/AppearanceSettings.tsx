@@ -18,7 +18,7 @@ import {
   exportCodexThemeString,
   parseCodexThemeString,
 } from '@/lib/codexTheme'
-import { HOME_LOGO_URL_MAX_LENGTH } from '@/lib/homeWordmark'
+import { isHomeLogoUrl } from '@/lib/homeWordmark'
 import { FontPicker } from './FontPicker'
 import { SettingsCard } from './SettingsCard'
 import { ThemeConfigPreview } from './ThemeConfigPreview'
@@ -333,12 +333,11 @@ export function AppearanceSettings() {
         </Row>
         <Row
           title="Logo Name or URL"
-          description="A name appears above the new-thread composer as dithered text. Paste an image URL to use the image. Leave blank for “jaz”."
+          description="Enter a name for dithered text, or paste a direct image URL. Leave blank for “jaz”."
         >
           <input
             type="text"
             value={homeWordmark}
-            maxLength={HOME_LOGO_URL_MAX_LENGTH}
             placeholder="jaz"
             aria-label="Logo Name or URL"
             onChange={(event) => {
@@ -348,6 +347,15 @@ export function AppearanceSettings() {
             className="h-8 w-72 rounded-control bg-surface-2 px-2.5 text-[13px] text-ink outline-none ring-1 ring-border/60 placeholder:text-ink-3 focus:ring-primary"
           />
         </Row>
+        {isHomeLogoUrl(settings.homeWordmark) ? (
+          <Row title="Invert image in light mode" description="For white logos on transparent backgrounds.">
+            <Switch
+              checked={settings.invertHomeLogoInLightMode}
+              onChange={(value) => setAppearance({ invertHomeLogoInLightMode: value })}
+              aria-label="Invert image in light mode"
+            />
+          </Row>
+        ) : null}
       </SettingsCard>
 
       <div className="mt-6 flex items-end justify-between gap-3">

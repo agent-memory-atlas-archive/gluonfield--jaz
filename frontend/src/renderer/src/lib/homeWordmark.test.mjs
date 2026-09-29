@@ -3,7 +3,6 @@ import {
   DEFAULT_HOME_WORDMARK,
   effectiveHomeWordmark,
   HOME_WORDMARK_MAX_LENGTH,
-  HOME_LOGO_URL_MAX_LENGTH,
   isHomeLogoUrl,
   normalizeHomeWordmark,
 } from './homeWordmark'
@@ -23,9 +22,8 @@ describe('home wordmark', () => {
   })
 
   test('keeps image URLs longer than the text limit', () => {
-    const url = `https://example.com/logo.png?token=${'a'.repeat(HOME_WORDMARK_MAX_LENGTH)}`
+    const url = `https://example.com/logo.png?token=${'a'.repeat(10000)}`
     expect(normalizeHomeWordmark(` ${url} `)).toBe(url)
-    expect(normalizeHomeWordmark(`https://${'a'.repeat(HOME_LOGO_URL_MAX_LENGTH)}`).length).toBe(HOME_LOGO_URL_MAX_LENGTH)
   })
 
   test('recognizes HTTP image links without treating other schemes as images', () => {

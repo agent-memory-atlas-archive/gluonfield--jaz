@@ -3,15 +3,32 @@ import { motion } from 'motion/react'
 import { DitherTerrain, DitherWordmark } from '@/components/launch/DitherArt'
 import { ComposerCard } from '@/components/session/Composer'
 import { FileDropScope } from '@/components/ui/FileDrop'
-import { useHomeWordmark } from '@/lib/appearance'
-import { DEFAULT_HOME_WORDMARK, isHomeLogoUrl } from '@/lib/homeWordmark'
+import { useAppearance } from '@/lib/appearance'
+import { DEFAULT_HOME_WORDMARK, effectiveHomeWordmark, isHomeLogoUrl } from '@/lib/homeWordmark'
 import type { SendMessageHandler } from '@/lib/sendMessage'
 
-// One column, as wide as the composer card: the wordmark never outgrows it.
 const HOME_WIDTH = 640
 
-// Welcome mode: the dithered wordmark over the composer card, standing on
-// the boot screen's brandscape under a sky that follows the theme.
+function HomeLogo({ value, invertInLightMode }: { value: string; invertInLightMode: boolean }) {
+  const url = isHomeLogoUrl(value) ? value : null
+  const [failed, setFailed] = useState(false)
+  return (
+    <div className="flex h-48 items-center justify-center">
+      {url && !failed ? (
+        <img
+          src={url}
+          alt="Home logo"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className={`block max-h-full max-w-full object-contain ${invertInLightMode ? 'invert dark:invert-0' : ''}`}
+        />
+      ) : (
+        <DitherWordmark text={url ? DEFAULT_HOME_WORDMARK : value} maxWidth={HOME_WIDTH} />
+      )}
+    </div>
+  )
+}
+
 export function NewSessionHome({
   creating,
   disabled = false,
@@ -32,9 +49,8 @@ export function NewSessionHome({
   onSend: SendMessageHandler
   onVoice?: () => void
 }) {
-  const wordmark = useHomeWordmark()
-  const logoUrl = isHomeLogoUrl(wordmark) ? wordmark : null
-  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null)
+  const { settings } = useAppearance()
+  const wordmark = effectiveHomeWordmark(settings.homeWordmark)
 
   return (
     <FileDropScope className="relative flex h-full flex-col overflow-hidden">
@@ -45,19 +61,7 @@ export function NewSessionHome({
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
       >
         <div className="flex w-full flex-col gap-8" style={{ maxWidth: HOME_WIDTH }}>
-          {logoUrl && logoUrl !== failedLogoUrl ? (
-            <div className="flex h-48 items-center justify-center">
-              <img
-                src={logoUrl}
-                alt="Home logo"
-                referrerPolicy="no-referrer"
-                onError={() => setFailedLogoUrl(logoUrl)}
-                className="block max-h-full max-w-full object-contain"
-              />
-            </div>
-          ) : (
-            <DitherWordmark text={logoUrl ? DEFAULT_HOME_WORDMARK : wordmark} maxWidth={HOME_WIDTH} />
-          )}
+          <HomeLogo key={wordmark} value={wordmark} invertInLightMode={settings.invertHomeLogoInLightMode} />
           <ComposerCard
             streaming={creating}
             autoFocus
