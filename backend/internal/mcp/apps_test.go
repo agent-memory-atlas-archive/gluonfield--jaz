@@ -32,7 +32,7 @@ func TestManagerServesPinnedMCPApp(t *testing.T) {
 	answer := func(ctx context.Context, req *mcpsdk.CallToolRequest, input appQueryInput) (*mcpsdk.CallToolResult, any, error) {
 		return &mcpsdk.CallToolResult{Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: req.Params.Name + ":" + input.Query}}}, nil, nil
 	}
-	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "search"}, answer)
+	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "search", Meta: mcpsdk.Meta{"ui": map[string]any{"resourceUri": "ui://tasks/app"}}}, answer)
 	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "graphql", Meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []string{"app"}}}}, answer)
 	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "admin", Meta: mcpsdk.Meta{"ui": map[string]any{"visibility": []string{"model"}}}}, answer)
 	httpServer := httptest.NewServer(mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {

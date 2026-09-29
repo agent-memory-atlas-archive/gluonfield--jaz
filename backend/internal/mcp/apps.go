@@ -31,36 +31,27 @@ type serverApp struct {
 	tools map[string]bool
 }
 
-// discoverApp finds the server's app resource; tools are the ones its
-// _meta.ui.visibility lets an app call.
-func (c *serverConnection) discoverApp(ctx context.Context, tools map[string]bool) (*serverApp, error) {
-	init := c.session.InitializeResult()
-	if init == nil || init.Capabilities == nil || init.Capabilities.Resources == nil {
-		return nil, nil
+// newServerApp describes the app a server's tools link to, or nil when none
+// does. Tools lists what its _meta.ui.visibility lets the app call.
+func newServerApp(init *mcpsdk.InitializeResult, uri string, tools map[string]bool) *serverApp {
+	if uri == "" {
+		return nil
 	}
-	for resource, err := range c.session.Resources(ctx, nil) {
-		if err != nil {
-			return nil, err
-		}
-		if resource.MIMEType != AppMIMEType {
-			continue
-		}
-		app := &serverApp{uri: resource.URI, tools: tools}
-		if init.ServerInfo != nil && len(init.ServerInfo.Icons) > 0 {
-			app.icon = init.ServerInfo.Icons[0].Source
-		}
-		return app, nil
+	app := &serverApp{uri: uri, tools: tools}
+	if init != nil && init.ServerInfo != nil && len(init.ServerInfo.Icons) > 0 {
+		app.icon = init.ServerInfo.Icons[0].Source
 	}
-	return nil, nil
+	return app
 }
 
-// toolVisibility reads MCP Apps' _meta.ui.visibility. A tool without it is
-// visible to both the model and the app.
-func toolVisibility(tool *mcpsdk.Tool) (model, app bool) {
+// toolUI reads a tool's MCP Apps _meta.ui: who may call it (both the model and
+// the app when visibility is unset) and the UI resource it opens, if any.
+func toolUI(tool *mcpsdk.Tool) (model, app bool, resourceURI string) {
 	ui, _ := tool.Meta["ui"].(map[string]any)
+	resourceURI, _ = ui["resourceUri"].(string)
 	list, ok := ui["visibility"].([]any)
 	if !ok {
-		return true, true
+		return true, true, resourceURI
 	}
 	for _, audience := range list {
 		switch audience {
@@ -70,7 +61,7 @@ func toolVisibility(tool *mcpsdk.Tool) (model, app bool) {
 			app = true
 		}
 	}
-	return model, app
+	return model, app, resourceURI
 }
 
 // Apps lists the MCP Apps of connected servers marked to show in the UI.
@@ -103,6 +94,9 @@ func (m *Manager) ReadApp(ctx context.Context, serverID string) (string, error) 
 		return "", err
 	}
 	for _, content := range result.Contents {
+		if content.MIMEType != AppMIMEType {
+			continue
+		}
 		if content.Text != "" {
 			return content.Text, nil
 		}
@@ -110,7 +104,7 @@ func (m *Manager) ReadApp(ctx context.Context, serverID string) (string, error) 
 			return string(content.Blob), nil
 		}
 	}
-	return "", fmt.Errorf("mcp app %s is empty", session.app.uri)
+	return "", fmt.Errorf("mcp app %s has no %s content", session.app.uri, AppMIMEType)
 }
 
 // CallAppTool relays a tool call from an app's UI to its own server. Apps may
