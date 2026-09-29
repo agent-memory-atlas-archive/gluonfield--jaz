@@ -55,8 +55,8 @@ function Trigger({ url, name, dot, onClick }: { url: string; name: string; dot: 
       title={url}
       className="group flex w-full items-center gap-2 rounded-lg px-2.5 py-1 text-[13px] font-medium text-ink transition-colors duration-150 hover:bg-list-hover"
     >
-      {/* The reachability dot rides the rail's icon gutter, so this label starts
-          on the same column as Settings and every row above it. */}
+      {/* The reachability dot rides the rows' icon gutter, so this label starts
+          on the same column as every row above it. */}
       <span className="grid size-[18px] shrink-0 place-items-center">
         <span className={`size-1.5 rounded-full ${dot}`} />
       </span>

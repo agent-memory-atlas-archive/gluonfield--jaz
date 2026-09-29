@@ -22,13 +22,13 @@ function subscribe(onChange: () => void) {
 
 export function TitlebarNavigation({
   hasPanel,
-  sidebarOpen,
+  panelOpen,
   isMobile,
   onToggleSidebar,
   onNavigate,
 }: {
   hasPanel: boolean
-  sidebarOpen: boolean
+  panelOpen: boolean
   isMobile: boolean
   onToggleSidebar: () => void
   onNavigate: (direction: BrowserNavigationDirection) => void
@@ -40,16 +40,16 @@ export function TitlebarNavigation({
       {hasPanel && (
         <button
           type="button"
-          aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-          aria-expanded={sidebarOpen}
-          title={`${sidebarOpen ? 'Hide' : 'Show'} sidebar (⌘S)`}
+          aria-label={panelOpen ? 'Hide sidebar' : 'Show sidebar'}
+          aria-expanded={panelOpen}
+          title={`${panelOpen ? 'Hide' : 'Show'} sidebar (⌘S)`}
           onClick={onToggleSidebar}
           className={CONTROL_CLASS}
         >
           <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden />
         </button>
       )}
-      {hasPanel && !sidebarOpen && (
+      {hasPanel && !panelOpen && (
         <Link to="/new" aria-label="New chat" title="New chat (⌘N)" className={CONTROL_CLASS}>
           <NewChatIcon className="size-4 max-sm:size-[18px]" aria-hidden />
         </Link>

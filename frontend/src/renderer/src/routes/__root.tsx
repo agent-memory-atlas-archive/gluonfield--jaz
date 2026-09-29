@@ -19,7 +19,7 @@ import { SidePanelStateProvider } from '@/components/session/SidePanelState'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { isSettingsSection, type SettingsSection } from '@/components/settings/sections'
 import { SettingsOverlay } from '@/components/settings/SettingsOverlay'
-import { NavRail, navTab, RAIL_WIDTH } from '@/components/sidebar/NavRail'
+import { inSection, NavRail, RAIL_WIDTH } from '@/components/sidebar/NavRail'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { TitlebarNavigation } from '@/components/sidebar/TitlebarNavigation'
 import { ToastProvider } from '@/components/ui/toast'
@@ -160,20 +160,18 @@ function RootLayout() {
     [navigate],
   )
 
-  // A specific board paints itself on bg-surface so its tiles blend; match main
-  // to surface there too so no bg-bg seam shows around the board.
-  const onBoard = useRouterState({
-    select: (s) => /^\/boards\/.+/.test(s.location.pathname),
-  })
-
   // Phone: the sidebar is a full-screen drawer (CSS `max-sm:w-full`) that slides
   // over the thread rather than a resizable column, and auto-dismisses on
   // navigation to reveal the thread underneath. On desktop the thread panel
-  // belongs to the Chat tab; the other rail tabs take the full card.
+  // belongs to Chat; the rail's other sections take the full card.
   const isMobile = useIsMobile()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const hasPanel = isMobile || navTab(pathname) === 'chat'
-  const panelEdge = !isMobile && hasPanel && sidebarOpen ? RAIL_WIDTH + sidebarWidth : 0
+  const hasPanel = isMobile || !inSection(pathname)
+  const panelOpen = hasPanel && sidebarOpen
+  const panelEdge = !isMobile && panelOpen ? RAIL_WIDTH + sidebarWidth : 0
+  // A specific board paints itself on bg-surface so its tiles blend; match main
+  // to surface there too so no bg-bg seam shows around the board.
+  const onBoard = /^\/boards\/.+/.test(pathname)
   useEffect(() => {
     if (isMobile) setSidebarOpen(false)
   }, [isMobile, pathname])
@@ -285,7 +283,7 @@ function RootLayout() {
             >
               <TitlebarNavigation
                 hasPanel={hasPanel}
-                sidebarOpen={sidebarOpen}
+                panelOpen={panelOpen}
                 isMobile={isMobile}
                 onToggleSidebar={() => setSidebarOpen((open) => !open)}
                 onNavigate={handleBrowserNavigation}
@@ -305,11 +303,11 @@ function RootLayout() {
               <motion.div
                 className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
                 initial={false}
-                animate={drawerSlide({ isMobile, open: sidebarOpen && hasPanel, side: 'left', width: sidebarWidth })}
+                animate={drawerSlide({ isMobile, open: panelOpen, side: 'left', width: sidebarWidth })}
                 transition={slide}
               >
                 <Sidebar
-                  open={sidebarOpen}
+                  open={panelOpen}
                   width={sidebarWidth}
                   mobile={isMobile}
                   onDismiss={() => setSidebarOpen(false)}

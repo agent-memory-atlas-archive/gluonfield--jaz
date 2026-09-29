@@ -1,21 +1,13 @@
-import { Link, type LinkComponentProps } from '@tanstack/react-router'
-import { LayoutDashboard, Repeat, Search, Settings, SquarePen } from 'lucide-react'
-import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { Search, Settings, SquarePen } from 'lucide-react'
+import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ConnectionFooterButton } from '@/components/connection/ConnectionFooterButton'
 import { UpdatePanel } from '@/components/update/UpdatePanel'
+import { SECTIONS } from './NavRail'
 import { SidebarSessions } from './SidebarSessions'
 
 const NAV_LINK_CLASS =
   'group flex h-[30px] items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-ink transition-colors duration-150 hover:bg-list-hover max-sm:h-11 max-sm:px-3 max-sm:text-[15px]'
-
-function NavLink({ to, icon, label }: { to: LinkComponentProps['to']; icon: ReactNode; label: string }) {
-  return (
-    <Link to={to} className={NAV_LINK_CLASS} activeProps={{ className: 'bg-list-active!' }}>
-      <span className="grid size-[18px] shrink-0 place-items-center">{icon}</span>
-      <span className="flex-1">{label}</span>
-    </Link>
-  )
-}
 
 export function Sidebar({
   open,
@@ -128,8 +120,14 @@ export function Sidebar({
         {/* Phones have no rail, so its tabs ride at the top of the drawer. */}
         {mobile && (
           <div className="flex flex-col gap-px">
-            <NavLink to="/loops" icon={<Repeat size={18} className="text-ink-2" />} label="Loops" />
-            <NavLink to="/boards" icon={<LayoutDashboard size={18} className="text-ink-2" />} label="Boards" />
+            {SECTIONS.map(({ to, label, Icon }) => (
+              <Link key={to} to={to} className={NAV_LINK_CLASS} activeProps={{ className: 'bg-list-active!' }}>
+                <span className="grid size-[18px] shrink-0 place-items-center">
+                  <Icon size={18} className="text-ink-2" />
+                </span>
+                <span className="flex-1">{label}</span>
+              </Link>
+            ))}
           </div>
         )}
 

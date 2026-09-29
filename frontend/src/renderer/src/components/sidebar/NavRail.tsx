@@ -4,11 +4,14 @@ import { useState } from 'react'
 
 export const RAIL_WIDTH = 48
 
-export function navTab(pathname: string) {
-  if (pathname.startsWith('/loops')) return 'loops'
-  if (pathname.startsWith('/boards')) return 'boards'
-  return 'chat'
-}
+// The sections beside Chat. Each takes the whole content card; Chat is the one
+// tab that keeps the thread panel.
+export const SECTIONS = [
+  { to: '/loops', label: 'Loops', Icon: Repeat },
+  { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
+] as const
+
+export const inSection = (pathname: string) => SECTIONS.some(({ to }) => pathname.startsWith(to))
 
 const TAB_CLASS =
   'grid size-9 place-items-center rounded-[10px] transition-[background-color,color,transform] duration-150 active:scale-[0.96] [&_svg]:size-[18px] [&_svg]:stroke-[1.75]'
@@ -18,7 +21,7 @@ const tabClass = (active: boolean) =>
 
 export function NavRail({ onOpenSettings }: { onOpenSettings: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const tab = navTab(pathname)
+  const chat = !inSection(pathname)
 
   // The Chat tab returns to the thread the user left, the way switching apps
   // does; a fresh /new clears it so the tab lands back on the composer.
@@ -34,29 +37,26 @@ export function NavRail({ onOpenSettings }: { onOpenSettings: () => void }) {
         params={lastSession ? { sessionId: lastSession } : {}}
         aria-label="Chat"
         title="Chat"
-        aria-current={tab === 'chat' ? 'page' : undefined}
-        className={tabClass(tab === 'chat')}
+        aria-current={chat ? 'page' : undefined}
+        className={tabClass(chat)}
       >
         <MessageSquare aria-hidden />
       </Link>
-      <Link
-        to="/loops"
-        aria-label="Loops"
-        title="Loops"
-        aria-current={tab === 'loops' ? 'page' : undefined}
-        className={tabClass(tab === 'loops')}
-      >
-        <Repeat aria-hidden />
-      </Link>
-      <Link
-        to="/boards"
-        aria-label="Boards"
-        title="Boards"
-        aria-current={tab === 'boards' ? 'page' : undefined}
-        className={tabClass(tab === 'boards')}
-      >
-        <LayoutDashboard aria-hidden />
-      </Link>
+      {SECTIONS.map(({ to, label, Icon }) => {
+        const active = pathname.startsWith(to)
+        return (
+          <Link
+            key={to}
+            to={to}
+            aria-label={label}
+            title={label}
+            aria-current={active ? 'page' : undefined}
+            className={tabClass(active)}
+          >
+            <Icon aria-hidden />
+          </Link>
+        )
+      })}
       <button
         type="button"
         onClick={onOpenSettings}
