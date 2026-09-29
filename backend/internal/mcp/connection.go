@@ -15,9 +15,13 @@ import (
 type serverConnection struct {
 	session      *mcpsdk.ClientSession
 	localSession *mcpsdk.ServerSession
-	mu           sync.Mutex
-	calls        int
-	retired      bool
+	// redial opens a fresh session to the same server; nil for local servers,
+	// whose sessions live in process.
+	redial   func(context.Context) (*mcpsdk.ClientSession, error)
+	resumeMu sync.Mutex
+	mu       sync.Mutex
+	calls    int
+	retired  bool
 }
 
 // acquire holds the connection open for one request; a retired connection
@@ -42,21 +46,60 @@ func (c *serverConnection) acquire() (func(), error) {
 }
 
 func (c *serverConnection) callTool(ctx context.Context, params *mcpsdk.CallToolParams) (*mcpsdk.CallToolResult, error) {
-	release, err := c.acquire()
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-	return c.session.CallTool(ctx, params)
+	return use(ctx, c, func(session *mcpsdk.ClientSession) (*mcpsdk.CallToolResult, error) {
+		return session.CallTool(ctx, params)
+	})
 }
 
 func (c *serverConnection) readResource(ctx context.Context, uri string) (*mcpsdk.ReadResourceResult, error) {
+	return use(ctx, c, func(session *mcpsdk.ClientSession) (*mcpsdk.ReadResourceResult, error) {
+		return session.ReadResource(ctx, &mcpsdk.ReadResourceParams{URI: uri})
+	})
+}
+
+// use runs a request on the live session. When the server has dropped the
+// session, as it does on restart, it rejected the request unseen, so the
+// connection opens a new session and sends it once more.
+func use[T any](ctx context.Context, c *serverConnection, request func(*mcpsdk.ClientSession) (T, error)) (T, error) {
+	var none T
 	release, err := c.acquire()
+	if err != nil {
+		return none, err
+	}
+	defer release()
+	session := c.current()
+	result, err := request(session)
+	if c.redial == nil || (!errors.Is(err, mcpsdk.ErrSessionMissing) && !errors.Is(err, mcpsdk.ErrConnectionClosed)) {
+		return result, err
+	}
+	if session, err = c.resume(ctx, session); err != nil {
+		return none, err
+	}
+	return request(session)
+}
+
+func (c *serverConnection) current() *mcpsdk.ClientSession {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.session
+}
+
+// resume replaces a lost session unless a concurrent request already did.
+func (c *serverConnection) resume(ctx context.Context, lost *mcpsdk.ClientSession) (*mcpsdk.ClientSession, error) {
+	c.resumeMu.Lock()
+	defer c.resumeMu.Unlock()
+	if session := c.current(); session != lost {
+		return session, nil
+	}
+	session, err := c.redial(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer release()
-	return c.session.ReadResource(ctx, &mcpsdk.ReadResourceParams{URI: uri})
+	c.mu.Lock()
+	c.session = session
+	c.mu.Unlock()
+	_ = lost.Close()
+	return session, nil
 }
 
 func (c *serverConnection) retire() {
@@ -70,7 +113,7 @@ func (c *serverConnection) retire() {
 }
 
 func (c *serverConnection) close() {
-	_ = c.session.Close()
+	_ = c.current().Close()
 	if c.localSession != nil {
 		_ = c.localSession.Close()
 	}
@@ -102,7 +145,8 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 	var items []remoteTool
 	var appURI string
 	appTools := map[string]bool{}
-	for tool, err := range c.session.Tools(ctx, nil) {
+	session := c.current()
+	for tool, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, err
 		}
@@ -128,6 +172,6 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 			inputSchema: inputSchema(tool.InputSchema),
 		})
 	}
-	app := newServerApp(c.session.InitializeResult(), appURI, appTools)
+	app := newServerApp(session.InitializeResult(), appURI, appTools)
 	return &serverSession{serverConnection: c, tools: items, app: app}, nil
 }

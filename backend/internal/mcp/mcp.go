@@ -491,18 +491,20 @@ func (m *Manager) connect(ctx context.Context, server mcpconfig.Server, handler 
 		return nil, err
 	}
 	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "jaz", Version: "0.1.0"}, nil)
-	transport := &mcpsdk.StreamableClientTransport{
-		Endpoint:             server.URL,
-		HTTPClient:           &http.Client{Transport: headerTransport{headers: headers, base: http.DefaultTransport}},
-		MaxRetries:           -1,
-		DisableStandaloneSSE: true,
-		OAuthHandler:         handler,
+	dial := func(ctx context.Context) (*mcpsdk.ClientSession, error) {
+		return client.Connect(ctx, &mcpsdk.StreamableClientTransport{
+			Endpoint:             server.URL,
+			HTTPClient:           &http.Client{Transport: headerTransport{headers: headers, base: http.DefaultTransport}},
+			MaxRetries:           -1,
+			DisableStandaloneSSE: true,
+			OAuthHandler:         handler,
+		}, nil)
 	}
-	session, err := client.Connect(ctx, transport, nil)
+	session, err := dial(ctx)
 	if err != nil {
 		return nil, err
 	}
-	connection := &serverConnection{session: session}
+	connection := &serverConnection{session: session, redial: dial}
 	ss, err := connection.loadCatalog(ctx, server)
 	if err != nil {
 		connection.close()
