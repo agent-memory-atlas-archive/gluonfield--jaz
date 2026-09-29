@@ -5,7 +5,6 @@ on:
     paths:
       - .github/acp-adapter-assets.json
       - .github/scripts/create-acp-adapters-manifest.mjs
-      - .github/scripts/bump-acp-adapters.mjs
       - .github/workflows/acp-adapters-validate.yml
       - dist/acp-adapters.json
   workflow_dispatch:
