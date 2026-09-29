@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -632,5 +633,48 @@ func TestBuiltinServersDoNotShareToolNames(t *testing.T) {
 	}
 	if manager.Status("alpha").ToolCount+manager.Status("beta").ToolCount != 1 {
 		t.Fatalf("statuses = %#v %#v, want one tool total", manager.Status("alpha"), manager.Status("beta"))
+	}
+}
+
+func TestManagerResumesSessionAfterServerRestart(t *testing.T) {
+	newHandler := func() http.Handler {
+		remote := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "restarting", Version: "1.0.0"}, nil)
+		mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "echo"}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input echoInput) (*mcpsdk.CallToolResult, any, error) {
+			return &mcpsdk.CallToolResult{Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: "got " + input.Value}}}, nil, nil
+		})
+		return mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server { return remote }, &mcpsdk.StreamableHTTPOptions{JSONResponse: true})
+	}
+	var live atomic.Pointer[http.Handler]
+	first := newHandler()
+	live.Store(&first)
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		(*live.Load()).ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	registry := tools.NewRegistry()
+	manager := NewManager(&testStore{servers: []mcpconfig.Server{{
+		ID:        "srv1",
+		Name:      "Restarting",
+		Transport: mcpconfig.TransportStreamableHTTP,
+		URL:       httpServer.URL,
+		Enabled:   true,
+	}}}, nil, registry, log.New(io.Discard))
+	manager.Refresh(context.Background())
+	defer manager.Close()
+	tool, ok := registry.Get(tools.DefinitionName(registry.Definitions()[0]))
+	if !ok {
+		t.Fatal("echo tool not registered")
+	}
+
+	// The restarted server knows none of the sessions it handed out before.
+	restarted := newHandler()
+	live.Store(&restarted)
+	result, err := tool.Execute(context.Background(), map[string]any{"value": "after restart"})
+	if err != nil {
+		t.Fatalf("call after server restart: %v", err)
+	}
+	if !strings.Contains(result.Content, "got after restart") {
+		t.Fatalf("result = %s", result.Content)
 	}
 }
