@@ -602,6 +602,20 @@ await tab.cdp.send('Runtime.evaluate', { expression: 'window.visibilityProbe += 
     if (panel.open || panel.activeTab?.id !== 'file') {
       throw new Error('Background browser work opened another conversation’s panel')
     }
+    await window.smoke.resize(1440, 900)
+    await until(() => window.innerWidth === 1440)
+    await window.smoke.key('S', ['meta', 'shift'])
+    await until(() => panel.open && panel.mode === 'tabs')
+    await window.smoke.key('S', ['meta', 'shift'])
+    await until(() => !panel.open)
+    await window.smoke.key('S', ['meta', 'shift'])
+    await until(() => panel.open && panel.mode === 'tabs')
+    await click(button('Overview')!)
+    await until(() => panel.open && panel.mode === 'overview')
+    await window.smoke.key('S', ['meta', 'shift'])
+    await until(() => !panel.open && panel.mode === 'overview')
+    await window.smoke.key('S', ['meta', 'shift'])
+    await until(() => panel.open && panel.mode === 'tabs')
   } catch (error) {
     await window.smoke.capture('side-panel-tabs-failure')
     throw error

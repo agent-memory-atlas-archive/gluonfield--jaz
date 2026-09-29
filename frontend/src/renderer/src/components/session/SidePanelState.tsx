@@ -158,7 +158,11 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     if (event.shiftKey) {
       if (key === 's') {
         event.preventDefault()
-        toggleMode('tabs')
+        if (open) {
+          close()
+        } else {
+          showTabs()
+        }
       }
       return
     }

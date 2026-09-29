@@ -53,6 +53,12 @@ function Fixture() {
     let stage = 'opening, profile import and cursor checks'
     const timeout = setTimeout(() => window.smoke.result({ ok: false, error: 'Browser smoke timed out', stage, pending: [...pending.values()] }), Number(new URLSearchParams(location.search).get('timeout') || 30000))
     const run = async () => {
+      if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
+        stage = 'side panel tabs and retained resources'
+        await exerciseSidePanelTabs()
+        window.smoke.result({ ok: true, checks: ['side panel and Overview shortcut visibility; compact tabs, browser retention, terminal, side chat, mobile layout and per-chat restoration'] })
+        return
+      }
       stage = 'model picker efforts, animation, focus and persistence'
       await exerciseModelPicker()
       if (new URLSearchParams(location.search).get('suite') === 'model-picker') {
@@ -85,12 +91,6 @@ function Fixture() {
       }
       stage = 'Mermaid rendering, streaming, themes and source fallback'
       await exerciseMermaid()
-      if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
-        stage = 'side panel tabs and retained resources'
-        await exerciseSidePanelTabs()
-        window.smoke.result({ ok: true, checks: ['compact flush panel and icons; file links, browser retention, terminal, side chat, keyboard, mobile layout and per-chat tabs restored across routes'] })
-        return
-      }
       stage = 'browser layout, navigation collapse and resize grip'
       await exerciseBrowserLayout()
       stage = 'side panel tabs and retained resources'
