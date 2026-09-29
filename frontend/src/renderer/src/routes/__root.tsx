@@ -305,7 +305,13 @@ function RootLayout() {
 
           <div className="flex min-h-0 flex-1">
             <NavRail tab={tab} onOpenSettings={() => openSettings()} />
-            <div className="relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg sm:mr-[3px] sm:mb-[3px] sm:rounded-card sm:border">
+            <div
+              className={`relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg transition-[margin,border-radius] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none sm:border ${
+                pathname === '/new' && !settingsOpen
+                  ? 'sm:m-4 sm:rounded-3xl'
+                  : 'sm:mr-[3px] sm:mb-[3px] sm:rounded-card'
+              }`}
+            >
               <motion.div
                 className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
                 initial={false}
