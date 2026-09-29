@@ -45,6 +45,8 @@ func TestCodexUltraModelsUseExplicitAllowlist(t *testing.T) {
 	}{
 		{provider.OpenAIModelGPT6Astra, true},
 		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Astra, true},
+		{provider.OpenAIModelGPT61Sol, true},
+		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT61Sol, true},
 		{provider.OpenAIModelGPT6Sol, true},
 		{provider.ProviderOpenAI + "/" + provider.OpenAIModelGPT6Sol, true},
 		{"gpt-6-luna", false},
