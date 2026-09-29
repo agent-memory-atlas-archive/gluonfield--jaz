@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { motion } from 'motion/react'
 import { DitherTerrain, DitherWordmark } from '@/components/launch/DitherArt'
 import { ComposerCard } from '@/components/session/Composer'
 import { FileDropScope } from '@/components/ui/FileDrop'
 import { useHomeWordmark } from '@/lib/appearance'
+import { DEFAULT_HOME_WORDMARK, isHomeLogoUrl } from '@/lib/homeWordmark'
 import type { SendMessageHandler } from '@/lib/sendMessage'
 
 // One column, as wide as the composer card: the wordmark never outgrows it.
@@ -32,6 +33,8 @@ export function NewSessionHome({
   onVoice?: () => void
 }) {
   const wordmark = useHomeWordmark()
+  const logoUrl = isHomeLogoUrl(wordmark) ? wordmark : null
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null)
 
   return (
     <FileDropScope className="relative flex h-full flex-col overflow-hidden">
@@ -42,7 +45,19 @@ export function NewSessionHome({
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
       >
         <div className="flex w-full flex-col gap-8" style={{ maxWidth: HOME_WIDTH }}>
-          <DitherWordmark text={wordmark} maxWidth={HOME_WIDTH} />
+          {logoUrl && logoUrl !== failedLogoUrl ? (
+            <div className="flex h-48 items-center justify-center">
+              <img
+                src={logoUrl}
+                alt="Home logo"
+                referrerPolicy="no-referrer"
+                onError={() => setFailedLogoUrl(logoUrl)}
+                className="block max-h-full max-w-full object-contain"
+              />
+            </div>
+          ) : (
+            <DitherWordmark text={logoUrl ? DEFAULT_HOME_WORDMARK : wordmark} maxWidth={HOME_WIDTH} />
+          )}
           <ComposerCard
             streaming={creating}
             autoFocus
