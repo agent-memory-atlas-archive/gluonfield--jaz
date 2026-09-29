@@ -19,7 +19,7 @@ import { SidePanelStateProvider } from '@/components/session/SidePanelState'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { isSettingsSection, type SettingsSection } from '@/components/settings/sections'
 import { SettingsOverlay } from '@/components/settings/SettingsOverlay'
-import { inSection, NavRail, RAIL_WIDTH } from '@/components/sidebar/NavRail'
+import { NavRail, RAIL_WIDTH, railTab } from '@/components/sidebar/NavRail'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { TitlebarNavigation } from '@/components/sidebar/TitlebarNavigation'
 import { ToastProvider } from '@/components/ui/toast'
@@ -166,7 +166,8 @@ function RootLayout() {
   // belongs to Chat; the rail's other sections take the full card.
   const isMobile = useIsMobile()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
-  const hasPanel = isMobile || !inSection(pathname)
+  const tab = railTab(pathname, settingsOpen)
+  const hasPanel = isMobile || tab === 'chat'
   const panelOpen = hasPanel && sidebarOpen
   const panelEdge = !isMobile && panelOpen ? RAIL_WIDTH + sidebarWidth : 0
   // A specific board paints itself on bg-surface so its tiles blend; match main
@@ -289,16 +290,21 @@ function RootLayout() {
                 onNavigate={handleBrowserNavigation}
               />
             </motion.div>
-            <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 items-center gap-1.5">
-              <TitlebarSlotOutlet />
-            </div>
-            <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
-              <TitlebarActionsOutlet />
-            </div>
+            {/* Settings covers the page, so the page's own title and actions go too. */}
+            {!settingsOpen && (
+              <>
+                <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 items-center gap-1.5">
+                  <TitlebarSlotOutlet />
+                </div>
+                <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
+                  <TitlebarActionsOutlet />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="flex min-h-0 flex-1">
-            <NavRail onOpenSettings={() => openSettings()} />
+            <NavRail tab={tab} onOpenSettings={() => openSettings()} />
             <div className="relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg sm:mr-[3px] sm:mb-[3px] sm:rounded-card sm:border">
               <motion.div
                 className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
@@ -325,16 +331,17 @@ function RootLayout() {
                   <Outlet />
                 </SidebarVisibility.Provider>
               </main>
+
+              <SettingsOverlay
+                open={settingsOpen}
+                section={settingsSection}
+                onSectionChange={goToSettingsSection}
+                onClose={closeSettings}
+                onOpenConnect={() => setConnectOpen(true)}
+              />
             </div>
           </div>
         </div>
-        <SettingsOverlay
-          open={settingsOpen}
-          section={settingsSection}
-          onSectionChange={goToSettingsSection}
-          onClose={closeSettings}
-          onOpenConnect={() => setConnectOpen(true)}
-        />
         <ConnectOverlay open={connectOpen} onClose={() => setConnectOpen(false)} />
         <CommandPalette
           open={commandOpen}
