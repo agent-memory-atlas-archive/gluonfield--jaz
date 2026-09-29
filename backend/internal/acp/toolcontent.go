@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
@@ -23,6 +22,8 @@ var (
 	bearerTokenPattern    = regexp.MustCompile(`(?i)(bearer\s+)[A-Za-z0-9._~+/\-]+=*`)
 	googleAccessPattern   = regexp.MustCompile(`\bya29\.[A-Za-z0-9._\-]+`)
 	googleRefreshPattern  = regexp.MustCompile(`\b1//[A-Za-z0-9._\-]+`)
+	// A token split across appended output chunks continues after its redacted start.
+	redactedTailPattern = regexp.MustCompile(`\[REDACTED\][A-Za-z0-9._~+/\-]+=*`)
 )
 
 // mergeToolCall overlays the populated fields of src onto dst. ACP updates (and
@@ -67,36 +68,22 @@ func mergeToolCall(dst *sessionevents.ACPToolCall, src sessionevents.ACPToolCall
 	normalizeToolCall(dst)
 }
 
-type toolUpdateFields struct {
-	ID        acpschema.ToolCallID
-	Title     string
-	Status    *acpschema.ToolCallStatus
-	Kind      *acpschema.ToolKind
-	Content   []acpschema.ToolCallContent
-	Locations []acpschema.ToolCallLocation
-	RawInput  json.RawMessage
-	RawOutput json.RawMessage
-	Meta      map[string]any
-	At        time.Time
-}
-
-// toolUpdateSnapshot decodes one ACP tool-call update (a ToolCall or
-// ToolCallUpdate) into a partial snapshot. Both session-update variants share
-// this so the protocol handler keeps one merge path.
-func toolUpdateSnapshot(fields toolUpdateFields) sessionevents.ACPToolCall {
+// toolUpdateSnapshot decodes one ACP tool-call update into a partial snapshot.
+// A ToolCall converts to a ToolCallUpdate, so every path shares one merge.
+func toolUpdateSnapshot(update acpschema.ToolCallUpdate) sessionevents.ACPToolCall {
 	src := sessionevents.ACPToolCall{
-		ID:        string(fields.ID),
-		Title:     fields.Title,
-		Kind:      derefString(fields.Kind),
-		ToolName:  toolUpdateName(fields),
-		Content:   normalizeToolContent(fields.Content),
-		Locations: normalizeToolLocations(fields.Locations),
-		RawInput:  boundedRawInput(fields.RawInput),
-		RawOutput: boundedRawOutput(fields.RawOutput),
-		Runtime:   acpToolRuntime(fields.Meta, fields.At),
+		ID:        string(update.ToolCallID),
+		Title:     update.Title,
+		Kind:      derefString(update.Kind),
+		ToolName:  toolUpdateName(update),
+		Content:   normalizeToolContent(update.Content),
+		Locations: normalizeToolLocations(update.Locations),
+		RawInput:  boundedRawInput(update.RawInput),
+		RawOutput: boundedRawOutput(update.RawOutput),
+		Runtime:   acpToolRuntime(update.Meta),
 	}
-	if fields.Status != nil {
-		src.Status = string(*fields.Status)
+	if update.Status != nil {
+		src.Status = string(*update.Status)
 	}
 	normalizeToolCall(&src)
 	return src
@@ -120,7 +107,17 @@ func boundedRawInput(raw json.RawMessage) map[string]any {
 	return redactToolMap(out)
 }
 
+// boundedRawOutput keeps the tail of a text result, such as a command's whole
+// output, and drops a structured result that is too large to show.
 func boundedRawOutput(raw json.RawMessage) json.RawMessage {
+	var text string
+	if len(raw) > 0 && raw[0] == '"' && json.Unmarshal(raw, &text) == nil {
+		if text == "" {
+			return nil
+		}
+		data, _ := json.Marshal(tailToolText(text))
+		return data
+	}
 	if len(raw) == 0 || len(raw) > maxToolRawOutputBytes {
 		return nil
 	}
@@ -152,13 +149,13 @@ func normalizeToolLocations(locations []acpschema.ToolCallLocation) []sessioneve
 	return out
 }
 
-func toolUpdateName(fields toolUpdateFields) string {
-	if cc, ok := fields.Meta["claudeCode"].(map[string]any); ok {
+func toolUpdateName(update acpschema.ToolCallUpdate) string {
+	if cc, ok := update.Meta["claudeCode"].(map[string]any); ok {
 		if name, ok := cc["toolName"].(string); ok && name != "" {
 			return name
 		}
 	}
-	codex, ok := fields.Meta[codexMetaKey].(map[string]any)
+	codex, ok := update.Meta[codexMetaKey].(map[string]any)
 	if !ok {
 		return ""
 	}
@@ -168,8 +165,8 @@ func toolUpdateName(fields toolUpdateFields) string {
 	var input struct {
 		ActivityKind string `json:"activityKind"`
 	}
-	action := fields.Title
-	if json.Unmarshal(fields.RawInput, &input) == nil && input.ActivityKind != "" {
+	action := update.Title
+	if json.Unmarshal(update.RawInput, &input) == nil && input.ActivityKind != "" {
 		action = input.ActivityKind
 	}
 	if action != "" {
@@ -398,11 +395,22 @@ func clampToolText(s string) string {
 	return string([]rune(s)[:maxToolContentText]) + "…"
 }
 
+// tailToolText keeps the end of a command's output, where it reports its result.
+func tailToolText(s string) string {
+	s = redactToolText(s)
+	runes := []rune(s)
+	if len(runes) <= maxToolContentText {
+		return s
+	}
+	return "…" + string(runes[len(runes)-maxToolContentText:])
+}
+
 func redactToolText(s string) string {
 	s = oauthJSONFieldPattern.ReplaceAllString(s, `${1}[REDACTED]${2}`)
 	s = bearerTokenPattern.ReplaceAllString(s, `${1}[REDACTED]`)
 	s = googleAccessPattern.ReplaceAllString(s, `[REDACTED]`)
 	s = googleRefreshPattern.ReplaceAllString(s, `[REDACTED]`)
+	s = redactedTailPattern.ReplaceAllString(s, `[REDACTED]`)
 	return s
 }
 

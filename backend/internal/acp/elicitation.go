@@ -144,7 +144,7 @@ type elicitationField struct {
 
 // readElicitationField reads one requested property in its agent's dialect.
 // Claude titles a field with its header, asks a lone question in the form
-// message and marks free text with the neutral _askUserQuestionCustomAnswer.
+// message and marks free text with _meta.jetbrains.air.customAnswer.
 // Codex titles a field with the question, describes it with the header, sends a
 // boilerplate form message and marks note fields in _meta.codex.
 func readElicitationField(property acpschema.ElicitationPropertySchema, message string) elicitationField {
@@ -153,7 +153,9 @@ func readElicitationField(property acpschema.ElicitationPropertySchema, message 
 		question: strings.TrimSpace(property.Description),
 		message:  strings.TrimSpace(message),
 	}
-	if custom, ok := property.Meta["_askUserQuestionCustomAnswer"].(map[string]any); ok {
+	jetbrains, _ := property.Meta["jetbrains"].(map[string]any)
+	air, _ := jetbrains["air"].(map[string]any)
+	if custom, ok := air["customAnswer"].(map[string]any); ok {
 		field.note = true
 		field.noteFor, _ = custom["questionId"].(string)
 		return field

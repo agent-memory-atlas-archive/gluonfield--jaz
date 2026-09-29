@@ -122,7 +122,7 @@ func TestNormalizeAgentDefaultsRejectsModelSpecificUnsupportedReasoning(t *testi
 	claude.ReasoningEffort = "minimal"
 	input.ACP["claude"] = claude
 
-	service := warmSettingsModelCatalog(t, `{"data":[{"id":"anthropic/claude-sonnet-5","reasoning":{"supported_efforts":["max","high","medium","low"]}}]}`)
+	service := warmSettingsModelCatalog(t, `{"data":[{"id":"anthropic/claude-sonnet-5.5","reasoning":{"supported_efforts":["max","high","medium","low"]}}]}`)
 
 	_, err := NormalizeAgentDefaults(input, acp.BuiltinAgents(), acp.ModelCapabilities{Catalog: service})
 	if err == nil || !strings.Contains(err.Error(), `reasoning effort "minimal" is not supported for claude model "sonnet"`) {

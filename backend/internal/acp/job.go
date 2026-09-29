@@ -114,6 +114,8 @@ type jobState struct {
 	finishing              chan struct{}
 	toolByID               map[string]sessionevents.ACPToolCall
 	pendingToolUpdateByID  map[string]sessionevents.ACPToolCall
+	subagentToolIDs        map[string]struct{}
+	deferredToolIDs        map[string]struct{}
 	savedAssistantLen      int
 	usage                  usageAccumulator
 	turnResultDiscarded    bool

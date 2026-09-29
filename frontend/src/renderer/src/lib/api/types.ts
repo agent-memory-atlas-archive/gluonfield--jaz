@@ -612,9 +612,8 @@ export interface ACPToolLocation {
 export interface ACPToolRuntime {
   terminal_id?: string
   terminal_cwd?: string
-  parent_tool_use_id?: string
   elapsed_time_seconds?: number
-  terminal_output_at?: string
+  terminal_output?: string
   terminal_exit_code?: number
   terminal_exit_signal?: string
 }

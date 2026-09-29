@@ -142,3 +142,13 @@ test('run summaries use the same typed categories as individual rows', () => {
     ]),
   ).toBe('Edited a file, read files, ran commands, 1 failed')
 })
+
+// Codex 2.0 and Claude 0.84 stream command output as terminal deltas; Codex adds
+// the whole output as raw_output when the deltas missed the command's startup.
+test('command output prefers the complete raw output, then terminal output, then content', () => {
+  const command = { id: 'cmd', kind: 'execute', raw_input: { command: 'npm test' } }
+  const streamed = { ...command, runtime: { terminal_output: 'tick-4\n' } }
+  expect(toolCallPresentation(streamed).output).toBe('tick-4\n')
+  expect(toolCallPresentation({ ...streamed, raw_output: 'line-1\ntick-4\n' }).output).toBe('line-1\ntick-4\n')
+  expect(toolCallPresentation({ ...command, content: [{ type: 'text', text: 'a.ts' }] }).output).toBe('a.ts')
+})

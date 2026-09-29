@@ -154,7 +154,7 @@ func transcriptToolPayload(t *testing.T) sessionevents.ACPToolCall {
 		"raw_output":{"stdout":"app.go\n","exit_code":0},
 		"content":[{"type":"text","text":"app.go\n"}],
 		"locations":[{"path":"/workspace/src/app.go","line":12}],
-		"runtime":{"terminal_id":"terminal-1","terminal_cwd":"/workspace","parent_tool_use_id":"parent-1","elapsed_time_seconds":1.5,"terminal_exit_code":0,"terminal_output_at":"2026-09-14T12:00:01Z"},
+		"runtime":{"terminal_id":"terminal-1","terminal_cwd":"/workspace","elapsed_time_seconds":1.5,"terminal_output":"ok\n","terminal_exit_code":0},
 		"started_at":"2026-09-14T12:00:00Z","updated_at":"2026-09-14T12:00:02Z"
 	}`), &call); err != nil {
 		t.Fatal(err)

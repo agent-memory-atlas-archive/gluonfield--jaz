@@ -57,7 +57,7 @@ func TestCreateElicitationPublishesQuestionsAndReturnsAnswers(t *testing.T) {
 							},
 						},
 						"question_0_custom": map[string]any{"type": "string", "title": "Other", "_meta": map[string]any{
-							"_askUserQuestionCustomAnswer": map[string]any{"questionId": "question_0", "isCustomAnswer": true},
+							"jetbrains": map[string]any{"air": map[string]any{"version": 1, "customAnswer": map[string]any{"questionId": "question_0", "isCustomAnswer": true}}},
 						}},
 					},
 				},

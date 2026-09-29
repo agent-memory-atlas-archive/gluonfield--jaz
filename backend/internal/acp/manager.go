@@ -309,9 +309,10 @@ func (m *Manager) connectWithHandler(ctx context.Context, name string, cfg Agent
 		},
 		ClientCapabilities: &acpschema.ClientCapabilities{
 			Meta: map[string]any{
-				"terminal-auth":  true,
-				"jetbrains":      map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{"asyncTasks", "recommendedValue"}}},
-				"jaz.dev/widget": map[string]any{"version": 1},
+				"terminal-auth":         true,
+				"terminal_output_delta": true,
+				"jetbrains":             map[string]any{"air": map[string]any{"version": 1, "capabilities": []string{"asyncTasks", "recommendedValue"}}},
+				"jaz.dev/widget":        map[string]any{"version": 1},
 			},
 			FS: &acpschema.FileSystemCapabilities{
 				ReadTextFile:  true,

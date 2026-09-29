@@ -447,21 +447,19 @@ type ACPToolContent struct {
 }
 
 type ACPToolRuntime struct {
-	TerminalID         string    `json:"terminal_id,omitempty"`
-	TerminalCwd        string    `json:"terminal_cwd,omitempty"`
-	ParentToolUseID    string    `json:"parent_tool_use_id,omitempty"`
-	ElapsedTimeSeconds float64   `json:"elapsed_time_seconds,omitempty"`
-	TerminalOutputAt   time.Time `json:"terminal_output_at,omitzero"`
-	TerminalExitCode   *int      `json:"terminal_exit_code,omitempty"`
-	TerminalExitSignal *string   `json:"terminal_exit_signal,omitempty"`
+	TerminalID         string  `json:"terminal_id,omitempty"`
+	TerminalCwd        string  `json:"terminal_cwd,omitempty"`
+	ElapsedTimeSeconds float64 `json:"elapsed_time_seconds,omitempty"`
+	TerminalOutput     string  `json:"terminal_output,omitempty"`
+	TerminalExitCode   *int    `json:"terminal_exit_code,omitempty"`
+	TerminalExitSignal *string `json:"terminal_exit_signal,omitempty"`
 }
 
 func (r ACPToolRuntime) IsZero() bool {
 	return r.TerminalID == "" &&
 		r.TerminalCwd == "" &&
-		r.ParentToolUseID == "" &&
 		r.ElapsedTimeSeconds == 0 &&
-		r.TerminalOutputAt.IsZero() &&
+		r.TerminalOutput == "" &&
 		r.TerminalExitCode == nil &&
 		r.TerminalExitSignal == nil
 }

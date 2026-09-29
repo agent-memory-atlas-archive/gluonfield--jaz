@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
+	"github.com/gluonfield/acp-transport/jsonrpc"
 	"github.com/google/uuid"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
@@ -52,11 +54,9 @@ func TestPermissionPlanContentExtractsPlan(t *testing.T) {
 			want: "Step one.\nStep two.",
 		},
 		{
-			name: "content block fallback",
-			raw: map[string]any{"toolCallId": "t2", "kind": "switch_mode", "content": []any{
-				map[string]any{"type": "content", "content": map[string]any{"type": "text", "text": "Plan body."}},
-			}},
-			want: "Plan body.",
+			name: "no kind",
+			raw:  map[string]any{"toolCallId": "t2", "rawInput": map[string]any{"plan": "nope"}},
+			want: "",
 		},
 		{
 			name: "non switch_mode ignored",
@@ -70,7 +70,7 @@ func TestPermissionPlanContentExtractsPlan(t *testing.T) {
 			if err := json.Unmarshal(mustJSON(t, tc.raw), &call); err != nil {
 				t.Fatal(err)
 			}
-			if got := permissionPlanContent(call); got != tc.want {
+			if got := permissionPlanContent(derefString(call.Kind), call.RawInput); got != tc.want {
 				t.Fatalf("permissionPlanContent = %q, want %q", got, tc.want)
 			}
 		})
@@ -626,5 +626,51 @@ func TestEventFromJobExcludesDedicatedTranscriptFields(t *testing.T) {
 	}
 	if len(event.Plan) != 1 || event.Plan[0].Content != "inspect" {
 		t.Fatalf("event lost plan state: %#v", event.Plan)
+	}
+}
+
+// Codex and Claude permission requests leave out the tool call fields that did
+// not change. Recorded from the adapters' mcp-tool-approval and
+// edit-with-permission scenarios.
+func TestPermissionEventOverlaysRecordedToolCall(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.CreateSession(storage.CreateSession{Slug: "permission-overlay", Runtime: storage.RuntimeACP})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager(store, Config{}, nil)
+	manager.Events = sessionevents.New()
+	job := &jobState{Job: Job{ID: session.ID, ACPAgent: AgentCodex, ACPSession: "acp-session"}, toolByID: map[string]sessionevents.ACPToolCall{}}
+	manager.jobsByID[session.ID] = job
+	manager.jobsByACP["acp-session"] = job
+	for _, update := range []string{
+		`{"sessionUpdate":"tool_call","toolCallId":"mcp-3","title":"mcp.docs.write","kind":"execute","status":"in_progress","rawInput":{"arguments":{"query":"acp"},"server":"docs","tool":"write"},"_meta":{"is_mcp_tool_call":true}}`,
+		`{"sessionUpdate":"tool_call","toolCallId":"toolu_edit","title":"Edit","kind":"edit","status":"pending","content":[],"locations":[]}`,
+		`{"sessionUpdate":"tool_call_update","toolCallId":"toolu_edit","title":"Edit src/app.ts","locations":[{"path":"/w/src/app.ts"}]}`,
+	} {
+		if _, rpcErr := manager.handleJSONRPC(context.Background(), jsonrpc.Request{
+			Method: acpschema.ClientMethodSessionUpdate,
+			Params: json.RawMessage(`{"sessionId":"acp-session","update":` + update + `}`),
+		}); rpcErr != nil {
+			t.Fatal(rpcErr)
+		}
+	}
+	for _, tc := range []struct {
+		toolCall, title, location string
+	}{
+		{`{"kind":"execute","status":"pending","toolCallId":"mcp-3"}`, "mcp.docs.write", ""},
+		{`{"rawInput":{"file_path":"/w/src/app.ts"},"title":"Edit src/app.ts","toolCallId":"toolu_edit"}`, "Edit src/app.ts", "/w/src/app.ts"},
+	} {
+		var req acpschema.RequestPermissionRequest
+		if err := json.Unmarshal([]byte(`{"sessionId":"acp-session","options":[],"toolCall":`+tc.toolCall+`}`), &req); err != nil {
+			t.Fatal(err)
+		}
+		got := job.permissionEvent(req)
+		if got.Title != tc.title || (tc.location != "" && (len(got.Locations) != 1 || got.Locations[0].Path != tc.location)) {
+			t.Fatalf("permission = %+v, want title %q and location %q", got, tc.title, tc.location)
+		}
 	}
 }

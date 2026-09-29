@@ -109,18 +109,24 @@ func (m *Manager) applyUpdate(acpSessionID string, raw json.RawMessage) {
 			call.StartedAt = now
 		}
 		mergeToolCall(&call, src)
-		if exists && job.toolByID[src.ID].EqualTranscript(call) {
+		previous := job.toolByID[src.ID]
+		if exists && previous.EqualTranscript(call) {
 			return
 		}
 		job.toolByID[src.ID] = call
 		job.ToolCalls = sortedToolCalls(job.toolByID)
 		job.LastToolAt = now
+		if exists && terminalOutputOnly(previous, call) {
+			m.deferToolPublishLocked(job, src.ID)
+			return
+		}
+		delete(job.deferredToolIDs, src.ID)
 		toolEvent = &call
 	}
 	if m.applySideChatUpdate(job, update) {
 		return
 	}
-	subagentUpdate := providerSubagentFromUpdate(job.ACPAgent, update)
+	subagentUpdate := providerSubagentFromUpdate(job, update)
 	m.publishProviderSubagents(job.eventView(), subagentUpdate.subagents)
 	if subagentUpdate.consume {
 		return
@@ -139,31 +145,9 @@ func (m *Manager) applyUpdate(acpSessionID string, raw json.RawMessage) {
 		thoughtMessageID = derefString(event.MessageID)
 		job.appendThoughtLocked(thoughtChunk)
 	case acpschema.ToolCallSessionUpdate:
-		recordTool(toolUpdateSnapshot(toolUpdateFields{
-			ID:        event.ToolCallID,
-			Title:     event.Title,
-			Status:    event.Status,
-			Kind:      event.Kind,
-			Content:   event.Content,
-			Locations: event.Locations,
-			RawInput:  event.RawInput,
-			RawOutput: event.RawOutput,
-			Meta:      event.Meta,
-			At:        now,
-		}), true)
+		recordTool(toolUpdateSnapshot(acpschema.ToolCallUpdate(event.ToolCall)), true)
 	case acpschema.ToolCallUpdateSessionUpdate:
-		recordTool(toolUpdateSnapshot(toolUpdateFields{
-			ID:        event.ToolCallID,
-			Title:     event.Title,
-			Status:    event.Status,
-			Kind:      event.Kind,
-			Content:   event.Content,
-			Locations: event.Locations,
-			RawInput:  event.RawInput,
-			RawOutput: event.RawOutput,
-			Meta:      event.Meta,
-			At:        now,
-		}), false)
+		recordTool(toolUpdateSnapshot(event.ToolCallUpdate), false)
 	case acpschema.PlanSessionUpdate:
 		plan := make([]sessionevents.PlanEntry, 0, len(event.Entries))
 		for _, entry := range event.Entries {

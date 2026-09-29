@@ -181,7 +181,7 @@ func warmOpenRouterCatalog(t *testing.T) *modelcatalog.Service {
 			{"id":"openai/gpt-6-sol","name":"OpenAI: GPT-6 Sol","reasoning":{"supported_efforts":["max","xhigh","high","medium","low"]}},
 			{"id":"z-ai/glm-5.2","name":"Z.AI: GLM 5.2"},
 			{"id":"qwen/qwen3-coder","name":"Qwen: Qwen3 Coder"},
-			{"id":"anthropic/claude-sonnet-5","name":"Anthropic: Claude Sonnet 5","reasoning":{"supported_efforts":["max","high","medium","low"]}}
+			{"id":"anthropic/claude-sonnet-5.5","name":"Anthropic: Claude Sonnet 5.5","reasoning":{"supported_efforts":["max","high","medium","low"]}}
 		]}`))
 	}))
 	t.Cleanup(upstream.Close)
