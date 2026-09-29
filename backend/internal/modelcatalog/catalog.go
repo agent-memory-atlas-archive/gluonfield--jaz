@@ -63,7 +63,8 @@ var (
 	}
 	openAIModels = []Model{
 		openRouterBackedModel(provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work", "openai/gpt-6-astra"),
-		openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work", "openai/gpt-6-sol"),
+		openRouterBackedModel(provider.OpenAIModelGPT61Sol, "GPT-6.1 Sol", "Latest workhorse for coding and everyday work", "openai/gpt-6.1-sol"),
+		openRouterBackedModel(provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Previous generation workhorse", "openai/gpt-6-sol"),
 		openRouterBackedModel(provider.DefaultOpenAIModel, "GPT-6 Luna", "Fast and affordable for easier tasks", "openai/gpt-6-luna"),
 	}
 	agentModels = map[string][]Model{
@@ -84,7 +85,8 @@ var (
 		"opencode": {
 			openRouterNativeModel(provider.DefaultOpenRouterModel, "GLM 5.2", "Default OpenRouter coding model"),
 			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Astra, "GPT-6 Astra", "Frontier intelligence for the most demanding work"),
-			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Workhorse for coding and everyday work"),
+			openRouterNativeModel("openai/"+provider.OpenAIModelGPT61Sol, "GPT-6.1 Sol", "Latest workhorse for coding and everyday work"),
+			openRouterNativeModel("openai/"+provider.OpenAIModelGPT6Sol, "GPT-6 Sol", "Previous generation workhorse"),
 			openRouterNativeModel("openai/"+provider.DefaultOpenAIModel, "GPT-6 Luna", "Fast and affordable for easier tasks"),
 			openRouterNativeModel("deepseek/deepseek-v4-flash", "DeepSeek V4 Flash", "Popular OpenRouter coding model"),
 			openRouterNativeModel("xiaomi/mimo-v2.5", "MiMo-V2.5", "Popular OpenRouter coding model"),

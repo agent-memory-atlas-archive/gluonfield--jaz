@@ -283,12 +283,12 @@ func TestServiceReturnsOpenAIBackendCatalog(t *testing.T) {
 	for _, model := range models {
 		values[model.Value] = model
 	}
-	for _, value := range []string{provider.OpenAIModelGPT6Astra, provider.OpenAIModelGPT6Sol, provider.DefaultOpenAIModel} {
+	for _, value := range []string{provider.OpenAIModelGPT6Astra, provider.OpenAIModelGPT61Sol, provider.OpenAIModelGPT6Sol, provider.DefaultOpenAIModel} {
 		if _, ok := values[value]; !ok {
 			t.Fatalf("OpenAI catalog missing %s: %#v", value, models)
 		}
 	}
-	if values[provider.OpenAIModelGPT6Sol].OpenRouterID != "openai/gpt-6-sol" {
+	if values[provider.OpenAIModelGPT6Sol].OpenRouterID != "openai/gpt-6-sol" || values[provider.OpenAIModelGPT61Sol].OpenRouterID != "openai/gpt-6.1-sol" {
 		t.Fatalf("unexpected GPT-6 metadata %#v", values)
 	}
 	for value, model := range values {
