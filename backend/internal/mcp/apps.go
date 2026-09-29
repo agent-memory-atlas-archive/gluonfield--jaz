@@ -64,8 +64,15 @@ func toolUI(tool *mcpsdk.Tool) (model, app bool, resourceURI string) {
 	return model, app, resourceURI
 }
 
-// Apps lists the MCP Apps of connected servers marked to show in the UI.
-func (m *Manager) Apps() ([]App, error) {
+// Apps lists the MCP Apps of connected servers marked to show in the UI. It
+// waits for the first full refresh, so a client asking as Jaz starts gets the
+// apps instead of an empty list.
+func (m *Manager) Apps(ctx context.Context) ([]App, error) {
+	select {
+	case <-m.refreshed:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	servers, err := m.store.ListMCPServers()
 	if err != nil {
 		return nil, err
