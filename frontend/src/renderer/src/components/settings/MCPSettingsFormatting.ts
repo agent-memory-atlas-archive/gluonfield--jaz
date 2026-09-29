@@ -9,5 +9,5 @@ export function mcpStatusText(server: MCPServer): string {
   if (server.status === 'connected') return mcpToolCountLabel(server.tool_count)
   if (server.status === 'needs_auth') return 'Sign in required'
   if (server.status === 'error') return server.error || 'Connection error'
-  return 'Not checked'
+  return 'Checking…'
 }

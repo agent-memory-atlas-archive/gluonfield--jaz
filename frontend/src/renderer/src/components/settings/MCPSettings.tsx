@@ -109,9 +109,14 @@ export function MCPSettings() {
   const toast = useToast()
   const [pendingAuthServerID, setPendingAuthServerID] = useState<string | null>(null)
   const authWindowRef = useRef<Window | null>(null)
+  // Saving or enabling a server checks it in the background, so keep reading
+  // until every enabled server has a status (and its Sign in action) to show.
   const servers = useQuery({
     ...mcpServersQuery,
-    refetchInterval: pendingAuthServerID ? 2000 : false,
+    refetchInterval: (query) =>
+      pendingAuthServerID || query.state.data?.some((server) => server.enabled && server.status === 'unknown')
+        ? 1000
+        : false,
   })
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toolsServerID, setToolsServerID] = useState<string | null>(null)
