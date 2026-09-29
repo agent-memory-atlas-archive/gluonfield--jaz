@@ -1,7 +1,8 @@
 import { queryOptions } from '@tanstack/react-query'
 import { keys } from '../query/keys'
 import { del, get, post, put } from './client'
-import type { MCPServer, MCPServerInput, MCPServerStatus } from './types'
+import type { CallToolResult } from '@modelcontextprotocol/client'
+import type { MCPApp, MCPServer, MCPServerInput, MCPServerStatus } from './types'
 
 function normalizeServer(server: MCPServer): MCPServer {
   return {
@@ -73,4 +74,24 @@ export function testMCPServer(id: string): Promise<MCPServerStatus> {
 
 export function authorizeMCPServer(id: string): Promise<MCPServerStatus> {
   return post<MCPServerStatus>(`/v1/mcp/servers/${id}/authorize`)
+}
+
+export const mcpAppsQuery = queryOptions({
+  queryKey: keys.mcpApps,
+  queryFn: async () => (await get<{ apps: MCPApp[] }>('/v1/mcp/apps')).apps,
+})
+
+export function mcpAppQuery(serverId: string) {
+  return queryOptions({
+    queryKey: keys.mcpApp(serverId),
+    queryFn: async () => (await get<{ html: string }>(`/v1/mcp/apps/${serverId}/resource`)).html,
+    staleTime: Infinity,
+  })
+}
+
+export function callMCPAppTool(
+  serverId: string,
+  params: { name: string; arguments?: Record<string, unknown> },
+): Promise<CallToolResult> {
+  return post<CallToolResult>(`/v1/mcp/apps/${serverId}/tools/call`, params)
 }

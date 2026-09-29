@@ -20,7 +20,9 @@ type serverConnection struct {
 	retired      bool
 }
 
-func (c *serverConnection) callTool(ctx context.Context, params *mcpsdk.CallToolParams) (*mcpsdk.CallToolResult, error) {
+// acquire holds the connection open for one request; a retired connection
+// closes once its last in-flight request releases it.
+func (c *serverConnection) acquire() (func(), error) {
 	c.mu.Lock()
 	if c.retired {
 		c.mu.Unlock()
@@ -28,7 +30,7 @@ func (c *serverConnection) callTool(ctx context.Context, params *mcpsdk.CallTool
 	}
 	c.calls++
 	c.mu.Unlock()
-	defer func() {
+	return func() {
 		c.mu.Lock()
 		c.calls--
 		closeNow := c.retired && c.calls == 0
@@ -36,8 +38,25 @@ func (c *serverConnection) callTool(ctx context.Context, params *mcpsdk.CallTool
 		if closeNow {
 			c.close()
 		}
-	}()
+	}, nil
+}
+
+func (c *serverConnection) callTool(ctx context.Context, params *mcpsdk.CallToolParams) (*mcpsdk.CallToolResult, error) {
+	release, err := c.acquire()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	return c.session.CallTool(ctx, params)
+}
+
+func (c *serverConnection) readResource(ctx context.Context, uri string) (*mcpsdk.ReadResourceResult, error) {
+	release, err := c.acquire()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	return c.session.ReadResource(ctx, &mcpsdk.ReadResourceParams{URI: uri})
 }
 
 func (c *serverConnection) retire() {
@@ -80,11 +99,19 @@ func (m *Manager) connectionKey(ctx context.Context, server mcpconfig.Server) ([
 
 func (c *serverConnection) listTools(ctx context.Context, server mcpconfig.Server) (*serverSession, error) {
 	var items []remoteTool
+	appTools := map[string]bool{}
 	for tool, err := range c.session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, err
 		}
 		if tool == nil || tool.Name == "" {
+			continue
+		}
+		model, app := toolVisibility(tool)
+		if app {
+			appTools[tool.Name] = true
+		}
+		if !model {
 			continue
 		}
 		items = append(items, remoteTool{
@@ -96,5 +123,9 @@ func (c *serverConnection) listTools(ctx context.Context, server mcpconfig.Serve
 			inputSchema: inputSchema(tool.InputSchema),
 		})
 	}
-	return &serverSession{serverConnection: c, tools: items}, nil
+	app, err := c.discoverApp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &serverSession{serverConnection: c, tools: items, app: app, appTools: appTools}, nil
 }

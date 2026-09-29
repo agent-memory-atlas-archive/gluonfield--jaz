@@ -54,6 +54,7 @@ function emptyDraft(): Draft {
     bearer_token_env_var: '',
     headers: [],
     oauth: {},
+    show_in_ui: false,
   }
 }
 
@@ -66,6 +67,7 @@ function draftFromServer(server: MCPServer): Draft {
     bearer_token_env_var: server.bearer_token_env_var ?? '',
     headers: server.headers ?? [],
     oauth: server.oauth ?? {},
+    show_in_ui: server.show_in_ui,
   }
 }
 
@@ -114,7 +116,7 @@ export function MCPSettings() {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [toolsServerID, setToolsServerID] = useState<string | null>(null)
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.mcpServers })
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.mcp })
   const save = useMutation({
     mutationFn: (input: Draft) =>
       input.id ? updateMCPServer(input.id, input) : createMCPServer(input),
@@ -509,15 +511,27 @@ function MCPServerForm({
         </Collapse>
       </div>
 
-      <div className="flex items-center gap-2.5 border-t border-border pt-4 text-[13px] text-ink-2">
-        <Switch
-          checked={draft.enabled}
-          onChange={(enabled) => onChange({ ...draft, enabled })}
-          aria-label="Enabled"
-        />
-        <span>
-          Enabled <span className="text-ink-3">— make its tools available to agents</span>
-        </span>
+      <div className="space-y-3 border-t border-border pt-4 text-[13px] text-ink-2">
+        <div className="flex items-center gap-2.5">
+          <Switch
+            checked={draft.enabled}
+            onChange={(enabled) => onChange({ ...draft, enabled })}
+            aria-label="Enabled"
+          />
+          <span>
+            Enabled <span className="text-ink-3">— make its tools available to agents</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <Switch
+            checked={draft.show_in_ui ?? false}
+            onChange={(show_in_ui) => onChange({ ...draft, show_in_ui })}
+            aria-label="Show in sidebar"
+          />
+          <span>
+            Show in sidebar <span className="text-ink-3">— open its app as a section</span>
+          </span>
+        </div>
       </div>
     </div>
   )

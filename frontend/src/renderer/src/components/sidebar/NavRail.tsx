@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { LayoutDashboard, MessageSquare, Repeat, Settings } from 'lucide-react'
 import { useState } from 'react'
+import { mcpAppsQuery } from '@/lib/api/mcp'
+import type { MCPApp } from '@/lib/api/types'
 
 export const RAIL_WIDTH = 48
 
@@ -11,12 +14,20 @@ export const SECTIONS = [
   { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
 ] as const
 
-export type RailTab = 'chat' | 'settings' | (typeof SECTIONS)[number]['to']
+export type RailTab = 'chat' | 'settings' | (typeof SECTIONS)[number]['to'] | `/apps/${string}`
 
 // Settings rides in the URL search over any page, so it outranks the path.
 export function railTab(pathname: string, settingsOpen: boolean): RailTab {
   if (settingsOpen) return 'settings'
+  const app = /^\/apps\/([^/]+)/.exec(pathname)?.[1]
+  if (app) return `/apps/${app}`
   return SECTIONS.find(({ to }) => pathname.startsWith(to))?.to ?? 'chat'
+}
+
+// A server's own icon, or its initial when it publishes none.
+export function AppIcon({ app }: { app: MCPApp }) {
+  if (!app.icon) return <span className="text-[13px] font-semibold leading-none">{app.name.slice(0, 1).toUpperCase()}</span>
+  return <img src={app.icon} alt="" draggable={false} className="size-[18px] shrink-0 rounded-[5px]" />
 }
 
 const TAB_CLASS =
@@ -39,6 +50,7 @@ function TabLabel({ children }: { children: string }) {
 
 export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const apps = useQuery(mcpAppsQuery).data ?? []
 
   // The Chat tab returns to the thread the user left, the way switching apps
   // does; a fresh /new clears it so the tab lands back on the composer.
@@ -67,6 +79,18 @@ export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings:
         >
           <Icon aria-hidden />
           <TabLabel>{label}</TabLabel>
+        </Link>
+      ))}
+      {apps.map((app) => (
+        <Link
+          key={app.server_id}
+          to="/apps/$serverId"
+          params={{ serverId: app.server_id }}
+          aria-label={app.name}
+          className={tabClass(tab === `/apps/${app.server_id}`)}
+        >
+          <AppIcon app={app} />
+          <TabLabel>{app.name}</TabLabel>
         </Link>
       ))}
       <button

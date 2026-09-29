@@ -394,17 +394,18 @@ func TestMCPServersCRUDRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	updated, err := store.UpdateMCPServer(created.ID, mcpconfig.ServerInput{
-		Name:    "Docs",
-		URL:     "https://docs.example.com/mcp",
-		Enabled: true,
-		Headers: []mcpconfig.Header{{Name: "X-Docs", Value: "1"}},
+		Name:     "Docs",
+		URL:      "https://docs.example.com/mcp",
+		Enabled:  true,
+		Headers:  []mcpconfig.Header{{Name: "X-Docs", Value: "1"}},
+		ShowInUI: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if updated.Name != "Docs" || updated.URL != "https://docs.example.com/mcp" ||
 		updated.BearerTokenEnvVar != "" || len(updated.Headers) != 1 || updated.Headers[0].Name != "X-Docs" ||
-		updated.OAuth.ClientID != "" {
+		updated.OAuth.ClientID != "" || loaded.ShowInUI || !updated.ShowInUI {
 		t.Fatalf("updated = %#v", updated)
 	}
 	if _, ok, err := store.LoadToken(context.Background(), tokenID); err != nil || ok {
@@ -415,8 +416,8 @@ func TestMCPServersCRUDRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if disabled.Enabled {
-		t.Fatalf("disabled server still enabled: %#v", disabled)
+	if disabled.Enabled || !disabled.ShowInUI {
+		t.Fatalf("disabled server = %#v", disabled)
 	}
 
 	servers, err := store.ListMCPServers()

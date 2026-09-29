@@ -1020,6 +1020,7 @@ export interface MCPServer {
   bearer_token_env_var?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
+  show_in_ui: boolean
   status: 'connected' | 'disabled' | 'error' | 'needs_auth' | 'unknown'
   tool_count: number
   tools?: MCPTool[]
@@ -1041,6 +1042,14 @@ export interface MCPServerInput {
   bearer_token_env_var?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
+  show_in_ui?: boolean
+}
+
+// A connected server's MCP App, pinned to the rail as a full-card section.
+export interface MCPApp {
+  server_id: string
+  name: string
+  icon?: string
 }
 
 export interface MCPServerStatus {

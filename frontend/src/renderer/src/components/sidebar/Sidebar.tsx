@@ -1,9 +1,11 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Search, Settings, SquarePen } from 'lucide-react'
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { ConnectionFooterButton } from '@/components/connection/ConnectionFooterButton'
 import { UpdatePanel } from '@/components/update/UpdatePanel'
-import { SECTIONS } from './NavRail'
+import { mcpAppsQuery } from '@/lib/api/mcp'
+import { AppIcon, SECTIONS } from './NavRail'
 import { SidebarSessions } from './SidebarSessions'
 
 const NAV_LINK_CLASS =
@@ -33,6 +35,7 @@ export function Sidebar({
   onOpenConnect: () => void
 }) {
   const navRef = useRef<HTMLElement | null>(null)
+  const apps = useQuery(mcpAppsQuery).data ?? []
   const [navEdge, setNavEdge] = useState({ scrollable: false, scrolled: false })
   const updateNavEdge = useCallback(() => {
     const nav = navRef.current
@@ -125,6 +128,20 @@ export function Sidebar({
                   <Icon size={18} className="text-ink-2" />
                 </span>
                 <span className="flex-1">{label}</span>
+              </Link>
+            ))}
+            {apps.map((app) => (
+              <Link
+                key={app.server_id}
+                to="/apps/$serverId"
+                params={{ serverId: app.server_id }}
+                className={NAV_LINK_CLASS}
+                activeProps={{ className: 'bg-list-active!' }}
+              >
+                <span className="grid size-[18px] shrink-0 place-items-center text-ink-2">
+                  <AppIcon app={app} />
+                </span>
+                <span className="flex-1">{app.name}</span>
               </Link>
             ))}
           </div>

@@ -71,7 +71,7 @@ export function useConnectionSignIn({ onStartAccepted }: { onStartAccepted?: () 
       if (result.type === 'mcp' && result.mcp) {
         onStartAccepted?.()
         void queryClient.invalidateQueries({ queryKey: keys.connectionPlugins })
-        void queryClient.invalidateQueries({ queryKey: keys.mcpServers })
+        void queryClient.invalidateQueries({ queryKey: keys.mcp })
         toast(`Added ${result.mcp.name} MCP server`)
         return
       }
