@@ -18,6 +18,7 @@ import { BrowserWorkspace } from '@/components/browser/BrowserWorkspace'
 import { SidePanelStateProvider } from '@/components/session/SidePanelState'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { isSettingsSection, type SettingsSection } from '@/components/settings/sections'
+import { MCPApps } from '@/components/apps/MCPAppFrame'
 import { SettingsOverlay } from '@/components/settings/SettingsOverlay'
 import { NavRail, RAIL_WIDTH, railTab } from '@/components/sidebar/NavRail'
 import { Sidebar } from '@/components/sidebar/Sidebar'
@@ -339,6 +340,8 @@ function RootLayout() {
                   <Outlet />
                 </SidebarVisibility.Provider>
               </main>
+
+              <MCPApps activeId={tab.startsWith('/apps/') ? tab.slice('/apps/'.length) : undefined} />
 
               <SettingsOverlay
                 open={settingsOpen}
