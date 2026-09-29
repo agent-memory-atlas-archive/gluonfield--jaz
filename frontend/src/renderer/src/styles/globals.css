@@ -11,6 +11,8 @@
   --color-bg: oklch(0.99 0.002 264);
   --color-surface: oklch(0.965 0.004 264);
   --color-surface-2: oklch(0.935 0.006 264);
+  /* The thread panel steps between the window chrome and the page. */
+  --color-panel: color-mix(in oklab, var(--color-surface) 45%, var(--color-bg));
   --color-list-hover: color-mix(in oklab, var(--color-ink) 5%, transparent);
   /* Selection has to outrank the pointer: at hover's weight the row you are
    * pointing at and the thread you are actually in look identical. */
@@ -608,43 +610,21 @@ body {
 }
 
 /* macOS vibrancy: index.html adds .vibrant when running in the mac app. The
- * page goes transparent for the titlebar/native material. The sidebar keeps a
- * weak translucent surface plus its own edge, so the material reads without
- * turning light mode milky or weakening row states. */
-.sidebar-material {
-  --sidebar-material-bg: var(--color-surface);
-  --sidebar-material-edge: var(--color-border);
-  --sidebar-material-highlight: transparent;
-  background: var(--sidebar-material-bg);
-  border-color: var(--sidebar-material-edge);
-  box-shadow: inset 1px 0 var(--sidebar-material-highlight);
+ * page goes transparent so the titlebar strip and rail show the native
+ * material through a weak surface tint; the content card stays opaque. */
+@media (width >= 40rem) {
+  .app-chrome {
+    background: var(--color-surface);
+  }
+  html.vibrant .app-chrome {
+    background: color-mix(in oklab, var(--color-surface) 30%, transparent);
+  }
+  html.vibrant.dark .app-chrome {
+    background: color-mix(in oklab, var(--color-surface) 36%, transparent);
+  }
 }
 html.vibrant body {
   background: transparent;
-}
-html.vibrant .sidebar-material {
-  --sidebar-material-bg: color-mix(in oklab, var(--color-surface) 30%, transparent);
-  --sidebar-material-edge: color-mix(in oklab, var(--color-border) 82%, transparent);
-  --sidebar-material-highlight: color-mix(in oklab, oklch(1 0 0) 42%, transparent);
-  -webkit-backdrop-filter: saturate(1.08);
-  backdrop-filter: saturate(1.08);
-}
-html.vibrant.dark .sidebar-material {
-  --sidebar-material-bg: color-mix(in oklab, var(--color-surface) 36%, transparent);
-  --sidebar-material-edge: color-mix(in oklab, var(--color-border) 74%, transparent);
-  --sidebar-material-highlight: color-mix(in oklab, oklch(1 0 0) 7%, transparent);
-  -webkit-backdrop-filter: saturate(1.12);
-  backdrop-filter: saturate(1.12);
-}
-
-html.dark .sidebar-material {
-  color: var(--color-ink);
-  --color-ink-2: var(--color-ink);
-  --color-ink-3: var(--color-ink);
-}
-
-html.dark .sidebar-material :is(a, button, p, span, kbd, svg) {
-  color: var(--color-ink) !important;
 }
 
 h1,
@@ -666,11 +646,9 @@ h3 {
   .titlebar-drag:has([role='tablist']) {
     height: auto;
     flex-wrap: wrap;
-    padding-left: 12px !important;
 
     #titlebar-slot {
       height: 52px;
-      margin-left: 84px;
     }
 
     #titlebar-actions {

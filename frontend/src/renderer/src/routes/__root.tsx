@@ -19,6 +19,7 @@ import { SidePanelStateProvider } from '@/components/session/SidePanelState'
 import { CommandPalette } from '@/components/search/CommandPalette'
 import { isSettingsSection, type SettingsSection } from '@/components/settings/sections'
 import { SettingsOverlay } from '@/components/settings/SettingsOverlay'
+import { NavRail, navTab, RAIL_WIDTH } from '@/components/sidebar/NavRail'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { TitlebarNavigation } from '@/components/sidebar/TitlebarNavigation'
 import { ToastProvider } from '@/components/ui/toast'
@@ -159,19 +160,20 @@ function RootLayout() {
     [navigate],
   )
 
-  // A specific board paints itself on bg-surface so its tiles blend; the app
-  // titlebar inherits main's background, so match main to surface there too —
-  // otherwise the titlebar strip reads as a bg-bg seam above the board.
+  // A specific board paints itself on bg-surface so its tiles blend; match main
+  // to surface there too so no bg-bg seam shows around the board.
   const onBoard = useRouterState({
     select: (s) => /^\/boards\/.+/.test(s.location.pathname),
   })
 
   // Phone: the sidebar is a full-screen drawer (CSS `max-sm:w-full`) that slides
   // over the thread rather than a resizable column, and auto-dismisses on
-  // navigation to reveal the thread underneath.
+  // navigation to reveal the thread underneath. On desktop the thread panel
+  // belongs to the Chat tab; the other rail tabs take the full card.
   const isMobile = useIsMobile()
-  const titlebarInset = (isMacDesktop && !isMobile ? 80 : 8) + 88
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const hasPanel = isMobile || navTab(pathname) === 'chat'
+  const panelEdge = !isMobile && hasPanel && sidebarOpen ? RAIL_WIDTH + sidebarWidth : 0
   useEffect(() => {
     if (isMobile) setSidebarOpen(false)
   }, [isMobile, pathname])
@@ -229,8 +231,8 @@ function RootLayout() {
     [handleBrowserNavigation],
   )
 
-  // Cmd+S toggles the sidebar — unless something closer (the agent-file
-  // editor's save keymap) already claimed the event. Cmd+N starts a thread.
+  // Cmd+S toggles the sidebar where the tab has one — unless something closer
+  // (the agent-file editor's save keymap) already claimed the event. Cmd+N starts a thread.
   // Cmd+K toggles the command palette. Cmd+, opens Settings. Cmd+[ / Cmd+]
   // follow browser history.
   useWindowEvent('keydown', (e) => {
@@ -250,7 +252,7 @@ function RootLayout() {
       openSettings()
       return
     }
-    if (!e.shiftKey && key === 's') {
+    if (!e.shiftKey && key === 's' && hasPanel) {
       e.preventDefault()
       setSidebarOpen((open) => !open)
     }
@@ -265,60 +267,68 @@ function RootLayout() {
     }
   })
 
+  const slide = resizing ? { duration: 0 } : { type: 'spring' as const, stiffness: 400, damping: 36 }
+
   return (
     <TitlebarProvider>
       <ToastProvider>
-        <div className="relative flex h-full">
-          <motion.div
-            className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
-            initial={false}
-            animate={drawerSlide({ isMobile, open: sidebarOpen, side: 'left', width: sidebarWidth })}
-            transition={resizing ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 36 }}
-          >
-            <Sidebar
-              open={sidebarOpen}
-              width={sidebarWidth}
-              mobile={isMobile}
-              onDismiss={() => setSidebarOpen(false)}
-              resizing={resizing}
-              onResizeStart={startResize}
-              onResizeReset={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
-              onOpenCommandPalette={() => setCommandOpen(true)}
-              onOpenSettings={() => openSettings()}
-              onOpenConnect={() => setConnectOpen(true)}
-            />
-          </motion.div>
-
-          <main className={`flex min-w-0 flex-1 flex-col ${onBoard ? 'bg-surface' : 'bg-bg'}`}>
-            <div
-              className="titlebar-drag flex h-[52px] shrink-0 items-center gap-2 pl-3 pr-3"
-              style={{ paddingLeft: sidebarOpen ? undefined : titlebarInset }}
+        <div className="app-chrome flex h-full flex-col">
+          <div className="titlebar-drag flex h-[52px] shrink-0 items-center pr-3">
+            {/* The controls' column stretches to the panel edge so the page
+                title starts over the content, not over the thread list. */}
+            <motion.div
+              className="flex shrink-0 items-center"
+              style={{ paddingLeft: isMacDesktop && !isMobile ? 80 : 8 }}
+              initial={false}
+              animate={{ minWidth: panelEdge }}
+              transition={slide}
             >
-              <div id="titlebar-slot" className="relative z-shell flex min-w-0 items-center gap-1.5">
-                <TitlebarSlotOutlet />
-              </div>
-              <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
-                <TitlebarActionsOutlet />
-              </div>
+              <TitlebarNavigation
+                hasPanel={hasPanel}
+                sidebarOpen={sidebarOpen}
+                isMobile={isMobile}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onNavigate={handleBrowserNavigation}
+              />
+            </motion.div>
+            <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 items-center gap-1.5">
+              <TitlebarSlotOutlet />
             </div>
-            <div className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto">
-              <SidebarVisibility.Provider value={setSidebarOpen}>
-                <Outlet />
-              </SidebarVisibility.Provider>
+            <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
+              <TitlebarActionsOutlet />
             </div>
-          </main>
+          </div>
 
-          {/* Kept LAST and explicitly no-drag because Electron unions
-              the .titlebar-drag strips then subtracts no-drag rects in document
-              order — so this cutout only stays clickable when subtracted after
-              the strips it overlaps. */}
-          <TitlebarNavigation
-            sidebarOpen={sidebarOpen}
-            isMobile={isMobile}
-            isMacDesktop={isMacDesktop}
-            onToggleSidebar={() => setSidebarOpen((open) => !open)}
-            onNavigate={handleBrowserNavigation}
-          />
+          <div className="flex min-h-0 flex-1">
+            <NavRail onOpenSettings={() => openSettings()} />
+            <div className="relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg sm:rounded-tl-card sm:border-l sm:border-t">
+              <motion.div
+                className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
+                initial={false}
+                animate={drawerSlide({ isMobile, open: sidebarOpen && hasPanel, side: 'left', width: sidebarWidth })}
+                transition={slide}
+              >
+                <Sidebar
+                  open={sidebarOpen}
+                  width={sidebarWidth}
+                  mobile={isMobile}
+                  onDismiss={() => setSidebarOpen(false)}
+                  resizing={resizing}
+                  onResizeStart={startResize}
+                  onResizeReset={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
+                  onOpenCommandPalette={() => setCommandOpen(true)}
+                  onOpenSettings={() => openSettings()}
+                  onOpenConnect={() => setConnectOpen(true)}
+                />
+              </motion.div>
+
+              <main className={`scrollbar-quiet min-w-0 flex-1 overflow-y-auto ${onBoard ? 'bg-surface' : 'bg-bg'}`}>
+                <SidebarVisibility.Provider value={setSidebarOpen}>
+                  <Outlet />
+                </SidebarVisibility.Provider>
+              </main>
+            </div>
+          </div>
         </div>
         <SettingsOverlay
           open={settingsOpen}
