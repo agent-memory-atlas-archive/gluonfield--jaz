@@ -38,7 +38,7 @@ export function SidebarOrganizationMenu({
   const close = useCallback(() => setOpen(false), [])
   return (
     <div className="group/organization flex h-10 items-center justify-between pl-2.5 max-sm:h-11 max-sm:pl-3">
-      <p className="text-[13px] font-semibold text-ink max-sm:text-[15px]">
+      <p className="text-[13px] font-medium text-ink-3 max-sm:text-[15px]">
         {organization === 'project' ? 'Projects' : 'Recents'}
       </p>
       <Popover
@@ -55,7 +55,7 @@ export function SidebarOrganizationMenu({
             aria-label="Organize sidebar"
             title="Organize sidebar"
             onClick={() => setOpen((value) => !value)}
-            className="grid size-10 place-items-center rounded-full text-ink-3 opacity-70 transition-[background-color,color,opacity,scale] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-primary/40 group-hover/organization:opacity-100 max-sm:size-11"
+            className="grid size-[30px] place-items-center rounded-lg text-ink-3 opacity-70 transition-[background-color,color,opacity,scale] duration-150 hover:bg-list-hover hover:text-ink hover:opacity-100 active:scale-[0.96] focus-visible:ring-2 focus-visible:ring-primary/40 group-hover/organization:opacity-100 max-sm:size-11"
           >
             <MoreHorizontal size={15} />
           </button>
