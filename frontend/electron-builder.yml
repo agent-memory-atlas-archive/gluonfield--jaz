@@ -35,6 +35,8 @@ win:
     - target: zip
       arch:
         - x64
+nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
 dmg:
   background: build/dmg-background.png
   window:

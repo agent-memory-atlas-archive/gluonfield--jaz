@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 import { useQuery } from '@tanstack/react-query'
 import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
 import { LayoutDashboard, MessageSquare, Repeat, Settings } from 'lucide-react'
+=======
+import { Link, useRouterState } from '@tanstack/react-router'
+import { Clock3, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
+>>>>>>> main
 import { useState } from 'react'
 import { mcpAppsQuery } from '@/lib/api/mcp'
 import type { MCPApp } from '@/lib/api/types'
@@ -10,7 +15,7 @@ export const RAIL_WIDTH = 48
 // The sections beside Chat. Each takes the whole content card; Chat is the one
 // tab that keeps the thread panel.
 export const SECTIONS = [
-  { to: '/loops', label: 'Scheduled', Icon: Repeat },
+  { to: '/loops', label: 'Scheduled', Icon: Clock3 },
   { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
 ] as const
 

@@ -46,13 +46,16 @@ export function TitlebarNavigation({
           onClick={onToggleSidebar}
           className={CONTROL_CLASS}
         >
-          <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden />
+          <SidebarIcon className="size-4 max-sm:size-[18px]" aria-hidden>
+            <path
+              d="M9 3H7a4 4 0 0 0-4 4v10a4 4 0 0 0 4 4h2Z"
+              fill="currentColor"
+              fillOpacity={panelOpen ? 1 : 0}
+              stroke="none"
+              className="transition-[fill-opacity] duration-150 motion-reduce:transition-none"
+            />
+          </SidebarIcon>
         </button>
-      )}
-      {hasPanel && !panelOpen && (
-        <Link to="/new" aria-label="New chat" title="New chat (⌘N)" className={CONTROL_CLASS}>
-          <NewChatIcon className="size-4 max-sm:size-[18px]" aria-hidden />
-        </Link>
       )}
       {!isMobile && (
         <>
@@ -77,6 +80,11 @@ export function TitlebarNavigation({
             <ArrowRight size={18} aria-hidden />
           </button>
         </>
+      )}
+      {hasPanel && !panelOpen && (
+        <Link to="/new" aria-label="New chat" title="New chat (⌘N)" className={CONTROL_CLASS}>
+          <NewChatIcon className="size-4 max-sm:size-[18px]" aria-hidden />
+        </Link>
       )}
     </div>
   )
