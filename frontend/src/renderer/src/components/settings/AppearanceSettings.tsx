@@ -18,6 +18,7 @@ import {
   exportCodexThemeString,
   parseCodexThemeString,
 } from '@/lib/codexTheme'
+import { isHomeLogoUrl } from '@/lib/homeWordmark'
 import { FontPicker } from './FontPicker'
 import { SettingsCard } from './SettingsCard'
 import { ThemeConfigPreview } from './ThemeConfigPreview'
@@ -346,6 +347,15 @@ export function AppearanceSettings() {
             className="h-8 w-72 rounded-control bg-surface-2 px-2.5 text-[13px] text-ink outline-none ring-1 ring-border/60 placeholder:text-ink-3 focus:ring-primary"
           />
         </Row>
+        {isHomeLogoUrl(settings.homeWordmark) ? (
+          <Row title="Invert image in light mode" description="For white logos on transparent backgrounds.">
+            <Switch
+              checked={settings.invertHomeLogoInLightMode}
+              onChange={(value) => setAppearance({ invertHomeLogoInLightMode: value })}
+              aria-label="Invert image in light mode"
+            />
+          </Row>
+        ) : null}
       </SettingsCard>
 
       <div className="mt-6 flex items-end justify-between gap-3">

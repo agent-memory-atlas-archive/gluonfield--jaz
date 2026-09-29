@@ -3,13 +3,13 @@ import { motion } from 'motion/react'
 import { DitherTerrain, DitherWordmark } from '@/components/launch/DitherArt'
 import { ComposerCard } from '@/components/session/Composer'
 import { FileDropScope } from '@/components/ui/FileDrop'
-import { useHomeWordmark } from '@/lib/appearance'
-import { DEFAULT_HOME_WORDMARK, isHomeLogoUrl } from '@/lib/homeWordmark'
+import { useAppearance } from '@/lib/appearance'
+import { DEFAULT_HOME_WORDMARK, effectiveHomeWordmark, isHomeLogoUrl } from '@/lib/homeWordmark'
 import type { SendMessageHandler } from '@/lib/sendMessage'
 
 const HOME_WIDTH = 640
 
-function HomeLogo({ value }: { value: string }) {
+function HomeLogo({ value, invertInLightMode }: { value: string; invertInLightMode: boolean }) {
   const url = isHomeLogoUrl(value) ? value : null
   const [failed, setFailed] = useState(false)
   return (
@@ -20,7 +20,7 @@ function HomeLogo({ value }: { value: string }) {
           alt="Home logo"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
-          className="block max-h-full max-w-full object-contain"
+          className={`block max-h-full max-w-full object-contain ${invertInLightMode ? 'invert dark:invert-0' : ''}`}
         />
       ) : (
         <DitherWordmark text={url ? DEFAULT_HOME_WORDMARK : value} maxWidth={HOME_WIDTH} />
@@ -49,7 +49,8 @@ export function NewSessionHome({
   onSend: SendMessageHandler
   onVoice?: () => void
 }) {
-  const wordmark = useHomeWordmark()
+  const { settings } = useAppearance()
+  const wordmark = effectiveHomeWordmark(settings.homeWordmark)
 
   return (
     <FileDropScope className="relative flex h-full flex-col overflow-hidden">
@@ -60,7 +61,7 @@ export function NewSessionHome({
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
       >
         <div className="flex w-full flex-col gap-8" style={{ maxWidth: HOME_WIDTH }}>
-          <HomeLogo key={wordmark} value={wordmark} />
+          <HomeLogo key={wordmark} value={wordmark} invertInLightMode={settings.invertHomeLogoInLightMode} />
           <ComposerCard
             streaming={creating}
             autoFocus
