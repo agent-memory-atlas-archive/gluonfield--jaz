@@ -13,7 +13,7 @@ import (
 
 // Runtime serves MCP Apps from the servers' live, authenticated sessions.
 type Runtime interface {
-	Apps() ([]mcp.App, error)
+	Apps(ctx context.Context) ([]mcp.App, error)
 	ReadApp(ctx context.Context, serverID string) (string, error)
 	CallAppTool(ctx context.Context, serverID, name string, arguments json.RawMessage) (*mcpsdk.CallToolResult, error)
 }
@@ -39,8 +39,8 @@ func NewHandler(runtime Runtime) *Handler {
 	return &Handler{runtime: runtime}
 }
 
-func (h *Handler) List(w http.ResponseWriter, _ *http.Request) {
-	apps, err := h.runtime.Apps()
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	apps, err := h.runtime.Apps(r.Context())
 	if err != nil {
 		httpapi.WriteError(w, http.StatusInternalServerError, err)
 		return

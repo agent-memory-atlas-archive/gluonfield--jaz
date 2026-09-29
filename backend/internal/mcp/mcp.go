@@ -60,6 +60,10 @@ type Manager struct {
 	proxyCatalog map[string]remoteTool
 	revision     uint64
 
+	// refreshed closes when the first full refresh finishes.
+	refreshed     chan struct{}
+	refreshedOnce sync.Once
+
 	proxyMu sync.Mutex
 
 	handlerOnce sync.Once
@@ -150,6 +154,7 @@ func NewManager(store mcpconfig.ServerReader, tokens tokenStore, registry *tools
 		statuses:     make(map[string]mcpconfig.ServerStatus),
 		authStates:   make(map[string]*authorizationPending),
 		proxyCatalog: make(map[string]remoteTool),
+		refreshed:    make(chan struct{}),
 		proxy:        mcpsdk.NewServer(&mcpsdk.Implementation{Name: ProxyServerName, Version: "0.1.0"}, &mcpsdk.ServerOptions{Capabilities: &mcpsdk.ServerCapabilities{Tools: &mcpsdk.ToolCapabilities{ListChanged: true}}}),
 	}
 	for _, opt := range opts {
@@ -171,6 +176,7 @@ func (m *Manager) backgroundHandler(server mcpconfig.Server) *oauthHandler {
 func (m *Manager) Refresh(ctx context.Context) {
 	m.refreshMu.Lock()
 	defer m.refreshMu.Unlock()
+	defer m.refreshedOnce.Do(func() { close(m.refreshed) })
 	servers, err := m.servers(nil)
 	if err != nil {
 		return

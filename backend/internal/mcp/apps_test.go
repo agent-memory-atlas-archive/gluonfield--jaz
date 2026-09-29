@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/log"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -50,8 +51,13 @@ func TestManagerServesPinnedMCPApp(t *testing.T) {
 	}}}
 	registry := tools.NewRegistry()
 	manager := NewManager(store, nil, registry, log.New(io.Discard))
-	manager.Refresh(context.Background())
 	defer manager.Close()
+	early, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if apps, err := manager.Apps(early); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("Apps before the first refresh = %#v, %v; want it to wait", apps, err)
+	}
+	manager.Refresh(context.Background())
 
 	var agentTools []string
 	for _, def := range registry.Definitions() {
@@ -61,7 +67,7 @@ func TestManagerServesPinnedMCPApp(t *testing.T) {
 		t.Fatalf("agent tools = %s, want search and admin without the app-only graphql", got)
 	}
 
-	apps, err := manager.Apps()
+	apps, err := manager.Apps(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +91,7 @@ func TestManagerServesPinnedMCPApp(t *testing.T) {
 	}
 
 	store.servers[0].ShowInUI = false
-	if apps, _ := manager.Apps(); len(apps) != 0 {
+	if apps, _ := manager.Apps(context.Background()); len(apps) != 0 {
 		t.Fatalf("unpinned server still listed: %#v", apps)
 	}
 	if _, err := manager.ReadApp(context.Background(), "missing"); err != ErrAppNotFound {
