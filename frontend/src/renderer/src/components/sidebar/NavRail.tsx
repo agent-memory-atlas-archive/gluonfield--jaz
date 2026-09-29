@@ -39,10 +39,18 @@ export function useRailSections() {
   ]
 }
 
-// A server's own icon, or its initial when it publishes none.
+// A server's icon is drawn as a mask in the current text colour, so it dims,
+// brightens and themes like the built-in glyphs; its initial stands in when
+// the server publishes none.
 function AppIcon({ app }: { app: MCPApp }) {
   if (!app.icon) return <span className="text-[13px] font-semibold leading-none">{app.name.slice(0, 1).toUpperCase()}</span>
-  return <img src={app.icon} alt="" draggable={false} className="size-[18px] shrink-0 rounded-[5px]" />
+  return (
+    <span
+      aria-hidden
+      className="size-[18px] shrink-0 bg-current"
+      style={{ maskImage: `url("${app.icon}")`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center' }}
+    />
+  )
 }
 
 const TAB_CLASS =
