@@ -269,7 +269,7 @@ function RootLayout() {
     }
   })
 
-  const slide = resizing ? { duration: 0 } : { type: 'spring' as const, stiffness: 400, damping: 36 }
+  const slide = resizing ? { duration: 0 } : { type: 'spring' as const, duration: 0.24, bounce: 0 }
 
   return (
     <TitlebarProvider>
@@ -316,7 +316,7 @@ function RootLayout() {
               }`}
             >
               <motion.div
-                className="shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
+                className="flex shrink-0 justify-end overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full!"
                 initial={false}
                 animate={drawerSlide({ isMobile, open: panelOpen, side: 'left', width: sidebarWidth })}
                 transition={slide}
