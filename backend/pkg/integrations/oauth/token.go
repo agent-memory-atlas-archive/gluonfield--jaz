@@ -51,14 +51,6 @@ type Refresher struct {
 }
 
 func (r Refresher) TokenSource(ctx context.Context, connectionID string) (oauth2.TokenSource, error) {
-	src, err := r.persistentTokenSource(ctx, connectionID)
-	if err != nil {
-		return nil, err
-	}
-	return src, nil
-}
-
-func (r Refresher) persistentTokenSource(ctx context.Context, connectionID string) (*persistingTokenSource, error) {
 	if r.Store == nil {
 		return nil, ErrTokenNotFound
 	}
@@ -83,14 +75,6 @@ func (r Refresher) Client(ctx context.Context, connectionID string) (*http.Clien
 		return nil, err
 	}
 	return oauth2.NewClient(r.context(ctx), src), nil
-}
-
-func (r Refresher) FreshToken(ctx context.Context, connectionID string) (Token, error) {
-	src, err := r.persistentTokenSource(ctx, connectionID)
-	if err != nil {
-		return Token{}, err
-	}
-	return src.FreshToken()
 }
 
 func (r Refresher) context(ctx context.Context) context.Context {
@@ -177,16 +161,6 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 	}
 	p.stored = stored
 	return tok, nil
-}
-
-func (p *persistingTokenSource) FreshToken() (Token, error) {
-	tok, err := p.Token()
-	if err != nil || tok == nil {
-		return Token{}, err
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.stored, nil
 }
 
 func sameToken(stored Token, tok *oauth2.Token) bool {

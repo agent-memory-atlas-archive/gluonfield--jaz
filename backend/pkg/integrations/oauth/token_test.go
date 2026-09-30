@@ -63,7 +63,11 @@ func TestRefresherPersistsUpdatedToken(t *testing.T) {
 			Resource:     "https://mcp.example.com",
 		},
 	}
-	got, err := (Refresher{Store: store}).FreshToken(context.Background(), "conn")
+	src, err := (Refresher{Store: store}).TokenSource(context.Background(), "conn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := src.Token()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,8 +77,8 @@ func TestRefresherPersistsUpdatedToken(t *testing.T) {
 	if got.AccessToken != "new-access" || store.token.AccessToken != "new-access" || store.token.RefreshToken != "new-refresh" {
 		t.Fatalf("token = %#v stored = %#v", got, store.token)
 	}
-	if got.ClientID != "client" || got.TokenURL != server.URL || got.Resource != "https://mcp.example.com" {
-		t.Fatalf("fresh token metadata = %#v", got)
+	if store.token.ClientID != "client" || store.token.TokenURL != server.URL || store.token.Resource != "https://mcp.example.com" {
+		t.Fatalf("stored token metadata = %#v", store.token)
 	}
 }
 
@@ -112,7 +116,7 @@ func TestRefresherUsesResolvedClientConfig(t *testing.T) {
 			AuthStyle:    int(oauth2.AuthStyleInParams),
 		},
 	}
-	_, err := (Refresher{
+	src, err := (Refresher{
 		Store: store,
 		ClientConfig: func(_ context.Context, token Token) (ClientConfig, error) {
 			return ClientConfig{
@@ -122,8 +126,11 @@ func TestRefresherUsesResolvedClientConfig(t *testing.T) {
 				AuthStyle:    oauth2.AuthStyleInParams,
 			}, nil
 		},
-	}).FreshToken(context.Background(), "conn")
+	}).TokenSource(context.Background(), "conn")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Token(); err != nil {
 		t.Fatal(err)
 	}
 	if !tokenEndpointCalled {
