@@ -136,6 +136,7 @@ type activeTurn struct {
 	firstPromptSentClosed bool
 	promptHandoff         chan struct{}
 	promptCalls           int
+	allowSilence          bool
 	grokInterjections     map[string]*grokInterjection
 	grokStopReason        string
 	cancel                context.CancelFunc
@@ -310,10 +311,10 @@ func (j *jobState) setState(state, stopReason, errMsg string) {
 }
 
 func (j *jobState) startTurn(completion CompletionMode, planRequested, parentVisible bool) chan struct{} {
-	return j.startTurnWithOperation(completion, planRequested, parentVisible, "")
+	return j.startTurnWithOperation(completion, planRequested, parentVisible, "", false)
 }
 
-func (j *jobState) startTurnWithOperation(completion CompletionMode, planRequested, parentVisible bool, activeOperation string) chan struct{} {
+func (j *jobState) startTurnWithOperation(completion CompletionMode, planRequested, parentVisible bool, activeOperation string, allowSilence bool) chan struct{} {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	now := time.Now().UTC()
@@ -342,6 +343,7 @@ func (j *jobState) startTurnWithOperation(completion CompletionMode, planRequest
 		startedAt:       now,
 		firstPromptSent: make(chan struct{}),
 		promptCalls:     1,
+		allowSilence:    allowSilence,
 	}
 	j.ParentVisible = parentVisible
 	j.toolByID = make(map[string]sessionevents.ACPToolCall)

@@ -87,7 +87,7 @@ func (s *Service) deliver(fromThread, sender, to, recipient, text string) {
 	if fromThread == "" || len(said) == 0 {
 		return
 	}
-	if _, err := s.Threads.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: fromThread, Message: replyPrompt(recipient, strings.Join(said, "\n\n"))}); err != nil {
+	if _, err := s.Threads.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: fromThread, Message: replyPrompt(recipient, strings.Join(said, "\n\n")), AllowSilence: true}); err != nil {
 		s.Log.Warn("bot reply delivery failed", "from", to, "to", fromThread, "error", err)
 		return
 	}
@@ -98,7 +98,7 @@ func (s *Service) deliver(fromThread, sender, to, recipient, text string) {
 // the bot said in it. The turn keeps its voice until it ends, even when ctx is
 // cancelled first.
 func (s *Service) ask(ctx context.Context, threadID, group, prompt string, activity sessionevents.BotActivityEvent) ([]string, error) {
-	job, err := s.Threads.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: threadID, Message: prompt})
+	job, err := s.Threads.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: threadID, Message: prompt, AllowSilence: true})
 	if err != nil {
 		return nil, err
 	}

@@ -51,11 +51,15 @@ type sendOptions struct {
 	requireCompactSupport bool
 	requireActiveGoal     bool
 	waitIdle              bool
+	allowSilence          bool
 }
 
 type InternalTurnRequest struct {
 	Session string
 	Message string
+	// AllowSilence lets the turn end without a message or tool call, for
+	// turns whose agent may rightly have nothing to say.
+	AllowSilence bool
 }
 
 func (m *Manager) Send(ctx context.Context, req SendRequest) (Job, error) {
@@ -77,7 +81,7 @@ func (m *Manager) StartInternalTurn(ctx context.Context, req InternalTurnRequest
 		Session:    req.Session,
 		Message:    req.Message,
 		Completion: CompletionAsync,
-	}, sendOptions{transcript: sendTranscriptHidden})
+	}, sendOptions{transcript: sendTranscriptHidden, allowSilence: req.AllowSilence})
 }
 
 // StartInternalTurnWhenIdle starts a hidden turn as soon as the thread's
@@ -87,7 +91,7 @@ func (m *Manager) StartInternalTurnWhenIdle(ctx context.Context, req InternalTur
 		Session:    req.Session,
 		Message:    req.Message,
 		Completion: CompletionAsync,
-	}, sendOptions{transcript: sendTranscriptHidden, waitIdle: true})
+	}, sendOptions{transcript: sendTranscriptHidden, waitIdle: true, allowSilence: req.AllowSilence})
 }
 
 func (m *Manager) Compact(ctx context.Context, req CompactRequest) (Job, error) {
@@ -193,7 +197,7 @@ func (m *Manager) sendOnce(ctx context.Context, req SendRequest, opts sendOption
 		}
 	}
 	m.log.Info("acp turn started", "session", job.ID, "agent", job.ACPAgent, "plan", req.PlanRequested, "goal", req.GoalRequested, "operation", opts.activeOperation)
-	job.startTurnWithOperation(req.Completion, req.PlanRequested, req.ParentVisible, opts.activeOperation)
+	job.startTurnWithOperation(req.Completion, req.PlanRequested, req.ParentVisible, opts.activeOperation, opts.allowSilence)
 	m.touchAttention(parentSessionIDs(job.eventView())...)
 	markGoalRequested(job, req.GoalRequested)
 	m.publishACP(job.eventView())

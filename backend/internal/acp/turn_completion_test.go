@@ -17,10 +17,11 @@ import (
 
 func TestEndTurnRequiresVisibleResult(t *testing.T) {
 	for _, test := range []struct {
-		name      string
-		operation string
-		prepare   func(*jobState)
-		wantState string
+		name         string
+		operation    string
+		allowSilence bool
+		prepare      func(*jobState)
+		wantState    string
 	}{
 		{name: "empty", wantState: StateFailed},
 		{name: "thought only", prepare: func(job *jobState) { job.Thought = "unfinished reasoning" }, wantState: StateFailed},
@@ -28,6 +29,7 @@ func TestEndTurnRequiresVisibleResult(t *testing.T) {
 		{name: "tool", prepare: func(job *jobState) { job.ToolCalls = []sessionevents.ACPToolCall{{ID: "tool"}} }, wantState: StateIdle},
 		{name: "plan", prepare: func(job *jobState) { job.Plan = []sessionevents.PlanEntry{{Content: "done"}} }, wantState: StateIdle},
 		{name: "compaction", operation: ActiveOperationCompact, wantState: StateIdle},
+		{name: "silence allowed", allowSilence: true, wantState: StateIdle},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			store, err := jsonstore.New(t.TempDir())
@@ -40,7 +42,7 @@ func TestEndTurnRequiresVisibleResult(t *testing.T) {
 			}
 			manager := NewManager(store, Config{}, log.New(io.Discard))
 			job := newIdleJob(session, AgentKimi, "acp-session", "", ModeState{})
-			done := job.startTurnWithOperation(CompletionInline, false, false, test.operation)
+			done := job.startTurnWithOperation(CompletionInline, false, false, test.operation, test.allowSilence)
 			if test.prepare != nil {
 				test.prepare(job)
 			}

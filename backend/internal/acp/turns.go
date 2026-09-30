@@ -92,7 +92,7 @@ func (m *Manager) completePromptCall(done chan struct{}, job *jobState, stopReas
 		return
 	}
 	turn.promptCalls = 0
-	if state == StateIdle && stopReason == StopReasonEndTurn && job.ActiveOperation != ActiveOperationCompact && !hasVisibleTurnResult(job) {
+	if state == StateIdle && stopReason == StopReasonEndTurn && job.ActiveOperation != ActiveOperationCompact && !turn.allowSilence && !hasVisibleTurnResult(job) {
 		state = StateFailed
 		errMessage = "Agent ended the turn without producing a message, plan, or tool activity."
 	}

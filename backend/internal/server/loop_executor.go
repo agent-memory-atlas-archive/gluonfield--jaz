@@ -97,7 +97,7 @@ func (r *LoopRunner) startBotTurn(execution loops.Execution) {
 	loop := execution.Loop
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 	defer cancel()
-	job, err := r.acp.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: execution.Thread, Message: execution.Prompt})
+	job, err := r.acp.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: execution.Thread, Message: execution.Prompt, AllowSilence: true})
 	if err != nil {
 		r.finishLoopRun(execution, loops.RunStatusError, err.Error())
 		return
