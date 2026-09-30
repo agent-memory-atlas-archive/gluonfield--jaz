@@ -109,7 +109,7 @@ export function chatEntries(
       close()
       if (SHOWN_ACTIVITY.has(event.bot_activity.kind)) out.push({ kind: 'activity', key, at, event })
       turn = { user: false, spoke: false }
-    } else if (event.loop_created) {
+    } else if (event.loop_created || event.type === 'agent_switch') {
       out.push({ kind: 'activity', key, at, event })
     } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {
       turn.reply = { key, at, text: event.content.trim() }

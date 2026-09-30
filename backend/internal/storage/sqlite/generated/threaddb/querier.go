@@ -17,6 +17,8 @@ type Querier interface {
 	GetThreadIDByID(ctx context.Context, id string) (string, error)
 	GetThreadIDBySlug(ctx context.Context, slug string) (string, error)
 	GetTranscriptRevision(ctx context.Context, id string) (int64, error)
+	// After an agent switch only the new agent's events count: its native session
+	// starts fresh at the switch, and a prompt it received always leaves events.
 	HasAgentTranscript(ctx context.Context, id string) (int64, error)
 	ListChildSessions(ctx context.Context, arg ListChildSessionsParams) ([]Thread, error)
 	ListErrorThreadIDsWithoutError(ctx context.Context, status string) ([]string, error)

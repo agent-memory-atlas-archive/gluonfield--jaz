@@ -54,6 +54,8 @@ type UpdateBot struct {
 	Name    *string   `json:"name,omitempty"`
 	Avatar  *Avatar   `json:"avatar,omitempty"`
 	Members *[]string `json:"members,omitempty"`
+	// Agent moves the bot to another agent, which starts a fresh native session.
+	Agent *string `json:"agent,omitempty"`
 }
 
 // Threads is the agent runtime bot threads run on.
@@ -61,6 +63,7 @@ type Threads interface {
 	CreateSession(context.Context, acp.SpawnRequest) (storage.Session, error)
 	StartInternalTurnWhenIdle(context.Context, acp.InternalTurnRequest) (acp.Job, error)
 	Wait(context.Context, acp.WaitRequest) (acp.Job, error)
+	SwitchAgent(ctx context.Context, sessionID, agent string) error
 }
 
 // Store keeps bot records and the threads they live in.

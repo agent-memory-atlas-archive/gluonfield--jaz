@@ -105,16 +105,12 @@ func agentProviderDefaultModel(agent, id string, providers map[string]provider.M
 }
 
 func (m *Manager) createStoredSession(req SpawnRequest, cfg AgentConfig, effort string) (storage.Session, error) {
-	modelProvider := req.ACPAgent
-	if cfg.Local || cfg.UsesProvider() {
-		modelProvider = strings.TrimSpace(cfg.ModelProvider)
-	}
 	return m.store.CreateSession(storage.CreateSession{
 		Slug:            req.Slug,
 		Title:           req.Title,
 		ParentID:        req.ParentID,
 		Runtime:         storage.RuntimeACP,
-		ModelProvider:   modelProvider,
+		ModelProvider:   sessionModelProvider(req.ACPAgent, cfg),
 		Model:           strings.TrimSpace(cfg.Model),
 		ReasoningEffort: effort,
 		SourceType:      req.SourceType,
@@ -126,4 +122,11 @@ func (m *Manager) createStoredSession(req SpawnRequest, cfg AgentConfig, effort 
 			MCPServerPolicy: req.MCPServerPolicy,
 		},
 	})
+}
+
+func sessionModelProvider(agent string, cfg AgentConfig) string {
+	if cfg.Local || cfg.UsesProvider() {
+		return strings.TrimSpace(cfg.ModelProvider)
+	}
+	return agent
 }

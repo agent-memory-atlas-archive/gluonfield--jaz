@@ -29,7 +29,7 @@ SELECT
   created_at_ms
 FROM session_events
 WHERE thread_id = sqlc.arg(thread_id)
-  AND type IN ('provider_subagent', 'agent_session', 'agent_task')
+  AND type IN ('provider_subagent', 'agent_session', 'agent_task', 'agent_switch')
 ORDER BY seq;
 
 -- name: ListLatestACPTurn :many

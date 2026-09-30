@@ -24,6 +24,7 @@ type fakeWorld struct {
 	created   []acp.SpawnRequest
 	loops     []loops.Loop
 	published []sessionevents.Event
+	switched  map[string]string
 	service   *Service
 }
 
@@ -34,6 +35,7 @@ func newFakeWorld() *fakeWorld {
 		events:   map[string][]sessionevents.Event{},
 		prompts:  map[string][]string{},
 		replies:  map[string][]string{},
+		switched: map[string]string{},
 	}
 }
 
@@ -199,6 +201,13 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 		}
 	}
 	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
+}
+
+func (t fakeThreads) SwitchAgent(_ context.Context, sessionID, agent string) error {
+	t.world.mu.Lock()
+	defer t.world.mu.Unlock()
+	t.world.switched[sessionID] = agent
+	return nil
 }
 
 func newTestService(world *fakeWorld) *Service {
@@ -397,5 +406,26 @@ func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBotExceptBoardWidgets(t *testing.
 	}
 	if world.loops[2].BotID != "" {
 		t.Fatal("a board widget was given a bot")
+	}
+}
+
+func TestUpdateSwitchesABotsAgentButNotAGroups(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("gimli", "Gimli")
+	world.addBot("egg", "Eggbot")
+	service := newTestService(world)
+	group, err := service.CreateGroup("Crew", []string{"gimli", "egg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	agent := " codex "
+	if _, err := service.Update(context.Background(), "gimli", UpdateBot{Agent: &agent}); err != nil {
+		t.Fatal(err)
+	}
+	if world.switched["gimli"] != "codex" {
+		t.Fatalf("switched = %v", world.switched)
+	}
+	if _, err := service.Update(context.Background(), group.ID, UpdateBot{Agent: &agent}); err == nil {
+		t.Fatal("a group was given an agent")
 	}
 }

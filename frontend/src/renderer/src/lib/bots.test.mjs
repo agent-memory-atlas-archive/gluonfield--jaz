@@ -55,7 +55,7 @@ describe('bot chat log', () => {
   const wrote = (minute, text) => event(minute, { type: 'acp_message', content: text, acp: { id: 'gimli' } })
   const tool = (minute) => event(minute, { type: 'acp', acp: { id: 'gimli', tool_calls: [{ id: 't', title: 'Run rm -rf build' }] } })
   const woke = (minute, kind, label) => event(minute, { type: 'bot_activity', bot_activity: { kind, label } })
-  const shape = (entries) => entries.map((entry) => entry.kind === 'activity' ? `· ${entry.event.bot_activity.kind}` : `${entry.kind}: ${entry.text}`)
+  const shape = (entries) => entries.map((entry) => entry.kind === 'activity' ? `· ${entry.event.bot_activity?.kind ?? entry.event.type}` : `${entry.kind}: ${entry.text}`)
 
   test('shows only what was typed and sent, never the work between', () => {
     const entries = chatEntries(
@@ -77,11 +77,11 @@ describe('bot chat log', () => {
   test('group turns and routine runs stay out of the chat unless the bot speaks', () => {
     const entries = chatEntries(
       [user(1, 1, 'hi')],
-      [said(2, 'Hey.'), woke(3, 'group', 'Team'), wrote(4, 'PASS'), woke(5, 'routine', 'Digest'), wrote(6, 'Nothing new.'), woke(7, 'message_sent', 'dr eggbot')],
+      [said(2, 'Hey.'), woke(3, 'group', 'Team'), wrote(4, 'PASS'), woke(5, 'routine', 'Digest'), wrote(6, 'Nothing new.'), woke(7, 'message_sent', 'dr eggbot'), event(8, { type: 'agent_switch', content: 'codex' })],
       self,
       false,
     )
-    expect(shape(entries)).toEqual(['user: hi', 'bot: Hey.', '· message_sent'])
+    expect(shape(entries)).toEqual(['user: hi', 'bot: Hey.', '· message_sent', '· agent_switch'])
   })
 })
 

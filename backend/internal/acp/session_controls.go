@@ -203,9 +203,17 @@ func (m *Manager) setSessionConfig(ctx context.Context, job *jobState, id, value
 	return nil
 }
 
+// restoreConfiguredChoices reapplies the user's model and effort picks made
+// since the thread last switched agent.
 func restoreConfiguredChoices(cfg *AgentConfig, events []sessionevents.Event) {
 	targets := map[string]*string{"model": &cfg.Model, "thought_level": &cfg.ReasoningEffort}
-	for _, event := range events {
+	start := 0
+	for i, event := range events {
+		if event.Type == sessionevents.TypeAgentSwitch {
+			start = i + 1
+		}
+	}
+	for _, event := range events[start:] {
 		if event.AgentSession == nil {
 			continue
 		}

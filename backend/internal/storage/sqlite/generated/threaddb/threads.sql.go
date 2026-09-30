@@ -192,14 +192,21 @@ func (q *Queries) GetTranscriptRevision(ctx context.Context, id string) (int64, 
 }
 
 const hasAgentTranscript = `-- name: HasAgentTranscript :one
+WITH switched AS (
+  SELECT MAX(seq) AS seq
+  FROM session_events
+  WHERE thread_id = ?1 AND type = 'agent_switch'
+)
 SELECT CAST(
-  EXISTS(SELECT 1 FROM messages WHERE messages.thread_id = ?1)
-  OR EXISTS(SELECT 1 FROM session_events WHERE session_events.thread_id = ?1 AND session_events.type NOT IN ('agent_session', 'voice_message'))
+  ((SELECT seq FROM switched) IS NULL AND EXISTS(SELECT 1 FROM messages WHERE messages.thread_id = ?1))
+  OR EXISTS(SELECT 1 FROM session_events WHERE session_events.thread_id = ?1 AND session_events.type NOT IN ('agent_session', 'voice_message', 'agent_switch') AND session_events.seq > COALESCE((SELECT seq FROM switched), 0))
 AS INTEGER)
 FROM threads
 WHERE threads.id = ?1
 `
 
+// After an agent switch only the new agent's events count: its native session
+// starts fresh at the switch, and a prompt it received always leaves events.
 func (q *Queries) HasAgentTranscript(ctx context.Context, id string) (int64, error) {
 	row := q.db.QueryRowContext(ctx, hasAgentTranscript, id)
 	var column_1 int64

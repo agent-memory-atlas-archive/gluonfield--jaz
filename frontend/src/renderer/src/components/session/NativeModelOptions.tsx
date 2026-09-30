@@ -5,10 +5,11 @@ import { setSessionAgentConfig } from '@/lib/api/sessions'
 import type { AgentSessionConfigOption } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
 
-export function NativeModelOptions({ sessionId, options, disabled }: {
+export function NativeModelOptions({ sessionId, options, disabled, categories = ['model_config'] }: {
   sessionId: string
   options?: AgentSessionConfigOption[] | null
   disabled: boolean
+  categories?: string[]
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -20,7 +21,7 @@ export function NativeModelOptions({ sessionId, options, disabled }: {
       queryClient.invalidateQueries({ queryKey: keys.sessionMessages(sessionId) })
     },
   })
-  return options?.filter((option) => option.category === 'model_config').map((option) => (
+  return options?.filter((option) => categories.includes(option.category ?? '')).map((option) => (
     <div key={option.id} className="px-2.5 py-1">
       <div className="flex min-h-10 items-center justify-between gap-3">
         <span className="text-[13px] text-ink-2">{option.name}</span>

@@ -35,7 +35,7 @@ function BotRoute() {
       key={bot.id}
       sessionId={bot.id}
       header={<BotPill avatars={[bot.avatar]} name={bot.name} />}
-      details={<BotDetails bot={bot} focusName={newBot} />}
+      details={(view) => <BotDetails bot={bot} focusName={newBot} {...view} />}
       openDetails={newBot}
       placeholder={`Message ${bot.name}`}
       chat={({ messages, events, working }) => (

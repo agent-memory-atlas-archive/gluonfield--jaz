@@ -357,7 +357,7 @@ SELECT
   created_at_ms
 FROM session_events
 WHERE thread_id = ?1
-  AND type IN ('provider_subagent', 'agent_session', 'agent_task')
+  AND type IN ('provider_subagent', 'agent_session', 'agent_task', 'agent_switch')
 ORDER BY seq
 `
 

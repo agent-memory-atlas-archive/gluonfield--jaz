@@ -127,10 +127,18 @@ func (s *Service) CreateGroup(name string, members []string) (Bot, error) {
 	return s.Load(session.ID)
 }
 
-func (s *Service) Update(id string, input UpdateBot) (Bot, error) {
+func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, error) {
 	record, _, err := s.load(id)
 	if err != nil {
 		return Bot{}, err
+	}
+	if input.Agent != nil {
+		if record.Kind != KindBot {
+			return Bot{}, errors.New("only a bot has an agent")
+		}
+		if err := s.Threads.SwitchAgent(ctx, id, strings.TrimSpace(*input.Agent)); err != nil {
+			return Bot{}, err
+		}
 	}
 	if input.Name != nil {
 		name := strings.TrimSpace(*input.Name)

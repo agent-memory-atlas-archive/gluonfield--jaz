@@ -1,4 +1,5 @@
-import { ArrowDownLeft, ArrowUpRight, CalendarPlus, Clock3, type LucideIcon, Users } from 'lucide-react'
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CalendarPlus, Clock3, type LucideIcon, Users } from 'lucide-react'
+import { agentLabel } from '@/lib/agentLabel'
 import type { BotActivityEvent, SessionEvent } from '@/lib/api/types'
 
 const ACTIVITY: Record<BotActivityEvent['kind'], [LucideIcon, (label: string) => string]> = {
@@ -12,11 +13,13 @@ const ACTIVITY: Record<BotActivityEvent['kind'], [LucideIcon, (label: string) =>
 export function SystemEventRow({ event }: { event: SessionEvent }) {
   const [Icon, text] = event.bot_activity
     ? ACTIVITY[event.bot_activity.kind]
-    : [CalendarPlus, (label: string) => `Created routine · ${label}`]
+    : event.type === 'agent_switch'
+      ? [ArrowLeftRight, (label: string) => `Switched to ${agentLabel(label)}`]
+      : [CalendarPlus, (label: string) => `Created routine · ${label}`]
   return (
     <p className="flex min-w-0 items-center justify-center gap-1.5 py-1 text-[12px] text-ink-3">
       <Icon size={12} aria-hidden className="shrink-0" />
-      <span className="truncate">{text(event.bot_activity?.label ?? event.loop_created?.loop_name ?? '')}</span>
+      <span className="truncate">{text(event.bot_activity?.label ?? event.loop_created?.loop_name ?? event.content ?? '')}</span>
     </p>
   )
 }

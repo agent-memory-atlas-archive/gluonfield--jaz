@@ -80,7 +80,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &input) {
 		return
 	}
-	bot, err := h.bots.Update(r.PathValue("bot"), input)
+	bot, err := h.bots.Update(r.Context(), r.PathValue("bot"), input)
 	writeBot(w, bot, err)
 }
 

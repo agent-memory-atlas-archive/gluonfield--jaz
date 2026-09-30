@@ -18,6 +18,7 @@ const (
 	TypeSession          = "session"
 	TypeLoopCreated      = "loop_created"
 	TypeBotActivity      = "bot_activity"
+	TypeAgentSwitch      = "agent_switch"
 	TypeRoomMessage      = "room_message"
 	TypeMCPApp           = "mcp_app"
 	TypeSideChatMessage  = "side_chat_message"

@@ -46,7 +46,7 @@ import {
   sessionRepoQuery,
   uploadSessionAttachment,
 } from '@/lib/api/sessions'
-import type { ChatMessage, SessionEvent, SessionOverview } from '@/lib/api/types'
+import type { AgentSessionState, ChatMessage, SessionEvent, SessionOverview } from '@/lib/api/types'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -101,6 +101,11 @@ export interface ThreadChatView {
   working: boolean
 }
 
+export interface ThreadDetailsView {
+  agentSession?: AgentSessionState
+  working: boolean
+}
+
 // One thread's full view: transcript, composer, and side panel. `header` and
 // `details` let an owning surface (a bot) replace the titlebar identity and the
 // Overview panel; `chat` replaces the agent transcript with a chat log.
@@ -118,7 +123,7 @@ export function ThreadView({
   message?: number
   initialPrompt?: OptimisticUserMessage
   header?: ReactNode
-  details?: ReactNode
+  details?: (view: ThreadDetailsView) => ReactNode
   openDetails?: boolean
   placeholder?: string
   chat?: (view: ThreadChatView) => ReactNode
@@ -628,7 +633,7 @@ export function ThreadView({
               panel={sidePanel}
               sideChatAvailable={sideChatAvailable}
               sideChatEvents={sideChatEvents}
-              overview={details}
+              overview={details?.({ agentSession: derived.agentSession, working: sessionRunning })}
               onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
               onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
               onSend={handleSend}

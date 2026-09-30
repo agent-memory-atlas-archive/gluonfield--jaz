@@ -356,3 +356,21 @@ func TestSetSessionConfigRefusesMidSessionGrokModelChange(t *testing.T) {
 		t.Fatalf("effort change should pass the model guard: %v", err)
 	}
 }
+
+func TestRestoredChoicesStartOverAtAnAgentSwitch(t *testing.T) {
+	picked := func(category, value string) sessionevents.Event {
+		return sessionevents.Event{Type: sessionevents.TypeAgentSession, AgentSession: &sessionevents.AgentSession{
+			ConfigOptions: []sessionevents.AgentConfigOption{{ID: category, Category: category, CurrentValue: value, UserValue: &value}},
+		}}
+	}
+	events := []sessionevents.Event{picked("model", "opus"), picked("thought_level", "max"), {Type: sessionevents.TypeAgentSwitch, Content: "codex"}}
+	cfg := AgentConfig{Model: "gpt-default", ReasoningEffort: "medium"}
+	restoreConfiguredChoices(&cfg, events)
+	if cfg.Model != "gpt-default" || cfg.ReasoningEffort != "medium" {
+		t.Fatalf("the old agent's picks reached the new agent: %+v", cfg)
+	}
+	restoreConfiguredChoices(&cfg, append(events, picked("model", "gpt-pro")))
+	if cfg.Model != "gpt-pro" {
+		t.Fatalf("a pick made after the switch was lost: %+v", cfg)
+	}
+}

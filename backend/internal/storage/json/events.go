@@ -29,7 +29,7 @@ func (s *Store) LoadSessionOverviewEvents(id string) ([]sessionevents.Event, err
 	overview := events[:0]
 	for _, event := range events {
 		switch event.Type {
-		case sessionevents.TypeAgentSession, sessionevents.TypeAgentTask, sessionevents.TypeProviderSubagent:
+		case sessionevents.TypeAgentSession, sessionevents.TypeAgentTask, sessionevents.TypeProviderSubagent, sessionevents.TypeAgentSwitch:
 			overview = append(overview, event)
 		}
 	}

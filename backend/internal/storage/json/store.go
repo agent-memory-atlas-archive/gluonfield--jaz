@@ -173,23 +173,29 @@ func (s *Store) HasAgentTranscript(id string) (bool, error) {
 	if _, err := s.loadSessionByID(id); err != nil {
 		return false, err
 	}
-	info, err := os.Stat(filepath.Join(s.sessionDir(id), "messages.jsonl"))
-	if err == nil && info.Size() > 0 {
-		return true, nil
-	}
-	if err != nil && !os.IsNotExist(err) {
-		return false, err
-	}
 	events, err := s.loadSessionEvents(id)
 	if err != nil {
 		return false, err
 	}
-	for _, event := range events {
+	start := 0
+	for i, event := range events {
+		if event.Type == sessionevents.TypeAgentSwitch {
+			start = i + 1
+		}
+	}
+	for _, event := range events[start:] {
 		if event.Type != sessionevents.TypeAgentSession && event.Type != sessionevents.TypeVoiceMessage {
 			return true, nil
 		}
 	}
-	return false, nil
+	if start > 0 {
+		return false, nil
+	}
+	info, err := os.Stat(filepath.Join(s.sessionDir(id), "messages.jsonl"))
+	if err != nil && !os.IsNotExist(err) {
+		return false, err
+	}
+	return err == nil && info.Size() > 0, nil
 }
 
 func (s *Store) ReplaceRuntimeSessionID(id, oldID, newID string) (bool, error) {

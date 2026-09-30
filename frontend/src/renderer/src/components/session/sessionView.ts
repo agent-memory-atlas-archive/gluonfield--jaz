@@ -324,7 +324,7 @@ export function deriveSessionView(
   )
   const agentSession = coalesceSessionEvents([
     ...(overview?.agent_events ?? []), ...persistedEvents, ...liveEvents,
-  ]).findLast((event) => event.session_id === session.id && event.agent_session)?.agent_session
+  ]).findLast((event) => event.session_id === session.id && (event.agent_session || event.type === 'agent_switch'))?.agent_session
   return {
     agentSession,
     transcriptEvents: settledTranscriptEvents,

@@ -64,3 +64,44 @@ func TestRuntimeSessionMaterializationState(t *testing.T) {
 		t.Fatalf("started transcript = %t, %v", hasTranscript, err)
 	}
 }
+
+func TestAgentSwitchStartsTheTranscriptOver(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	session, err := store.CreateSession(storage.CreateSession{Slug: "switching", RuntimeRef: &storage.RuntimeRef{Type: storage.RuntimeACP, Agent: "codex"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := func() bool {
+		t.Helper()
+		hasTranscript, err := store.HasAgentTranscript(session.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hasTranscript
+	}
+	if err := storage.AppendUserMessage(store, session.ID, "prior turn", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{Type: sessionevents.TypeACPMessage, Content: "prior reply"}); err != nil {
+		t.Fatal(err)
+	}
+	if !has() {
+		t.Fatal("history before a switch was not counted")
+	}
+	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{Type: sessionevents.TypeAgentSwitch, Content: "claude"}); err != nil {
+		t.Fatal(err)
+	}
+	if has() {
+		t.Fatal("the old agent's history still counts after the switch")
+	}
+	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{Type: sessionevents.TypeACPMessage, Content: "new agent reply"}); err != nil {
+		t.Fatal(err)
+	}
+	if !has() {
+		t.Fatal("the new agent's history is not counted")
+	}
+}
