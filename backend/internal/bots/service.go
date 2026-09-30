@@ -23,9 +23,9 @@ type Service struct {
 	Events   Publisher
 	Log      *log.Logger
 
-	mu     sync.Mutex
-	rounds map[string]context.CancelFunc
-	voices map[string]*voice
+	mu        sync.Mutex
+	voices    map[string]*voice
+	followUps map[string]int
 }
 
 func NewService(store Store, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {

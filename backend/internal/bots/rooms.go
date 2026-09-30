@@ -3,11 +3,10 @@ package bots
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -15,14 +14,15 @@ import (
 )
 
 const (
-	maxRounds  = 2
-	maxReplies = 6
-	maxHistory = 20
+	// maxFollowUps bounds the turns bots wake in each other between two posts
+	// from the user, so a mention ping-pong cannot run on.
+	maxFollowUps = 6
+	maxHistory   = 20
 )
 
 var mentionPattern = regexp.MustCompile(`\]\(bot:([A-Za-z0-9_-]+)\)`)
 
-// Post adds the user's message to a group; its members then take turns.
+// Post adds the user's message to a group.
 func (s *Service) Post(groupID, text string) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
@@ -35,78 +35,69 @@ func (s *Service) Post(groupID, text string) error {
 	if record.Kind != KindGroup {
 		return errors.New("not a group")
 	}
-	return s.post(record, session.Title, sessionevents.RoomMessageEvent{Speaker: "user", Name: "You", Text: text}, mentions(text))
+	return s.post(record, session.Title, sessionevents.RoomMessageEvent{Speaker: "user", Name: "You", Text: text})
 }
 
-// post records a message and starts a new round, superseding any round still
-// running for the group. Members named in the message answer; otherwise all
-// members except the speaker may.
-func (s *Service) post(group storage.BotRecord, name string, message sessionevents.RoomMessageEvent, mentioned []string) error {
+// post records a message in a group and wakes the members it mentions, each in
+// a turn of its own, all at once. A message that mentions nobody wakes every
+// member when the user or an outsider wrote it, and nobody when a member did:
+// bots follow up on each other only when addressed.
+func (s *Service) post(group storage.BotRecord, name string, message sessionevents.RoomMessageEvent) error {
 	s.appendEvent(sessionevents.Event{SessionID: group.ThreadID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
-	responders := make([]string, 0, len(group.Members))
-	for _, member := range group.Members {
-		if member == message.BotID || len(mentioned) > 0 && !slices.Contains(mentioned, member) {
+	fromMember := slices.Contains(group.Members, message.BotID)
+	wake := group.Members
+	if mentioned := mentions(message.Text); len(mentioned) > 0 {
+		wake = mentioned
+	} else if fromMember {
+		wake = nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.followUps == nil {
+		s.followUps = make(map[string]int)
+	}
+	if !fromMember {
+		s.followUps[group.ThreadID] = 0
+	}
+	for _, member := range wake {
+		if member == message.BotID || !slices.Contains(group.Members, member) {
 			continue
 		}
-		responders = append(responders, member)
+		if fromMember {
+			if s.followUps[group.ThreadID] >= maxFollowUps {
+				break
+			}
+			s.followUps[group.ThreadID]++
+		}
+		go func() {
+			if err := s.memberTurn(group.ThreadID, name, member); err != nil {
+				s.Log.Warn("group turn failed", "group", group.ThreadID, "member", member, "error", err)
+			}
+		}()
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	s.mu.Lock()
-	if s.rounds == nil {
-		s.rounds = make(map[string]context.CancelFunc)
-	}
-	if previous := s.rounds[group.ThreadID]; previous != nil {
-		previous()
-	}
-	s.rounds[group.ThreadID] = cancel
-	s.mu.Unlock()
-	go s.runRound(ctx, group.ThreadID, name, responders)
 	return nil
 }
 
-// runRound gives every responder a turn at once, so one slow member holds up
-// nobody, then a follow-up round to react to each other, stopping when a round
-// passes in silence or the reply cap is reached.
-func (s *Service) runRound(ctx context.Context, groupID, name string, responders []string) {
-	replies := 0
-	for range maxRounds {
-		var spoke atomic.Int64
-		var wg sync.WaitGroup
-		for _, member := range responders {
-			wg.Go(func() {
-				said, err := s.memberTurn(ctx, groupID, name, member)
-				if err != nil && ctx.Err() == nil {
-					s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
-				}
-				spoke.Add(int64(len(said)))
-			})
-		}
-		wg.Wait()
-		replies += int(spoke.Load())
-		if ctx.Err() != nil || spoke.Load() == 0 || replies >= maxReplies {
-			return
-		}
-	}
-}
-
-// memberTurn gives member a turn in the group and returns what it posted.
-func (s *Service) memberTurn(ctx context.Context, groupID, name, member string) ([]string, error) {
+// memberTurn gives member a turn in the group, in which it posts with
+// send_message.
+func (s *Service) memberTurn(groupID, name, member string) error {
 	record, err := s.Store.LoadBot(groupID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	events, err := s.Store.LoadSessionEvents(groupID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	peers := make([]string, 0, len(record.Members))
 	for _, other := range record.Members {
 		if other != member {
-			peers = append(peers, s.name(other))
+			peers = append(peers, fmt.Sprintf("[@%s](bot:%s)", s.name(other), other))
 		}
 	}
 	prompt := groupTurnPrompt(name, s.name(member), peers, unseen(events, member))
-	return s.ask(ctx, member, groupID, prompt, sessionevents.BotActivityEvent{Kind: "group", Label: name, BotID: groupID})
+	_, err = s.ask(context.Background(), member, groupID, prompt, sessionevents.BotActivityEvent{Kind: "group", Label: name, BotID: groupID})
+	return err
 }
 
 // unseen returns the group messages posted since member last spoke.

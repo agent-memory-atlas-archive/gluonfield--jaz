@@ -37,7 +37,7 @@ func (s *Service) Message(fromThread, to, text string) error {
 	sender := s.name(fromThread)
 	if target.Kind == KindGroup {
 		speaker := sessionevents.RoomMessageEvent{Speaker: "bot", BotID: fromThread, Name: sender, Text: text}
-		return s.post(target, session.Title, speaker, mentions(text))
+		return s.post(target, session.Title, speaker)
 	}
 	if to == fromThread {
 		return errors.New("a bot cannot message itself")
@@ -64,16 +64,19 @@ func (s *Service) Say(threadID, text string) error {
 		turn.said = append(turn.said, text)
 	}
 	s.mu.Unlock()
-	room := threadID
-	if turn != nil {
-		if turn.group == "" {
-			return nil
-		}
-		room = turn.group
-	}
 	message := sessionevents.RoomMessageEvent{Speaker: "bot", BotID: threadID, Name: session.Title, Text: text}
-	s.appendEvent(sessionevents.Event{SessionID: room, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
-	return nil
+	switch {
+	case turn == nil:
+		s.appendEvent(sessionevents.Event{SessionID: threadID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
+		return nil
+	case turn.group == "":
+		return nil
+	}
+	group, groupSession, err := s.load(turn.group)
+	if err != nil {
+		return err
+	}
+	return s.post(group, groupSession.Title, message)
 }
 
 func (s *Service) deliver(fromThread, sender, to, recipient, text string) {

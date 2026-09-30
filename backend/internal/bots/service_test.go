@@ -283,7 +283,7 @@ func TestRoutineOwnerChecksNamedBotsKeepsBotThreadAndGivesOtherThreadsANewBot(t 
 	}
 }
 
-func TestGroupRoundPostsWhatMembersSendAndStopsOnSilence(t *testing.T) {
+func TestMembersFollowUpOnlyWhenMentioned(t *testing.T) {
 	world := newFakeWorld()
 	world.addBot("a", "Research")
 	world.addBot("b", "Marketing")
@@ -292,24 +292,47 @@ func TestGroupRoundPostsWhatMembersSendAndStopsOnSilence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world.replies["a"] = []string{"", ""}
-	world.replies["b"] = []string{"Draft is in the doc.", ""}
+	world.replies["a"] = []string{"", "Checked."}
+	world.replies["b"] = []string{"[@Research](bot:a) can you check the numbers?"}
 
 	if err := service.Post(group.ID, "Where is the launch draft?"); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, func() bool { return world.promptCount("a") == 2 && world.promptCount("b") == 2 })
+	waitUntil(t, func() bool { return len(world.roomMessages(group.ID)) == 3 })
 	time.Sleep(20 * time.Millisecond)
-
-	got := strings.Join(world.roomMessages(group.ID), "\n")
-	if got != "You: Where is the launch draft?\nMarketing: Draft is in the doc." {
-		t.Fatalf("room = %q", got)
+	if world.promptCount("a") != 2 || world.promptCount("b") != 1 {
+		t.Fatalf("turns: Research %d, Marketing %d", world.promptCount("a"), world.promptCount("b"))
 	}
 	world.mu.Lock()
-	secondPrompt := world.prompts["a"][1]
+	followUp := world.prompts["a"][1]
 	world.mu.Unlock()
-	if !strings.Contains(secondPrompt, "Marketing: Draft is in the doc.") {
-		t.Fatalf("second round prompt misses what was said since:\n%s", secondPrompt)
+	if !strings.Contains(followUp, "can you check the numbers?") {
+		t.Fatalf("follow-up prompt misses the mention:\n%s", followUp)
+	}
+}
+
+func TestMentionPingPongStopsAtTheFollowUpCap(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("a", "Research")
+	world.addBot("b", "Marketing")
+	service := newTestService(world)
+	group, err := service.CreateGroup("Launch", []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 20 {
+		world.replies["a"] = append(world.replies["a"], "[@Marketing](bot:b) you?")
+		world.replies["b"] = append(world.replies["b"], "[@Research](bot:a) no, you?")
+	}
+	turns := func() int { return world.promptCount("a") + world.promptCount("b") }
+
+	if err := service.Post(group.ID, "who goes first?"); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, func() bool { return turns() == 2+maxFollowUps })
+	time.Sleep(30 * time.Millisecond)
+	if turns() != 2+maxFollowUps {
+		t.Fatalf("turns = %d, want %d", turns(), 2+maxFollowUps)
 	}
 }
 
@@ -344,12 +367,13 @@ func TestGroupMentionPicksResponders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world.replies["b"] = []string{"On it.", ""}
+	world.replies["b"] = []string{"On it."}
 
 	if err := service.Post(group.ID, "[@Marketing](bot:b) draft the post"); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, func() bool { return world.promptCount("b") == 2 })
+	waitUntil(t, func() bool { return world.promptCount("b") == 1 })
+	time.Sleep(20 * time.Millisecond)
 	if world.promptCount("a") != 0 {
 		t.Fatal("an unmentioned member took a turn")
 	}

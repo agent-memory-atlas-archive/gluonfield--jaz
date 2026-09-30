@@ -44,6 +44,6 @@ func groupTurnPrompt(group, self string, peers []string, messages []sessionevent
 	for _, message := range messages {
 		fmt.Fprintf(&b, "%s: %s\n", message.Name, message.Text)
 	}
-	b.WriteString("\nPost to the group with send_message, short and only when you add something new. If you have nothing to add, send nothing.")
+	b.WriteString("\nPost to the group with send_message, short and only when you add something new. If you have nothing to add, send nothing. Your post wakes only the members you mention, so mention one when you want their answer.")
 	return b.String()
 }
