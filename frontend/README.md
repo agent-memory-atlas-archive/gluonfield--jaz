@@ -33,6 +33,30 @@ Remote backend setup and the planned connected-device approval model are in
 - `bun run test:dictation` — verify native audio conversion and background callback isolation on macOS
 - `bun run typecheck` — renderer + main/preload TypeScript
 
+## Appearance defaults
+
+Edit [`src/renderer/public/jaz-defaults.js`](src/renderer/public/jaz-defaults.js)
+to set theme and UI defaults for a build. For a deployed web client, replace
+`jaz-defaults.js` beside `index.html` and reload; rebuilding is unnecessary.
+
+```js
+window.__JAZ_DEFAULTS__ = {
+  theme: 'system',
+  homeWordmark: 'https://example.com/logo.svg',
+  invertHomeLogoInLightMode: true,
+}
+```
+
+`homeWordmark` is the config key for **Logo Name or URL** in Settings → Appearance.
+Use a name for dithered text, or an HTTP(S) image URL. Names are limited to 64
+Unicode characters; image URLs retain their full length. Blank values and failed
+image loads display “jaz”. `invertHomeLogoInLightMode` defaults to `false`; enable
+it for white image logos that need to darken in light mode.
+
+Saved user settings take precedence over these defaults, including an explicitly
+blank logo name or disabled inversion. The config file lists the other theme,
+font, layout and composer options.
+
 ## Dictation
 
 The composer microphone uses Apple's on-device `SpeechAnalyzer` on macOS 26+
