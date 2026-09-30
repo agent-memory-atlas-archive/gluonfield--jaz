@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { chatEntries } from './bots'
+import { botDoing, chatEntries } from './bots'
 
 describe('bot chat log', () => {
   const self = { id: 'gimli', name: 'Gimli' }
@@ -39,5 +39,11 @@ describe('bot chat log', () => {
     )
     expect(shape(entries)).toEqual(['user: hi', 'bot: Hey.', '· message_sent', '· agent_switch'])
   })
-})
 
+  test('a working bot says what it is busy with until the user writes again', () => {
+    const events = [said(2, 'Hey.'), woke(3, 'group', 'Team')]
+    expect(botDoing([user(1, 1, 'hi')], events)).toBe('working in Team')
+    expect(botDoing([user(1, 1, 'hi')], [...events, woke(4, 'routine', 'Say hi')])).toBe('running Say hi')
+    expect(botDoing([user(1, 1, 'hi'), user(2, 5, 'still there?')], events)).toBeUndefined()
+  })
+})

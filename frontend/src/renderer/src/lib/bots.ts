@@ -119,3 +119,21 @@ export function chatEntries(
   return out
 }
 
+// What a bot is busy with when a group, another bot or a routine opened its
+// latest turn, whose output lands elsewhere; undefined for the user's own.
+export function botDoing(messages: ChatMessage[], events: SessionEvent[]): string | undefined {
+  const opener = events.findLast((event) => event.bot_activity && event.bot_activity.kind !== 'message_sent')
+  const activity = opener?.bot_activity
+  if (!opener || !activity) return undefined
+  if (messages.some((message) => message.role === 'user' && Date.parse(message.created_at) > Date.parse(opener.at))) return undefined
+  switch (activity.kind) {
+    case 'group':
+      return `working in ${activity.label}`
+    case 'message_received':
+      return `working on ${activity.label}'s message`
+    case 'routine':
+      return `running ${activity.label}`
+  }
+  return undefined
+}
+

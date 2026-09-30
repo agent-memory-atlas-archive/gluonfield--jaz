@@ -21,7 +21,7 @@ export function ChatLog({
   entries: ChatEntry[]
   bots: Bot[]
   named: boolean
-  working: Bot[]
+  working: { bot: Bot; doing?: string }[]
 }) {
   const avatar = (id?: string) => bots.find((bot) => bot.id === id)?.avatar ?? GONE
   return (
@@ -65,10 +65,12 @@ export function ChatLog({
           </div>
         )
       })}
-      {working.map((bot) => (
+      {working.map(({ bot, doing = 'working' }) => (
         <p key={bot.id} role="status" className="mt-4 flex items-center gap-2 text-sm text-ink-3 first:mt-0">
           <BotAvatar avatar={bot.avatar} size={22} />
-          <span className="live-shimmer">{bot.name} is working…</span>
+          <span className="live-shimmer">
+            {bot.name} is {doing}…
+          </span>
         </p>
       ))}
     </div>
