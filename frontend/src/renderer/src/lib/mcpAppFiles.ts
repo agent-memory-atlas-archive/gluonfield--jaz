@@ -1,7 +1,7 @@
 import type { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge'
 import { z } from 'zod'
-import { put } from '@/lib/api/client'
-import { sessionFileRawUrl } from '@/lib/api/sessions'
+import { apiFetch } from '@/lib/api/client'
+import { sessionFilePath } from '@/lib/api/sessions'
 
 // OpenedFile is a session file handed to a file entrypoint. The app only sees
 // its opaque uri; reads and saves come back to Jaz, which holds the path.
@@ -19,32 +19,36 @@ const writeParams = z.object({
 })
 
 // serveFile answers a file viewer's resources/read and openai/resources/write
-// for the opened file, as OpenAI's MCP extensions define them.
+// for the opened file, translating OpenAI's MCP extensions to the session file
+// endpoint's ETag, If-Match, 412 and 413.
 export function serveFile(bridge: AppBridge, file: OpenedFile) {
+  const path = sessionFilePath(file.sessionId, file.path)
   bridge.onreadresource = async ({ uri, _meta }) => {
     if (uri !== file.uri) throw new Error(`unknown resource ${uri}`)
-    const response = await fetch(sessionFileRawUrl(file.sessionId, file.path))
+    const response = await apiFetch(path)
     if (!response.ok) throw new Error(`could not read ${file.name}`)
     const bytes = new Uint8Array(await response.arrayBuffer())
     const representation = (_meta?.['openai/resource'] as { representation?: string } | undefined)?.representation
     const text = representation === 'blob' ? undefined : decodeText(bytes, representation === 'text')
-    const meta = { 'openai/resource': { etag: await etag(bytes), writable: true } }
+    const meta = { 'openai/resource': { etag: response.headers.get('ETag') ?? undefined, writable: true } }
     return { contents: [text === undefined ? { uri, blob: toBase64(bytes), _meta: meta } : { uri, text, _meta: meta }] }
   }
-  bridge.setRequestHandler('openai/resources/write', { params: writeParams }, (params) => {
-    if (params.uri !== file.uri) throw new Error('only the opened file can be written')
-    return put<Record<string, unknown>>(`/v1/sessions/${encodeURIComponent(file.sessionId)}/file`, {
-      path: file.path,
-      text: params.text,
-      blob: params.blob,
-      if_match: params.ifMatch,
-    })
+  bridge.setRequestHandler('openai/resources/write', { params: writeParams }, async ({ uri, ifMatch, text, blob }) => {
+    if (uri !== file.uri) throw new Error('only the opened file can be written')
+    const body = text ?? (blob === undefined ? undefined : Uint8Array.from(atob(blob), (char) => char.charCodeAt(0)))
+    if (body === undefined) throw new Error('text or blob is required')
+    const response = await apiFetch(path, { method: 'PUT', headers: ifMatch ? { 'If-Match': ifMatch } : {}, body })
+    const etag = response.headers.get('ETag') ?? ''
+    if (response.status === 412) return { outcome: 'conflict', etag }
+    if (response.status === 413) return { outcome: 'too-large', maxBytes: ((await response.json()) as { max_bytes: number }).max_bytes }
+    if (!response.ok) throw new Error(`could not save ${file.name}`)
+    return { outcome: 'saved', etag }
   })
 }
 
 // decodeText reads UTF-8, or reports undefined for binary content unless text
 // was asked for.
-function decodeText(bytes: Uint8Array<ArrayBuffer>, force: boolean): string | undefined {
+function decodeText(bytes: Uint8Array, force: boolean): string | undefined {
   try {
     return new TextDecoder('utf-8', { fatal: !force }).decode(bytes)
   } catch {
@@ -52,13 +56,7 @@ function decodeText(bytes: Uint8Array<ArrayBuffer>, force: boolean): string | un
   }
 }
 
-// etag matches the backend's: the hex SHA-256 of the file's bytes.
-async function etag(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
-  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-function toBase64(bytes: Uint8Array<ArrayBuffer>): string {
+function toBase64(bytes: Uint8Array): string {
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))

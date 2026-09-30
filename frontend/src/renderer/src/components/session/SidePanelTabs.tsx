@@ -20,6 +20,11 @@ const TAB_TYPES = {
   diff: { label: 'Code diff', icon: FolderGit2 },
 }
 
+function KindIcon({ kind }: { kind: keyof typeof TAB_TYPES }) {
+  const Icon = TAB_TYPES[kind].icon
+  return <Icon size={14} className="shrink-0 text-ink-3" aria-hidden />
+}
+
 // The new-tab menu lists the built-in tabs, then the thread apps of connected
 // MCP servers.
 export function SidePanelTabMenu({ sideChatAvailable, onAdd, empty = false }: {
@@ -106,7 +111,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
     <div className="flex h-9 min-w-0 flex-1 items-center gap-1 px-1 pointer-coarse:h-11">
       <Reorder.Group as="div" axis="x" values={tabs.map((tab) => tab.id)} onReorder={onReorder} layoutScroll ref={list} role="tablist" aria-label="Side panel tabs" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-app-region:no-drag]">
         {tabs.map((tab, index) => {
-          const { label, icon: Icon } = tab.kind === 'app' ? { label: tab.file?.name ?? tab.app.title, icon: null } : TAB_TYPES[tab.kind]
+          const label = tab.kind === 'app' ? tab.file?.name ?? tab.app.title : TAB_TYPES[tab.kind].label
           const target = browsers.find((browser) => browser.id === tab.id)?.target
           const title = tab.kind === 'file' ? tab.file?.path.split('/').pop() || label : target?.title || target?.displayUrl || label
           const active = activeId === tab.id
@@ -153,7 +158,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
                 {tab.kind === 'preview' ? <Favicon url={target?.displayUrl || ''} iconUrl={target?.favicon} />
                   : tab.kind === 'app' ? <span className="text-ink-3"><AppIcon app={tab.app} size={14} /></span>
                     : tab.kind === 'file' && tab.file && isSpreadsheetPath(tab.file.path) ? <FileSpreadsheet size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                      : Icon ? <Icon size={14} className="shrink-0 text-ink-3" aria-hidden /> : null}
+                      : <KindIcon kind={tab.kind} />}
                 <span className="truncate">{title}</span>
               </motion.button>
               <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onPointerDownCapture={(event) => event.stopPropagation()} onClick={() => closeTabs([tab])} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">

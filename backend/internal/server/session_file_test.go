@@ -191,40 +191,50 @@ func TestSessionFileWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := (&Server{Store: store}).Handler()
-	save := func(body string) sessionFileWriteResult {
+	fileURL := "/v1/sessions/" + session.ID + "/file?path=part.stl&raw=1"
+	send := func(method, body, ifMatch string) *httptest.ResponseRecorder {
 		t.Helper()
-		req := httptest.NewRequest(http.MethodPut, "/v1/sessions/"+session.ID+"/file", strings.NewReader(body))
+		req := httptest.NewRequest(method, fileURL, strings.NewReader(body))
+		if ifMatch != "" {
+			req.Header.Set("If-Match", ifMatch)
+		}
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)
-		if res.Code != http.StatusOK {
-			t.Fatalf("PUT %s = %d; body = %s", body, res.Code, res.Body.String())
-		}
-		var out sessionFileWriteResult
-		if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil {
-			t.Fatal(err)
-		}
-		return out
+		return res
 	}
 
-	first := save(`{"path":"part.stl","text":"solid b\n","if_match":"` + fileETag([]byte("solid a\n")) + `"}`)
-	if first.Outcome != "saved" || first.ETag != fileETag([]byte("solid b\n")) {
-		t.Fatalf("save = %#v", first)
+	// Each version differs in size, as coarse file timestamps can repeat
+	// within a test.
+	read := send(http.MethodGet, "", "")
+	original := read.Header().Get("ETag")
+	if read.Code != http.StatusOK || original == "" {
+		t.Fatalf("raw read = %d with ETag %q", read.Code, original)
 	}
-	if data, _ := os.ReadFile(file); string(data) != "solid b\n" {
+	saved := send(http.MethodPut, "solid bb\n", original)
+	if saved.Code != http.StatusNoContent || saved.Header().Get("ETag") == original {
+		t.Fatalf("save = %d with ETag %q", saved.Code, saved.Header().Get("ETag"))
+	}
+	if data, _ := os.ReadFile(file); string(data) != "solid bb\n" {
 		t.Fatalf("file = %q", data)
 	}
-	if stale := save(`{"path":"part.stl","text":"solid c\n","if_match":"` + fileETag([]byte("solid a\n")) + `"}`); stale.Outcome != "conflict" || stale.ETag != first.ETag {
-		t.Fatalf("a save against an old version = %#v", stale)
+	if again := send(http.MethodGet, "", ""); again.Header().Get("ETag") != saved.Header().Get("ETag") {
+		t.Fatalf("read after save has ETag %q, want %q", again.Header().Get("ETag"), saved.Header().Get("ETag"))
 	}
-	if data, _ := os.ReadFile(file); string(data) != "solid b\n" {
-		t.Fatalf("a conflict overwrote the file: %q", data)
+	stale := send(http.MethodPut, "solid ccc\n", original)
+	if stale.Code != http.StatusPreconditionFailed || stale.Header().Get("ETag") != saved.Header().Get("ETag") {
+		t.Fatalf("a save against an old version = %d with ETag %q", stale.Code, stale.Header().Get("ETag"))
 	}
-	if blob := save(`{"path":"` + file + `","blob":"c29saWQgZA=="}`); blob.Outcome != "saved" {
-		t.Fatalf("blob save = %#v", blob)
+	if data, _ := os.ReadFile(file); string(data) != "solid bb\n" {
+		t.Fatalf("a refused save overwrote the file: %q", data)
 	}
-	sessionFileWriteLimit = 4
-	t.Cleanup(func() { sessionFileWriteLimit = 10 * 1024 * 1024 })
-	if big := save(`{"path":"part.stl","text":"too long"}`); big.Outcome != "too-large" || big.MaxBytes != 4 {
-		t.Fatalf("an oversized save = %#v", big)
+	if blind := send(http.MethodPut, "solid dddd\n", ""); blind.Code != http.StatusNoContent {
+		t.Fatalf("a save without If-Match = %d", blind.Code)
+	}
+	big := send(http.MethodPut, strings.Repeat("x", sessionFileWriteLimit+1), "")
+	if big.Code != http.StatusRequestEntityTooLarge || !strings.Contains(big.Body.String(), `"max_bytes":10485760`) {
+		t.Fatalf("an oversized save = %d %s", big.Code, big.Body.String())
+	}
+	if data, _ := os.ReadFile(file); string(data) != "solid dddd\n" {
+		t.Fatalf("an oversized save changed the file: %q", data)
 	}
 }

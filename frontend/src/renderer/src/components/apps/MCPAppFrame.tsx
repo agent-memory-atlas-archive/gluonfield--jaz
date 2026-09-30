@@ -61,10 +61,10 @@ export function MCPAppFrame({ entry, active, file }: { entry: MCPEntrypoint; act
         { openLinks: {}, serverTools: {}, logging: {}, ...(file && { experimental: { 'openai/resource': {} } }) },
         { hostContext: mcpAppHostContext() },
       )
-      // A file viewer's calls carry the opened file's path, which only its
-      // server may see.
+      // The host alone attests the opened file's path, which only the app's
+      // server may see; an app's own openai/resource claim never passes.
       bridge.oncalltool = (params) =>
-        callMCPAppTool(serverId, file ? { ...params, _meta: { ...params._meta, 'openai/resource': { path: file.path } } } : params)
+        callMCPAppTool(serverId, { ...params, _meta: { ...params._meta, 'openai/resource': file && { path: file.path } } })
       bridge.onopenlink = async ({ url }) => {
         window.open(url, '_blank', 'noopener,noreferrer')
         return {}

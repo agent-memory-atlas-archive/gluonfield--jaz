@@ -144,8 +144,7 @@ func (m *Manager) connectionKey(ctx context.Context, server mcpconfig.Server) ([
 func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Server) (*serverSession, error) {
 	var items []remoteTool
 	session := c.current()
-	apps := newServerApps()
-	icon := serverIcon(session.InitializeResult())
+	apps := newServerApps(server.ID, session.InitializeResult())
 	for tool, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, err
@@ -153,8 +152,9 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 		if tool == nil || tool.Name == "" {
 			continue
 		}
-		apps.add(tool, icon)
-		if model, _, _ := toolUI(tool); !model {
+		meta := readToolMeta(tool)
+		apps.add(tool, meta)
+		if !meta.visibleTo("model") {
 			continue
 		}
 		items = append(items, remoteTool{

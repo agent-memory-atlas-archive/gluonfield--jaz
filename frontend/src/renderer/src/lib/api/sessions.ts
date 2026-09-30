@@ -74,9 +74,15 @@ export function sendSessionSideChat(id: string, input: SideChatMessageInput): Pr
   return post<{ ok: boolean }>(`/v1/sessions/${id}/side-chat`, input)
 }
 
-export function sessionFileRawUrl(sessionId: string, path: string): string {
+// sessionFilePath addresses a session file's raw content: GET reads it with an
+// ETag, and PUT replaces it, honouring If-Match.
+export function sessionFilePath(sessionId: string, path: string): string {
   const params = new URLSearchParams({ path, raw: '1' })
-  return apiEmbeddedGetUrl(`/v1/sessions/${encodeURIComponent(sessionId)}/file?${params.toString()}`)
+  return `/v1/sessions/${encodeURIComponent(sessionId)}/file?${params.toString()}`
+}
+
+export function sessionFileRawUrl(sessionId: string, path: string): string {
+  return apiEmbeddedGetUrl(sessionFilePath(sessionId, path))
 }
 
 export function sessionAttachmentUrl(sessionId: string, attachmentId: string): string {

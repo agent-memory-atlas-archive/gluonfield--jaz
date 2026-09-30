@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -32,40 +33,70 @@ type Entrypoint struct {
 	Extensions []string `json:"extensions,omitempty"`
 }
 
+// toolMeta is what a tool's _meta declares for MCP Apps: the UI resource it
+// opens and who may call it, and where OpenAI's MCP extensions open it.
+type toolMeta struct {
+	UI struct {
+		ResourceURI string   `json:"resourceUri"`
+		Visibility  []string `json:"visibility"`
+	} `json:"ui"`
+	OpenAI struct {
+		Entrypoints []struct {
+			Type       string   `json:"type"`
+			Extensions []string `json:"extensions"`
+		} `json:"entrypoints"`
+	} `json:"openai/ui"`
+}
+
+// readToolMeta decodes a tool's _meta; a malformed field reads as unset.
+func readToolMeta(tool *mcpsdk.Tool) toolMeta {
+	var meta toolMeta
+	if data, err := json.Marshal(tool.Meta); err == nil {
+		_ = json.Unmarshal(data, &meta)
+	}
+	return meta
+}
+
+// visibleTo reports whether "model" or "app" may call the tool; both may when
+// its visibility is unset.
+func (m toolMeta) visibleTo(audience string) bool {
+	return m.UI.Visibility == nil || slices.Contains(m.UI.Visibility, audience)
+}
+
 // serverApps is what a server's tools declare for MCP Apps: the UI resource
 // each linked tool opens, its entrypoints, and the tools apps may call.
 type serverApps struct {
+	serverID    string
+	icon        string
 	uris        map[string]string
 	entrypoints []Entrypoint
 	callable    map[string]bool
 }
 
-func newServerApps() *serverApps {
-	return &serverApps{uris: map[string]string{}, callable: map[string]bool{}}
+func newServerApps(serverID string, init *mcpsdk.InitializeResult) *serverApps {
+	apps := &serverApps{serverID: serverID, uris: map[string]string{}, callable: map[string]bool{}}
+	if init != nil && init.ServerInfo != nil && len(init.ServerInfo.Icons) > 0 {
+		apps.icon = init.ServerInfo.Icons[0].Source
+	}
+	return apps
 }
 
 // add records what one tool declares. An entrypoint's tool is callable by the
 // host whatever its visibility, as opening the entrypoint calls it.
-func (a *serverApps) add(tool *mcpsdk.Tool, icon string) {
-	_, app, uri := toolUI(tool)
-	if app {
+func (a *serverApps) add(tool *mcpsdk.Tool, meta toolMeta) {
+	if meta.visibleTo("app") {
 		a.callable[tool.Name] = true
 	}
-	if uri == "" {
+	if meta.UI.ResourceURI == "" {
 		return
 	}
-	a.uris[tool.Name] = uri
-	ui, _ := tool.Meta["openai/ui"].(map[string]any)
-	list, _ := ui["entrypoints"].([]any)
-	for _, raw := range list {
-		entry, _ := raw.(map[string]any)
-		kind, _ := entry["type"].(string)
-		if kind != "global" && kind != "thread" && kind != "file" {
-			continue
-		}
-		point := Entrypoint{Tool: tool.Name, Type: kind, Title: toolTitle(tool), Icon: icon}
-		if kind == "file" {
-			for _, ext := range asStrings(entry["extensions"]) {
+	a.uris[tool.Name] = meta.UI.ResourceURI
+	for _, declared := range meta.OpenAI.Entrypoints {
+		point := Entrypoint{ServerID: a.serverID, Tool: tool.Name, Type: declared.Type, Title: toolTitle(tool), Icon: a.icon}
+		switch declared.Type {
+		case "global", "thread":
+		case "file":
+			for _, ext := range declared.Extensions {
 				if strings.HasPrefix(ext, ".") {
 					point.Extensions = append(point.Extensions, strings.ToLower(ext))
 				}
@@ -73,6 +104,8 @@ func (a *serverApps) add(tool *mcpsdk.Tool, icon string) {
 			if len(point.Extensions) == 0 {
 				continue
 			}
+		default:
+			continue
 		}
 		a.entrypoints = append(a.entrypoints, point)
 		a.callable[tool.Name] = true
@@ -87,45 +120,6 @@ func toolTitle(tool *mcpsdk.Tool) string {
 		return tool.Annotations.Title
 	}
 	return tool.Name
-}
-
-func asStrings(v any) []string {
-	list, _ := v.([]any)
-	out := make([]string, 0, len(list))
-	for _, item := range list {
-		if s, ok := item.(string); ok {
-			out = append(out, s)
-		}
-	}
-	return out
-}
-
-// serverIcon is the icon a server publishes in its initialize result.
-func serverIcon(init *mcpsdk.InitializeResult) string {
-	if init != nil && init.ServerInfo != nil && len(init.ServerInfo.Icons) > 0 {
-		return init.ServerInfo.Icons[0].Source
-	}
-	return ""
-}
-
-// toolUI reads a tool's MCP Apps _meta.ui: who may call it (both the model and
-// the app when visibility is unset) and the UI resource it opens, if any.
-func toolUI(tool *mcpsdk.Tool) (model, app bool, resourceURI string) {
-	ui, _ := tool.Meta["ui"].(map[string]any)
-	resourceURI, _ = ui["resourceUri"].(string)
-	list, ok := ui["visibility"].([]any)
-	if !ok {
-		return true, true, resourceURI
-	}
-	for _, audience := range list {
-		switch audience {
-		case "model":
-			model = true
-		case "app":
-			app = true
-		}
-	}
-	return model, app, resourceURI
 }
 
 // Entrypoints lists the MCP Apps people can open from connected servers:
@@ -151,11 +145,9 @@ func (m *Manager) Entrypoints(ctx context.Context) ([]Entrypoint, error) {
 			continue
 		}
 		for _, point := range session.apps.entrypoints {
-			if point.Type == "global" && !server.ShowInUI {
-				continue
+			if point.Type != "global" || server.ShowInUI {
+				out = append(out, point)
 			}
-			point.ServerID = server.ID
-			out = append(out, point)
 		}
 	}
 	return out, nil
