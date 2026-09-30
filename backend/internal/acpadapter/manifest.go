@@ -1,6 +1,7 @@
 package acpadapter
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,31 +31,16 @@ type manifestAsset struct {
 	Env    map[string]string `json:"env,omitempty"`
 }
 
-func manifestURLForVersion(version string) string {
+// releaseTag is the release a manifest is pinned to, or "" for latest.
+func releaseTag(version string) string {
 	version = strings.TrimSpace(version)
 	if version == "" || version == "dev" {
-		return releasesURL + "/latest/download/acp-adapters.json"
-	}
-	if !strings.HasPrefix(version, "v") {
-		version = "v" + version
-	}
-	return releasesURL + "/download/" + version + "/acp-adapters.json"
-}
-
-func manifestCacheNameForVersion(version string) string {
-	version = strings.TrimSpace(version)
-	if version == "" || version == "dev" {
-		return "latest"
+		return ""
 	}
 	if !strings.HasPrefix(version, "v") {
 		version = "v" + version
 	}
 	return version
-}
-
-func usesLatestManifest(version string) bool {
-	version = strings.TrimSpace(version)
-	return version == "" || version == "dev"
 }
 
 func (m *Manager) resolveSpec(ctx context.Context, name string) (adapterSpec, error) {
@@ -102,15 +88,20 @@ func (m *Manager) specFromManifest(source manifest, name, platform string) (adap
 	return spec, nil
 }
 
-// fetchManifest reads the dev manifest, or refreshes the release manifest
-// cache and falls back to it when the network fails.
+// fetchManifest reads the dev manifest or the release manifest. A tagged
+// release manifest never changes, so once cached it is final; the latest
+// manifest is refetched and falls back to its cache when the network fails.
 func (m *Manager) fetchManifest(ctx context.Context) (manifest, error) {
 	if m.localManifestPath != "" {
 		return readLocalManifest(m.localManifestPath)
 	}
+	cached, cachedOK := m.readManifestCache()
+	if cachedOK && m.tag != "" {
+		return cached, nil
+	}
 	out, err := m.fetchRemoteManifest(ctx)
 	if err != nil {
-		if cached, ok := m.readManifestCache(); ok {
+		if cachedOK {
 			return cached, nil
 		}
 		return manifest{}, err
@@ -189,7 +180,7 @@ func (m *Manager) readManifestCache() (manifest, bool) {
 }
 
 func (m *Manager) manifestCachePath() string {
-	return filepath.Join(m.root, "acp", "managed", "adapters", "manifest-"+m.manifestCacheName+".json")
+	return filepath.Join(m.root, "acp", "managed", "adapters", "manifest-"+cmp.Or(m.tag, "latest")+".json")
 }
 
 func findLocalManifestPath() string {

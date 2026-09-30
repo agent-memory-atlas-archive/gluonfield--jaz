@@ -14,7 +14,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 const (
@@ -29,7 +28,7 @@ func (m *Manager) install(ctx context.Context, spec toolSpec) error {
 		return err
 	}
 	if err := verifySHA512(body, spec.SHA512); err != nil {
-		return fmt.Errorf("verify %s: %w", DisplayName(spec.Tool), err)
+		return fmt.Errorf("verify %s: %w", displayName(spec.Tool), err)
 	}
 	parent := filepath.Dir(spec.Root)
 	if err := os.MkdirAll(parent, 0o755); err != nil {
@@ -147,37 +146,32 @@ func copyLimited(dst io.Writer, src io.Reader, limit int64) (int64, error) {
 
 func downloadingStatus(spec toolSpec) Status {
 	return Status{
-		Tool:      spec.Tool,
-		Version:   spec.Version,
-		Platform:  spec.Platform,
-		Path:      spec.Command,
-		State:     StateDownloading,
-		Message:   "Downloading " + DisplayName(spec.Tool),
-		StartedAt: time.Now().UTC(),
+		Tool:     spec.Tool,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateDownloading,
 	}
 }
 
 func readyStatus(spec toolSpec) Status {
 	return Status{
-		Tool:       spec.Tool,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateReady,
-		Message:    DisplayName(spec.Tool) + " is ready",
-		FinishedAt: time.Now().UTC(),
+		Tool:     spec.Tool,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateReady,
 	}
 }
 
 func failedStatus(spec toolSpec, err error) Status {
 	return Status{
-		Tool:       spec.Tool,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateFailed,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
+		Tool:     spec.Tool,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateFailed,
+		Message:  err.Error(),
 	}
 }
 

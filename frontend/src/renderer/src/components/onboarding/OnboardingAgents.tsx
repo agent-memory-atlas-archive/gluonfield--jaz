@@ -142,11 +142,7 @@ function AgentCard({
   let missingDetail = ''
   if (companionAppBlocked) {
     missingDetail = `${probe.app_name || authProviderLabel(probe.agent)} is installed on ${agentHost}, but ${onboardingAgentLabel(probe.agent)} is not available to jaz.`
-  } else if (state === 'downloading') {
-    missingDetail = installMessage(probe) || 'Downloading.'
-  } else if (state === 'failed') {
-    missingDetail = installMessage(probe) || 'Download failed.'
-  } else if (state === 'missing') {
+  } else if (state === 'missing' || state === 'failed') {
     missingDetail = installMessage(probe) || probe.reason || ''
   }
 

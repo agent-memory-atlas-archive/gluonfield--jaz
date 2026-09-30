@@ -35,7 +35,7 @@ type Status struct {
 type Manager struct {
 	root              string
 	manifestURL       string
-	manifestCacheName string
+	tag               string
 	localManifestPath string
 	client            *http.Client
 	installMu         sync.Mutex
@@ -44,24 +44,24 @@ type Manager struct {
 }
 
 func New(root, releaseVersion string) *Manager {
-	localManifestPath := ""
-	if usesLatestManifest(releaseVersion) {
-		localManifestPath = findLocalManifestPath()
+	m := &Manager{
+		root:   root,
+		tag:    releaseTag(releaseVersion),
+		client: &http.Client{Timeout: 10 * time.Minute},
+		status: map[string]Status{},
 	}
-	return &Manager{
-		root:              root,
-		manifestURL:       manifestURLForVersion(releaseVersion),
-		manifestCacheName: manifestCacheNameForVersion(releaseVersion),
-		localManifestPath: localManifestPath,
-		client:            &http.Client{Timeout: 10 * time.Minute},
-		status:            map[string]Status{},
+	if m.tag == "" {
+		m.manifestURL = releasesURL + "/latest/download/acp-adapters.json"
+		m.localManifestPath = findLocalManifestPath()
+	} else {
+		m.manifestURL = releasesURL + "/download/" + m.tag + "/acp-adapters.json"
 	}
+	return m
 }
 
 func NewForTest(root, manifestURL string, client *http.Client) *Manager {
 	m := New(root, "dev")
 	m.manifestURL = strings.TrimSpace(manifestURL)
-	m.manifestCacheName = "test"
 	m.localManifestPath = ""
 	if client != nil {
 		m.client = client
@@ -113,7 +113,6 @@ func (m *Manager) Status(name string) Status {
 		Adapter:  name,
 		Platform: platform,
 		State:    StateMissing,
-		Message:  displayName(name) + " adapter is not downloaded yet",
 	}
 }
 
@@ -179,7 +178,6 @@ func downloadingStatus(spec adapterSpec) Status {
 		Platform: spec.Platform,
 		Path:     spec.Command,
 		State:    StateDownloading,
-		Message:  "Downloading " + displayName(spec.Adapter) + " adapter",
 	}
 }
 
@@ -190,7 +188,6 @@ func readyStatus(spec adapterSpec) Status {
 		Platform: spec.Platform,
 		Path:     spec.Command,
 		State:    StateReady,
-		Message:  displayName(spec.Adapter) + " adapter is ready",
 	}
 }
 
@@ -202,19 +199,6 @@ func failedStatus(spec adapterSpec, err error) Status {
 		Path:     spec.Command,
 		State:    StateFailed,
 		Message:  err.Error(),
-	}
-}
-
-func displayName(adapter string) string {
-	switch adapter {
-	case "codex":
-		return "Codex"
-	case "claude":
-		return "Claude"
-	case "kimi":
-		return "Kimi"
-	default:
-		return adapter
 	}
 }
 
