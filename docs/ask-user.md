@@ -6,6 +6,9 @@
 - [x] Review the implementation; commit after verification.
 - [x] Complete the requested thermo-nuclear review, repair reproduced defects, and verify the revised lifecycle.
 - [x] Merge the reviewed changes into local main.
+- [x] Read the six extracted skills and attempt a live question call for the Databricks-to-Snowflake scenario.
+- [x] Reproduce and repair the immediate cancellation seen after native steering.
+- [ ] Activate the steering correction and complete the live question/answer trial.
 
 `ask_user` accepts ordered `questions`, each with `id`, `question`, optional `header`, and optional `options` containing labels and descriptions. It uses the caller's thread binding, displays the existing question card, waits for all answers, and returns `answers` keyed by question id. Free text is always available. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle. There is no new plan-mode requirement or frontend implementation.
 
@@ -27,4 +30,8 @@ Use fresh ordinary-mode Codex and Claude threads with the same model/effort as t
 
 Record whether a structured question card appears voluntarily, whether the questions affect the plan, and whether the agent uses the submitted answers. Compare with fresh threads on the current build. A forced tool call verifies availability; voluntary use measures adoption. Keep tool-response timeout behavior under observation during the live trial.
 
-Status: implemented, reviewed and fast-forwarded into local main at `7b51a343`. Backend activation, actual UI smoke check, and voluntary Codex/Claude adoption remain pending. No live agent test or native-parity release certification is claimed.
+## First live trial
+
+The tool was available in the current Codex session. After reading all six skills, the migration example asked about workload scope, goal/deadline, target readiness and cutover constraints. It immediately returned `cancelled: true`, with no confirmed question-card display. The native-steering HTTP MCP regression reproduces this: overlapping native steering calls were counted as a queued future prompt. The queue guard now applies only to adapters advertising prompt queueing. Initial-prompt and native-steering round trips pass, queued elicitation still cancels correctly, and the full backend suite, repeated race checks and affected vet pass.
+
+Status: the initial reviewed implementation is on local main. The steering correction needs backend activation before another live question/answer trial. Voluntary Codex/Claude adoption remains unmeasured; no native-parity release certification is claimed.

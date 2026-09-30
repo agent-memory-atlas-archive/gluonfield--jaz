@@ -483,7 +483,7 @@ func (j *jobState) turnCancel() context.CancelFunc {
 func (j *jobState) hasQueuedPromptSuccessor() bool {
 	j.mu.RLock()
 	defer j.mu.RUnlock()
-	return j.turn != nil && j.turn.promptCalls > 1
+	return j.steerMethod == steerPromptQueueing && j.turn != nil && j.turn.promptCalls > 1
 }
 
 func (j *jobState) requirePromptHandoff(done chan struct{}) <-chan struct{} {

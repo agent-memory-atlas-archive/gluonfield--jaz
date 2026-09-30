@@ -46,7 +46,26 @@ func (t askUserTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func TestAskUserMCPRoundTripInOrdinaryMode(t *testing.T) {
+	for _, steered := range []bool{false, true} {
+		name := "initial prompt"
+		if steered {
+			name = "native steering"
+		}
+		t.Run(name, func(t *testing.T) {
+			testAskUserMCPRoundTrip(t, steered)
+		})
+	}
+}
+
+func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
+	t.Helper()
 	manager, store, session, ctx := askUserFixture(t)
+	if steered {
+		job := manager.jobByID(session.ID)
+		job.steerMethod = steerNative
+		job.startTurn(CompletionInline, false, false)
+		job.turn.promptCalls++
+	}
 	events := manager.Events.Subscribe(ctx, session.ID)
 	server := mcp.NewServer(&mcp.Implementation{Name: "jaztools", Version: "1"}, nil)
 	NewMCPTools(manager).AddTo(server)
@@ -99,6 +118,8 @@ func TestAskUserMCPRoundTripInOrdinaryMode(t *testing.T) {
 			t.Fatalf("unexpected event: %#v", event)
 		}
 		permission = *event.Permission
+	case call := <-done:
+		t.Fatalf("tool returned before presenting questions: %#v", call.StructuredContent)
 	case err := <-errs:
 		t.Fatal(err)
 	case <-ctx.Done():
