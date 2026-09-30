@@ -5,6 +5,10 @@
  * `dark:` variant is only needed for the rare per-element tweak. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Keyboard focus styling applies only while navigating with Tab; see
+ * lib/dom/keyboardFocus. */
+@custom-variant focus-visible (&:focus-visible:where([data-keyboard-focus] *));
+
 @theme {
   /* ground + surfaces — near-white paper with a trace of the cobalt hue;
    * surfaces deepen as they come forward */
@@ -662,6 +666,9 @@ h3 {
  * shape (offset 0 so it follows the border-radius instead of floating off as a
  * detached pill). Interactive elements should NOT redeclare their own ring. */
 :focus-visible {
+  outline: none;
+}
+:focus-visible:where([data-keyboard-focus] *) {
   outline: 2px solid color-mix(in oklab, var(--color-primary) 50%, transparent);
   outline-offset: 0;
 }

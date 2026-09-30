@@ -1,5 +1,6 @@
 import { cloneElement, createContext, type ReactElement, type ReactNode, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { hasKeyboardFocus } from '@/lib/dom/keyboardFocus'
 import { layoutRect, layoutViewport } from '@/lib/dom/zoom'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
 
@@ -90,7 +91,7 @@ export function HoverCard({ children, content, disabled = false }: {
       onPointerDownCapture={group.close}
       onContextMenuCapture={group.close}
       onFocus={(event) => {
-        if (!disabled && event.target.matches(':focus-visible')) {
+        if (!disabled && hasKeyboardFocus(event.target)) {
           group.show(id, event.currentTarget, content)
         }
       }}
