@@ -15,14 +15,16 @@ import (
 )
 
 type fakeWorld struct {
-	mu       sync.Mutex
-	records  map[string]storage.BotRecord
-	sessions map[string]storage.Session
-	events   map[string][]sessionevents.Event
-	prompts  map[string][]string
-	replies  map[string][]string
-	created  []acp.SpawnRequest
-	loops    []loops.Loop
+	mu        sync.Mutex
+	records   map[string]storage.BotRecord
+	sessions  map[string]storage.Session
+	events    map[string][]sessionevents.Event
+	prompts   map[string][]string
+	replies   map[string][]string
+	created   []acp.SpawnRequest
+	loops     []loops.Loop
+	published []sessionevents.Event
+	service   *Service
 }
 
 func newFakeWorld() *fakeWorld {
@@ -117,15 +119,29 @@ func (w *fakeWorld) LoadSessionEvents(id string) ([]sessionevents.Event, error) 
 func (w *fakeWorld) AppendSessionEvents(id string, events ...sessionevents.Event) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	w.events[id] = append(w.events[id], events...)
+	for i := range events {
+		events[i].Seq = int64(len(w.events[id]) + 1)
+		w.events[id] = append(w.events[id], events[i])
+	}
 	return nil
 }
 
-func (w *fakeWorld) LoadLatestACPTurn(context.Context, string) ([]sessionevents.Event, error) {
-	return nil, nil
+func (w *fakeWorld) LoadLatestSessionEvent(id, eventType string) (sessionevents.Event, bool, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for i := len(w.events[id]) - 1; i >= 0; i-- {
+		if w.events[id][i].Type == eventType {
+			return w.events[id][i], true, nil
+		}
+	}
+	return sessionevents.Event{}, false, nil
 }
 
-func (w *fakeWorld) Publish(sessionevents.Event) {}
+func (w *fakeWorld) Publish(event sessionevents.Event) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.published = append(w.published, event)
+}
 
 func (w *fakeWorld) List() ([]loops.Loop, error) {
 	return w.loops, nil
@@ -167,19 +183,27 @@ func (t fakeThreads) StartInternalTurnWhenIdle(_ context.Context, req acp.Intern
 	return acp.Job{ID: req.Session}, nil
 }
 
+// Wait runs the turn: the bot sends its scripted message, if any, the way it
+// would call send_message.
 func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, error) {
 	t.world.mu.Lock()
-	defer t.world.mu.Unlock()
 	reply := ""
 	if queue := t.world.replies[req.Session]; len(queue) > 0 {
 		reply = queue[0]
 		t.world.replies[req.Session] = queue[1:]
 	}
-	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: reply}, nil
+	t.world.mu.Unlock()
+	if reply != "" {
+		if err := t.world.service.Say(req.Session, reply); err != nil {
+			return acp.Job{}, err
+		}
+	}
+	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
 }
 
 func newTestService(world *fakeWorld) *Service {
-	return NewService(world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
+	world.service = NewService(world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
+	return world.service
 }
 
 func (w *fakeWorld) addBot(id, name string) {
@@ -248,7 +272,7 @@ func TestRoutineOwnerChecksNamedBotsKeepsBotThreadAndGivesOtherThreadsANewBot(t 
 	}
 }
 
-func TestGroupRoundSkipsPassesAndStopsOnSilence(t *testing.T) {
+func TestGroupRoundPostsWhatMembersSendAndStopsOnSilence(t *testing.T) {
 	world := newFakeWorld()
 	world.addBot("a", "Research")
 	world.addBot("b", "Marketing")
@@ -257,8 +281,8 @@ func TestGroupRoundSkipsPassesAndStopsOnSilence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world.replies["a"] = []string{"PASS", "pass"}
-	world.replies["b"] = []string{"Marketing: Draft is in the doc.", "PASS"}
+	world.replies["a"] = []string{"", ""}
+	world.replies["b"] = []string{"Draft is in the doc.", ""}
 
 	if err := service.Post(group.ID, "Where is the launch draft?"); err != nil {
 		t.Fatal(err)
@@ -287,7 +311,7 @@ func TestGroupMentionPicksResponders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world.replies["b"] = []string{"On it.", "PASS"}
+	world.replies["b"] = []string{"On it.", ""}
 
 	if err := service.Post(group.ID, "[@Marketing](bot:b) draft the post"); err != nil {
 		t.Fatal(err)
@@ -316,6 +340,36 @@ func TestMessageRelaysReplyToSender(t *testing.T) {
 	}
 	if relayed := world.prompts["gimli"][0]; !strings.HasPrefix(relayed, "[reply from dr eggbot]") || !strings.Contains(relayed, "temporal harness") {
 		t.Fatalf("relayed reply = %q", relayed)
+	}
+	if len(world.published) == 0 {
+		t.Fatal("nothing was published")
+	}
+	for _, event := range world.published {
+		if event.RoomMessage != nil {
+			t.Fatalf("an answer to a bot reached a chat: %+v", event.RoomMessage)
+		}
+		if event.Seq == 0 {
+			t.Fatalf("published %s without the seq clients match history by", event.Type)
+		}
+	}
+}
+
+func TestSayOutsideAServiceTurnReachesTheBotsOwnChat(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("gimli", "Gimli")
+	service := newTestService(world)
+
+	if err := service.Say("gimli", "  Moved it to In Progress.  "); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(world.roomMessages("gimli"), "\n"); got != "Gimli: Moved it to In Progress." {
+		t.Fatalf("own chat = %q", got)
+	}
+	if bot, err := service.Load("gimli"); err != nil || bot.Preview != "Moved it to In Progress." {
+		t.Fatalf("preview = %q, %v", bot.Preview, err)
+	}
+	if err := service.Say("plain-chat", "hi"); err == nil {
+		t.Fatal("a thread that is not a bot sent a bot message")
 	}
 }
 

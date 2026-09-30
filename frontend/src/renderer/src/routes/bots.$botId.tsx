@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useLocation } from '@tanstack/react-router'
 import { BotPill } from '@/components/bots/BotAvatar'
 import { BotDetails } from '@/components/bots/BotDetails'
+import { ChatLog } from '@/components/bots/ChatLog'
 import { GroupChat } from '@/components/bots/GroupChat'
 import { ThreadView } from '@/components/session/ThreadView'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { botsQuery } from '@/lib/api/bots'
+import { chatEntries } from '@/lib/bots'
 
 declare module '@tanstack/history' {
   interface HistoryState {
@@ -24,8 +26,8 @@ function BotRoute() {
   const bot = bots.data?.find((item) => item.id === botId)
   if (!bot) return bots.isPending ? null : <EmptyState title="This bot is gone" />
   if (bot.kind === 'group') return <GroupChat key={bot.id} group={bot} bots={bots.data ?? []} />
-  // A bot is a thread with a face: the thread view, its identity in the
-  // titlebar, and its details where Overview would be.
+  // A bot is a thread with a face: the thread view shown as a chat, its
+  // identity in the titlebar, and its details where Overview would be.
   return (
     <ThreadView
       key={bot.id}
@@ -34,6 +36,14 @@ function BotRoute() {
       details={<BotDetails bot={bot} focusName={newBot} />}
       openDetails={newBot}
       placeholder={`Message ${bot.name}`}
+      chat={({ messages, events, working }) => (
+        <ChatLog
+          entries={chatEntries(messages, events, bot, working)}
+          bots={bots.data ?? []}
+          named={false}
+          working={working ? [bot] : []}
+        />
+      )}
     />
   )
 }

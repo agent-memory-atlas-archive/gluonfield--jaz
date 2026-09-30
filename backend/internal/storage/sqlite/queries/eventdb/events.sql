@@ -59,6 +59,24 @@ WHERE events.thread_id = sqlc.arg(thread_id)
   AND events.seq > COALESCE((SELECT boundary.seq FROM boundary), 0)
 ORDER BY events.seq;
 
+-- name: LatestSessionEventOfType :one
+SELECT
+  thread_id,
+  seq,
+  projection_key,
+  projection_op,
+  type,
+  content,
+  acp,
+  plan,
+  permission,
+  created_at_ms
+FROM session_events
+WHERE thread_id = sqlc.arg(thread_id)
+  AND type = sqlc.arg(type)
+ORDER BY seq DESC
+LIMIT 1;
+
 -- name: ListSessionEventCompactionPage :many
 SELECT
   thread_id,

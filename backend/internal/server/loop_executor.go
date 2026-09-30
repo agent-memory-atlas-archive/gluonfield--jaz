@@ -109,13 +109,13 @@ func (r *LoopRunner) startBotTurn(execution loops.Execution) {
 }
 
 func (r *LoopRunner) announce(threadID string, activity sessionevents.BotActivityEvent) {
-	event := sessionevents.Event{SessionID: threadID, Type: sessionevents.TypeBotActivity, BotActivity: &activity, At: time.Now().UTC()}
-	if err := r.store.AppendSessionEvents(threadID, event); err != nil {
+	events := []sessionevents.Event{{SessionID: threadID, Type: sessionevents.TypeBotActivity, BotActivity: &activity, At: time.Now().UTC()}}
+	if err := r.store.AppendSessionEvents(threadID, events...); err != nil {
 		r.logger().Warn("append bot activity failed", "thread", threadID, "error", err)
 		return
 	}
 	if r.events != nil {
-		r.events.Publish(event)
+		r.events.Publish(events[0])
 	}
 }
 

@@ -81,7 +81,7 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 		spoke := false
 		for i := range responders {
 			member := responders[(offset+turn+i)%len(responders)]
-			reply, err := s.memberTurn(ctx, groupID, name, member)
+			said, err := s.memberTurn(ctx, groupID, name, member)
 			if ctx.Err() != nil {
 				return
 			}
@@ -89,17 +89,11 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 				s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
 				continue
 			}
-			if reply == "" || strings.EqualFold(reply, passReply) {
+			if len(said) == 0 {
 				continue
 			}
-			name := s.name(member)
-			if rest, ok := strings.CutPrefix(reply, name+":"); ok {
-				reply = strings.TrimSpace(rest)
-			}
-			message := sessionevents.RoomMessageEvent{Speaker: "bot", BotID: member, Name: name, Text: reply}
-			s.appendEvent(sessionevents.Event{SessionID: groupID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
 			spoke = true
-			replies++
+			replies += len(said)
 			if replies >= maxReplies {
 				return
 			}
@@ -110,14 +104,15 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 	}
 }
 
-func (s *Service) memberTurn(ctx context.Context, groupID, name, member string) (string, error) {
+// memberTurn gives member a turn in the group and returns what it posted.
+func (s *Service) memberTurn(ctx context.Context, groupID, name, member string) ([]string, error) {
 	record, err := s.Store.LoadBot(groupID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	events, err := s.Store.LoadSessionEvents(groupID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	peers := make([]string, 0, len(record.Members))
 	for _, other := range record.Members {
@@ -126,7 +121,7 @@ func (s *Service) memberTurn(ctx context.Context, groupID, name, member string) 
 		}
 	}
 	prompt := groupTurnPrompt(name, s.name(member), peers, unseen(events, member))
-	return s.ask(ctx, member, prompt, sessionevents.BotActivityEvent{Kind: "group", Label: name, BotID: groupID})
+	return s.ask(ctx, member, groupID, prompt, sessionevents.BotActivityEvent{Kind: "group", Label: name, BotID: groupID})
 }
 
 // unseen returns the group messages posted since member last spoke.

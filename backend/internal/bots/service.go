@@ -28,6 +28,7 @@ type Service struct {
 
 	mu     sync.Mutex
 	rounds map[string]*round
+	voices map[string]*voice
 }
 
 func NewService(store Store, threads Threads, routines Routines, events Publisher, workspace string, logger *log.Logger) *Service {
@@ -270,9 +271,9 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 		UpdatedAt: session.UpdatedAt,
 		Members:   record.Members,
 		Routines:  routines,
+		Preview:   s.preview(session.ID, record.Kind == KindGroup),
 	}
 	if record.Kind == KindGroup {
-		bot.Preview = s.groupPreview(session.ID)
 		return bot
 	}
 	bot.Model = session.Model
@@ -283,35 +284,25 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 			bot.Directory = rel
 		}
 	}
-	bot.Preview = s.botPreview(session.ID)
 	return bot
 }
 
-func (s *Service) botPreview(threadID string) string {
-	events, err := s.Store.LoadLatestACPTurn(context.Background(), threadID)
-	if err != nil {
+// preview is the newest chat message in a bot's or group's thread; a group's
+// preview names its speaker.
+func (s *Service) preview(threadID string, group bool) string {
+	event, ok, err := s.Store.LoadLatestSessionEvent(threadID, sessionevents.TypeRoomMessage)
+	if err != nil || !ok || event.RoomMessage == nil {
 		return ""
 	}
-	var text strings.Builder
-	for _, event := range events {
-		if event.Type == sessionevents.TypeACPMessage {
-			text.WriteString(event.Content)
-		}
+	text := event.RoomMessage.Text
+	if group {
+		text = event.RoomMessage.Name + ": " + text
 	}
-	return preview(text.String())
-}
-
-func (s *Service) groupPreview(threadID string) string {
-	events, err := s.Store.LoadSessionEvents(threadID)
-	if err != nil {
-		return ""
+	text = strings.Join(strings.Fields(text), " ")
+	if runes := []rune(text); len(runes) > 140 {
+		return string(runes[:140]) + "…"
 	}
-	for _, event := range slices.Backward(events) {
-		if message := event.RoomMessage; message != nil {
-			return preview(message.Name + ": " + message.Text)
-		}
-	}
-	return ""
+	return text
 }
 
 func (s *Service) routineCounts() (map[string]int, error) {
@@ -344,18 +335,12 @@ func (s *Service) memberBots(ids []string) ([]string, error) {
 
 func normalizeAvatar(avatar *Avatar) (Avatar, error) {
 	if avatar == nil {
-		return Avatar{Shape: shapes[rand.IntN(len(shapes))], Color: colors[rand.IntN(len(colors))]}, nil
+		// A random face skips the neutral white and gray at the ends of colors.
+		vivid := colors[1 : len(colors)-1]
+		return Avatar{Shape: shapes[rand.IntN(len(shapes))], Color: vivid[rand.IntN(len(vivid))]}, nil
 	}
 	if !slices.Contains(shapes, avatar.Shape) || !slices.Contains(colors, avatar.Color) {
 		return Avatar{}, fmt.Errorf("unsupported avatar %s/%s", avatar.Shape, avatar.Color)
 	}
 	return *avatar, nil
-}
-
-func preview(text string) string {
-	text = strings.Join(strings.Fields(text), " ")
-	if runes := []rune(text); len(runes) > 140 {
-		return string(runes[:140]) + "…"
-	}
-	return text
 }

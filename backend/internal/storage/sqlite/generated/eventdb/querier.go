@@ -17,6 +17,7 @@ type Querier interface {
 	GetSessionEventByCoalesceKey(ctx context.Context, arg GetSessionEventByCoalesceKeyParams) (GetSessionEventByCoalesceKeyRow, error)
 	GetSessionEventCompactionState(ctx context.Context, threadID string) (GetSessionEventCompactionStateRow, error)
 	HasPendingSessionEventCompaction(ctx context.Context, runningStatus string) (bool, error)
+	LatestSessionEventOfType(ctx context.Context, arg LatestSessionEventOfTypeParams) (LatestSessionEventOfTypeRow, error)
 	LatestSessionEventSeq(ctx context.Context, threadID string) (int64, error)
 	ListLatestACPTurn(ctx context.Context, threadID string) ([]ListLatestACPTurnRow, error)
 	ListOverviewEvents(ctx context.Context, threadID string) ([]ListOverviewEventsRow, error)

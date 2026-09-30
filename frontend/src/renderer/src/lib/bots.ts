@@ -1,4 +1,5 @@
-import type { Bot, BotAvatar, BotColor, BotShape } from '@/lib/api/types'
+import type { Bot, BotAvatar, BotColor, BotShape, ChatMessage, SessionEvent } from '@/lib/api/types'
+import { messageText } from '@/lib/messageText'
 
 export const BOT_SHAPES: BotShape[] = ['circle', 'blob', 'squircle', 'pill', 'triangle', 'hex', 'cloud', 'drop']
 
@@ -19,8 +20,11 @@ export const BOT_COLORS: Record<BotColor, string> = {
 
 const pick = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)]
 
+// A random face skips the neutral white and gray.
+const VIVID = (Object.keys(BOT_COLORS) as BotColor[]).filter((color) => color !== 'white' && color !== 'gray')
+
 export function randomAvatar(): BotAvatar {
-  return { shape: pick(BOT_SHAPES), color: pick(Object.keys(BOT_COLORS) as BotColor[]) }
+  return { shape: pick(BOT_SHAPES), color: pick(VIVID) }
 }
 
 const TARGET_PREFIX = 'bot:'
@@ -51,3 +55,61 @@ export function botAvatars(bot: Bot, bots: Bot[]): BotAvatar[] {
     .slice(0, 2)
   return members.length ? members : [bot.avatar]
 }
+
+export type ChatEntry =
+  | { kind: 'user'; key: string; at: string; text: string }
+  | { kind: 'bot'; key: string; at: string; botId?: string; name: string; text: string }
+  | { kind: 'activity'; key: string; at: string; event: SessionEvent }
+
+type ChatTurn = { user: boolean; spoke: boolean; reply?: { key: string; at: string; text: string } }
+
+const SHOWN_ACTIVITY = new Set(['message_sent', 'message_received'])
+
+// A bot's chat log: what people typed, what bots sent with send_message, and
+// the activity worth a row. Everything else in the thread is the bot's private
+// work. A finished turn the user started in which the bot sent nothing shows
+// its last written reply, so an answer is never lost.
+export function chatEntries(
+  messages: ChatMessage[],
+  events: SessionEvent[],
+  self: { id: string; name: string },
+  working: boolean,
+): ChatEntry[] {
+  const items = [
+    ...messages.flatMap((message) =>
+      message.role === 'user' ? [{ at: message.created_at, message, event: undefined }] : [],
+    ),
+    ...events.map((event) => ({ at: event.at, message: undefined, event })),
+  ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  const out: ChatEntry[] = []
+  let turn: ChatTurn | undefined
+  const close = () => {
+    if (turn?.user && !turn.spoke && turn.reply) out.push({ kind: 'bot', name: self.name, botId: self.id, ...turn.reply })
+  }
+  for (const { at, message, event } of items) {
+    if (message) {
+      close()
+      out.push({ kind: 'user', key: `message:${message.seq}:${at}`, at, text: messageText(message) })
+      turn = { user: true, spoke: false }
+      continue
+    }
+    const key = `${event.session_id}:${event.seq ?? at}`
+    const room = event.room_message
+    if (room) {
+      if (room.speaker === 'user') out.push({ kind: 'user', key, at, text: room.text })
+      else out.push({ kind: 'bot', key, at, botId: room.bot_id, name: room.name, text: room.text })
+      if (turn && room.speaker === 'bot') turn.spoke = true
+    } else if (event.bot_activity) {
+      close()
+      if (SHOWN_ACTIVITY.has(event.bot_activity.kind)) out.push({ kind: 'activity', key, at, event })
+      turn = { user: false, spoke: false }
+    } else if (event.loop_created) {
+      out.push({ kind: 'activity', key, at, event })
+    } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {
+      turn.reply = { key, at, text: event.content.trim() }
+    }
+  }
+  if (!working) close()
+  return out
+}
+

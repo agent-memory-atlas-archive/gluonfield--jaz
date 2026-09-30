@@ -28,6 +28,11 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 		Title:       "Message a Jaz bot",
 		Description: "Send a message to a Jaz bot or post it to a group chat. Delivery is asynchronous: a bot's reply arrives later as a new turn in this thread, so do not wait for it.",
 	}, t.Message)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "send_message",
+		Title:       "Send a chat message",
+		Description: "Only for Jaz bots: send a chat message as yourself. It is the only thing anyone sees from you. In a group chat turn it posts to the group, when answering a bot it goes to that bot, and otherwise it reaches the user in your chat.",
+	}, t.Send)
 }
 
 type MCPListInput struct{}
@@ -73,6 +78,21 @@ func (t *MCPTools) Message(_ context.Context, req *mcp.CallToolRequest, input MC
 		return nil, MCPMessageOutput{}, err
 	}
 	return nil, MCPMessageOutput{Delivered: true}, nil
+}
+
+type MCPSendInput struct {
+	Message string `json:"message"`
+}
+
+type MCPSendOutput struct {
+	Sent bool `json:"sent"`
+}
+
+func (t *MCPTools) Send(_ context.Context, req *mcp.CallToolRequest, input MCPSendInput) (*mcp.CallToolResult, MCPSendOutput, error) {
+	if err := t.service.Say(mcpsession.SessionID(req), input.Message); err != nil {
+		return nil, MCPSendOutput{}, err
+	}
+	return nil, MCPSendOutput{Sent: true}, nil
 }
 
 func (t *MCPTools) resolve(ref string) (string, error) {

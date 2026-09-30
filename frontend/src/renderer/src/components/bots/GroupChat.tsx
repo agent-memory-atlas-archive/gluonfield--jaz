@@ -2,21 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUp } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { UserBubble } from '@/components/session/Bubble'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from '@/components/session/MentionInput'
-import { UserMessageMarkdown } from '@/components/session/MessageMarkdown'
 import { SidePanelControl } from '@/components/session/SidePanelControl'
-import { stableEventKey } from '@/components/session/timeline'
 import { THREAD_COLUMN_CLASS } from '@/components/session/threadLayout'
 import { useThreadAutoScroll } from '@/components/session/useThreadAutoScroll'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { IconButton } from '@/components/ui/IconButton'
 import { useToast } from '@/components/ui/toast'
-import { sendGroupMessage } from '@/lib/api/bots'
+import { botsQuery, sendGroupMessage } from '@/lib/api/bots'
 import { markThreadSeen } from '@/lib/api/feed'
 import { sessionEventsQuery } from '@/lib/api/sessions'
-import type { Bot, BotAvatar as Avatar, RoomMessageEvent } from '@/lib/api/types'
-import { BOT_COLORS, botAvatars } from '@/lib/bots'
+import type { Bot } from '@/lib/api/types'
+import { botAvatars, chatEntries } from '@/lib/bots'
 import { modalDialogOpen } from '@/lib/dom/modal'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -25,10 +22,9 @@ import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { coalesceSessionEvents } from '@/lib/sessionEvents'
 import { OVERVIEW_PANEL_WIDTH } from '@/lib/sidePanelTabs'
 import { useTitlebarActions, useTitlebarSlot } from '@/lib/titlebar'
-import { BotAvatar, BotPill } from './BotAvatar'
+import { BotPill } from './BotAvatar'
+import { ChatLog } from './ChatLog'
 import { GroupDetails } from './GroupDetails'
-
-const GONE: Avatar = { shape: 'circle', color: 'gray' }
 
 // A group is a room, not an agent thread: its transcript is the room_message
 // events on the group's thread, and messages go to the room, which decides
@@ -45,13 +41,14 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
   useSessionEvents(group.id, history.data?.latest_event_seq)
   const { attachScroll, onScroll, pinToBottom } = useThreadAutoScroll({ resetKey: group.id })
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const messages = useMemo(
-    () =>
-      coalesceSessionEvents([...(history.data?.events ?? []), ...live.data]).flatMap((event) =>
-        event.room_message ? [{ key: stableEventKey(event), at: event.at, message: event.room_message }] : [],
-      ),
-    [history.data?.events, live.data],
+  const entries = useMemo(
+    () => chatEntries([], coalesceSessionEvents([...(history.data?.events ?? []), ...live.data]), group, false),
+    [history.data?.events, live.data, group],
   )
+  // Members' status comes from the bot list, polled briskly while the room is
+  // open so "is working" rows keep up with the round.
+  const fresh = useQuery({ ...botsQuery, refetchInterval: 2_000 }).data ?? bots
+  const working = fresh.filter((bot) => group.members?.includes(bot.id) && bot.status === 'running')
 
   useEffect(() => {
     void markThreadSeen(group.id).finally(() => invalidateSessionLists(queryClient))
@@ -82,15 +79,14 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
     <div className="relative flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
         <div ref={attachScroll} onScroll={onScroll} className="scrollbar-quiet min-h-0 flex-1 overflow-y-auto">
-          <div className={`${THREAD_COLUMN_CLASS} flex flex-col gap-5 py-6`}>
+          <div className={`${THREAD_COLUMN_CLASS} py-6`}>
             {history.isError && !history.data ? (
               <EmptyState title="Couldn't load this chat" />
-            ) : history.data && !messages.length ? (
+            ) : history.data && !entries.length ? (
               <EmptyState title="Say something to the group" />
             ) : (
-              messages.map(({ key, at, message }) => <RoomMessage key={key} at={at} message={message} bots={bots} />)
+              <ChatLog entries={entries} bots={bots} named working={working} />
             )}
-            {group.status === 'running' ? <p className="animate-pulse text-sm text-ink-3">Replying…</p> : null}
           </div>
         </div>
         <div className={`${THREAD_COLUMN_CLASS} w-full pb-4`}>
@@ -106,27 +102,6 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
       >
         <GroupDetails group={group} bots={bots} />
       </motion.div>
-    </div>
-  )
-}
-
-function RoomMessage({ at, message, bots }: { at: string; message: RoomMessageEvent; bots: Bot[] }) {
-  if (message.speaker === 'user') return <UserBubble text={message.text} createdAt={at} />
-  const avatar = bots.find((bot) => bot.id === message.bot_id)?.avatar ?? GONE
-  return (
-    <div className="flex items-start gap-2.5">
-      <BotAvatar avatar={avatar} size={28} className="mt-5" />
-      <div className="flex min-w-0 max-w-[84%] flex-col items-start gap-1">
-        <span
-          className="px-1 text-[12px] font-medium"
-          style={{ color: `color-mix(in oklab, ${BOT_COLORS[avatar.color]} 65%, var(--color-ink))` }}
-        >
-          {message.name}
-        </span>
-        <div className="min-w-0 rounded-card bg-surface px-3.5 py-2.5 text-sm [overflow-wrap:break-word] select-text">
-          <UserMessageMarkdown text={message.text} />
-        </div>
-      </div>
     </div>
   )
 }

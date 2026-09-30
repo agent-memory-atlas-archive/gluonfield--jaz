@@ -46,7 +46,7 @@ import {
   sessionRepoQuery,
   uploadSessionAttachment,
 } from '@/lib/api/sessions'
-import type { SessionEvent, SessionOverview } from '@/lib/api/types'
+import type { ChatMessage, SessionEvent, SessionOverview } from '@/lib/api/types'
 import { useIsMobile } from '@/lib/hooks/useIsMobile'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -95,9 +95,15 @@ const SESSION_DRAFT_KEY_PREFIX = 'jaz.sessionDraft.'
 const TRANSCRIPT_DOCK_GAP_PX = 20
 const EMPTY_OVERVIEW: SessionOverview = { threads: [], subagents: [] }
 
+export interface ThreadChatView {
+  messages: ChatMessage[]
+  events: SessionEvent[]
+  working: boolean
+}
+
 // One thread's full view: transcript, composer, and side panel. `header` and
 // `details` let an owning surface (a bot) replace the titlebar identity and the
-// Overview panel.
+// Overview panel; `chat` replaces the agent transcript with a chat log.
 export function ThreadView({
   sessionId,
   message,
@@ -106,6 +112,7 @@ export function ThreadView({
   details,
   openDetails = false,
   placeholder,
+  chat,
 }: {
   sessionId: string
   message?: number
@@ -114,6 +121,7 @@ export function ThreadView({
   details?: ReactNode
   openDetails?: boolean
   placeholder?: string
+  chat?: (view: ThreadChatView) => ReactNode
 }) {
   const queryClient = useQueryClient()
   const toast = useToast()
@@ -408,6 +416,14 @@ export function ThreadView({
       onClick: () => handleSend('Continue'),
       title: 'Continue this thread',
     } : undefined
+  const errorNotice = visibleSessionError ? (
+    <SessionErrorNotice
+      message={visibleSessionError}
+      context={sessionError ? sessionErrorContext : undefined}
+      className="mt-5"
+      action={continueErrorAction}
+    />
+  ) : null
 
   return (
     <FileReaderLinkProvider sessionId={session.id} documentPath={session.runtime_ref?.cwd ? `${session.runtime_ref.cwd}/` : undefined} onOpen={sidePanel.openFile}>
@@ -443,7 +459,12 @@ export function ThreadView({
                 className={`${THREAD_COLUMN_CLASS} pt-2`}
                 style={{ paddingBottom: transcriptBottomPadding }}
               >
-                {empty ? (
+                {chat ? (
+                  <>
+                    {chat({ messages: transcriptMessages, events: displayEvents, working: sessionRunning })}
+                    {errorNotice}
+                  </>
+                ) : empty ? (
                   <EmptyState title="Start the conversation">
                     <p>Messages stream in live as your assistant thinks and works.</p>
                   </EmptyState>
@@ -510,24 +531,19 @@ export function ThreadView({
                         ) : null
                       }
                     />
-                    {visibleSessionError ? (
-                      <SessionErrorNotice
-                        message={visibleSessionError}
-                        context={sessionError ? sessionErrorContext : undefined}
-                        className="mt-5"
-                        action={continueErrorAction}
-                      />
-                    ) : null}
+                    {errorNotice}
                   </>
                 )}
               </div>
             </div>
-            <ThreadOutline
-              messages={transcriptMessages}
-              events={displayEvents}
-              scrollRef={scrollRef}
-              onSelect={jumpToMessage}
-            />
+            {chat ? null : (
+              <ThreadOutline
+                messages={transcriptMessages}
+                events={displayEvents}
+                scrollRef={scrollRef}
+                onSelect={jumpToMessage}
+              />
+            )}
             <ThreadFindBar find={threadFind} />
             <SelectionContextToolbar scrollRef={scrollRef} onAdd={composerContexts.addSelection} />
 

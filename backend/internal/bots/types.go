@@ -75,7 +75,7 @@ type Store interface {
 	SetArchived(id string, archived bool) error
 	LoadSessionEvents(id string) ([]sessionevents.Event, error)
 	AppendSessionEvents(id string, events ...sessionevents.Event) error
-	LoadLatestACPTurn(ctx context.Context, id string) ([]sessionevents.Event, error)
+	LoadLatestSessionEvent(id, eventType string) (sessionevents.Event, bool, error)
 }
 
 type BotLoader interface {
