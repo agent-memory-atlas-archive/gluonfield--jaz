@@ -5,6 +5,7 @@
 - [x] Verify the MCP request/answer round trip, cancellation, input validation, and existing native question paths.
 - [x] Review the implementation; commit after verification.
 - [x] Complete the requested thermo-nuclear review, repair reproduced defects, and verify the revised lifecycle.
+- [x] Merge the reviewed changes into local main.
 
 `ask_user` accepts ordered `questions`, each with `id`, `question`, optional `header`, and optional `options` containing labels and descriptions. It uses the caller's thread binding, displays the existing question card, waits for all answers, and returns `answers` keyed by question id. Free text is always available. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle. There is no new plan-mode requirement or frontend implementation.
 
@@ -26,4 +27,4 @@ Use fresh ordinary-mode Codex and Claude threads with the same model/effort as t
 
 Record whether a structured question card appears voluntarily, whether the questions affect the plan, and whether the agent uses the submitted answers. Compare with fresh threads on the current build. A forced tool call verifies availability; voluntary use measures adoption. Keep tool-response timeout behavior under observation during the live trial.
 
-Status: implemented and tested on `jaz/ask-user-tool`; merge, backend activation, actual UI smoke check, and voluntary Codex/Claude adoption remain pending. No live agent test or native-parity release certification is claimed.
+Status: implemented, reviewed and fast-forwarded into local main at `7b51a343`. Backend activation, actual UI smoke check, and voluntary Codex/Claude adoption remain pending. No live agent test or native-parity release certification is claimed.
