@@ -12,6 +12,7 @@
 - [x] Support radio buttons for one answer and checkboxes for multiple answers, with an open field alongside choices.
 - [x] Tell the agent to provide concrete options whenever useful.
 - [x] Verify selection, custom answers, navigation and submission in the rendered UI and MCP round trip.
+- [x] Complete the requested review of choice controls; repair native custom-answer routing and consolidate question state.
 
 `ask_user` accepts ordered `questions`, each with `id`, `question`, optional `header`, and optional `options` containing labels and descriptions. Options use radio buttons by default; `multi_select: true` uses checkboxes and requires options. The agent should provide concrete options whenever useful. Free text remains available alongside choices, and multi-select answers can combine choices with custom text. It uses the caller's thread binding, waits for all answers, and returns `answers` keyed by question id. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle, without entering plan mode.
 
@@ -45,4 +46,12 @@ Verified in an isolated preview of the real permission card: selecting and desel
 
 Full backend tests, focused race checks, affected vet, frontend tests, typecheck and targeted lint pass. No dependency was added.
 
-Status: the base tool and steering correction are on local main; choice controls are on `jaz/ask-user-tool`. The updated backend/frontend must be activated before an agent trial of multi-select questions. Voluntary Codex/Claude adoption remains unmeasured; no native-parity release certification is claimed.
+## Choice-control review
+
+Found and reproduced incorrect native response encoding for array questions with a separate custom-answer property: custom text went into the enum choices array, and the declared custom field was omitted. Split choices and custom answers before the shared scalar/array encoding. The regression checks choices-only, mixed and custom-only responses and fails on the reviewed revision.
+
+Consolidated choices and custom text into one state entry per question, eliminating cross-map synchronization. Checkbox updates now read the previous state inside their updater. An isolated component-handler probe queues two changes without rerendering: the reviewed revision loses the first checkbox selection; the correction preserves both, custom text, radio exclusivity and the submission payload. Updaters also pass a repeated-invocation check. This probe uses a mocked hook runtime; it establishes handler behavior rather than browser timing.
+
+Full backend tests, two focused race runs, affected vet, 281 frontend tests, typecheck and targeted lint pass. The side browser was disconnected during this review, so rendered UI verification was not repeated. Appearance is unchanged; no dependencies or files crossing 1,000 lines were added.
+
+Status: the choice implementation is on local main at `b48ffe16`; these review fixes are on `jaz/ask-user-tool`. Backend/frontend activation and the live agent multi-select trial remain open. Voluntary Codex/Claude adoption remains unmeasured; no native-parity release certification is claimed.
