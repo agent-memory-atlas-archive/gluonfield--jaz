@@ -12,12 +12,12 @@ func TestRenderRulesOnly(t *testing.T) {
 	}
 	for _, want := range []string{
 		"You are Jaz",
-		"Use the Jaz agent tools only when the user explicitly asks to run work in a separate Jaz agent session: jazagent_spawn, jazagent_options, jazagent_send, jazagent_wait, jazagent_status, jazagent_cancel, and jazagent_list.",
+		"Use create_thread only when the user explicitly asks for a separate thread or Jaz agent session.",
 		"Merely discussing or reviewing an agent harness does not authorize a separate session.",
 		"Generic requests to use subagents, parallelize, or spawn child agents stay with the active agent's native collaboration tools.",
 		"Do not inspect or invoke local agent CLIs unless the user explicitly asks for the local CLI.",
-		"jazagent_spawn only creates a Jaz agent session; send work with jazagent_send.",
-		"Omit model overrides unless the user asks for a specific model. Use jazagent_options({}) when you need available agents and useful model choices",
+		"create_thread creates a saved thread and starts its initial prompt.",
+		"Omit model overrides unless the user asks for a specific model. Use list_agent_options({}) when you need available agents and useful model choices",
 		"Use worktree=true for isolated repo changes; add branch when the new worktree should start from a specific branch/ref.",
 		"For reviewing another session's worktree, pass that worktree as directory without worktree=true.",
 		"Use plan=true for delegated planning/review/proposal tasks.",

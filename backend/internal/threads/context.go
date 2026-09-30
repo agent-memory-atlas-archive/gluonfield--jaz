@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
@@ -23,24 +23,26 @@ const (
 )
 
 type ContextStore interface {
+	ListSessions(storage.SessionFilter) ([]storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	LoadMessageRecords(string) ([]storage.Message, error)
+	LoadSessionEvents(string) ([]sessionevents.Event, error)
 }
 
 type ContextRequest struct {
-	Session      string `json:"session" jsonschema:"Jaz thread id or thread slug"`
+	Session      string `json:"threadId" jsonschema:"Jaz thread ID or slug from list_threads, search_threads, or create_thread"`
 	Query        string `json:"query,omitempty" jsonschema:"optional search query; returns matching message neighborhoods when set"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"maximum returned messages, 1-60; defaults to 16"`
 	Context      int    `json:"context,omitempty" jsonschema:"messages before and after each query hit, 0-4; defaults to 0"`
-	BeforeSeq    int64  `json:"before_seq,omitempty" jsonschema:"return the page before this message sequence"`
-	AfterSeq     int64  `json:"after_seq,omitempty" jsonschema:"return the page after this message sequence"`
-	AroundSeq    int64  `json:"around_seq,omitempty" jsonschema:"return a page centered near this message sequence"`
+	BeforeSeq    int64  `json:"before_seq,omitempty" jsonschema:"return the page before this sequence from a previous read_thread result"`
+	AfterSeq     int64  `json:"after_seq,omitempty" jsonschema:"return the page after this sequence from a previous read_thread result"`
+	AroundSeq    int64  `json:"around_seq,omitempty" jsonschema:"return a page centered near this sequence from a previous read_thread result"`
 	IncludeTools string `json:"include_tools,omitempty" jsonschema:"none or summary; defaults to summary"`
 	MaxTextChars int    `json:"max_text_chars,omitempty" jsonschema:"per-message text limit; max 8000; defaults to 2000"`
 }
 
 type ContextResponse struct {
-	Session       ContextSession   `json:"session"`
+	Session       ContextSession   `json:"thread"`
 	Mode          string           `json:"mode"`
 	Query         string           `json:"query,omitempty"`
 	Messages      []ContextMessage `json:"messages"`
@@ -54,7 +56,7 @@ type ContextResponse struct {
 }
 
 type ContextSession struct {
-	ID           string    `json:"id"`
+	ID           string    `json:"threadId"`
 	Slug         string    `json:"slug"`
 	Title        string    `json:"title,omitempty"`
 	ParentID     string    `json:"parent_id,omitempty"`
@@ -100,7 +102,7 @@ func (s *Service) Context(ctx context.Context, req ContextRequest) (ContextRespo
 	}
 	sessionRef := strings.TrimSpace(req.Session)
 	if sessionRef == "" {
-		return ContextResponse{}, errors.New("session is required")
+		return ContextResponse{}, errors.New("threadId is required")
 	}
 	if queryHasCursor(req) {
 		return ContextResponse{}, errors.New("query cannot be combined with before_seq, after_seq, or around_seq")
@@ -121,11 +123,27 @@ func (s *Service) Context(ctx context.Context, req ContextRequest) (ContextRespo
 		return ContextResponse{}, err
 	}
 	visible := visibleContextRecords(records, opts)
+	events, err := s.context.LoadSessionEvents(session.ID)
+	if err != nil {
+		return ContextResponse{}, err
+	}
+	counts := ToolCounts(records)
+	visible = mergeContextEvents(session.ID, visible, events, opts, counts)
+	if opts.includeTools == IncludeToolsNone {
+		withoutTools := visible[:0]
+		for _, record := range visible {
+			record.message.Tools = nil
+			if record.message.Text != "" {
+				withoutTools = append(withoutTools, record)
+			}
+		}
+		visible = withoutTools
+	}
 	response := ContextResponse{
 		Session:    contextSession(session, len(visible)),
 		Mode:       "tail",
 		Messages:   []ContextMessage{},
-		ToolCounts: ToolCounts(records),
+		ToolCounts: counts,
 	}
 	query := strings.TrimSpace(req.Query)
 	if query != "" {
@@ -227,7 +245,7 @@ func visibleContextRecords(records []storage.Message, opts contextOptions) []con
 			CreatedAt: record.CreatedAt,
 		}
 		message.Text, message.Truncated = clampText(transcriptText(record), opts.maxTextChars)
-		message.Tools = contextTools(record.Blocks, opts)
+		message.Tools = contextTools(record.Blocks)
 		if message.Text == "" && len(message.Tools) == 0 {
 			continue
 		}
@@ -357,10 +375,7 @@ func firstIndexAfter(messages []contextRecord, seq int64) int {
 	return len(messages)
 }
 
-func contextTools(blocks []storage.Block, opts contextOptions) []ContextTool {
-	if opts.includeTools == IncludeToolsNone {
-		return nil
-	}
+func contextTools(blocks []storage.Block) []ContextTool {
 	var out []ContextTool
 	for _, block := range blocks {
 		if block.Type != storage.BlockTypeTool {
@@ -389,27 +404,6 @@ func matchesAllTokens(text string, tokens []string) bool {
 		}
 	}
 	return true
-}
-
-func searchTokens(query string) []string {
-	var tokens []string
-	var current strings.Builder
-	flush := func() {
-		if current.Len() == 0 {
-			return
-		}
-		tokens = append(tokens, strings.ToLower(current.String()))
-		current.Reset()
-	}
-	for _, r := range query {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
-			continue
-		}
-		flush()
-	}
-	flush()
-	return tokens
 }
 
 func clampText(text string, maxChars int) (string, bool) {

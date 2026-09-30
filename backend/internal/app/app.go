@@ -40,13 +40,7 @@ import (
 	"github.com/wins/jaz/backend/internal/templates/acpcompletion"
 	"github.com/wins/jaz/backend/internal/threads"
 	"github.com/wins/jaz/backend/internal/tools"
-	agentcancel "github.com/wins/jaz/backend/internal/tools/agent/cancel"
-	agentlist "github.com/wins/jaz/backend/internal/tools/agent/list"
-	agentoptions "github.com/wins/jaz/backend/internal/tools/agent/options"
-	agentsend "github.com/wins/jaz/backend/internal/tools/agent/send"
 	agentspawn "github.com/wins/jaz/backend/internal/tools/agent/spawn"
-	agentstatus "github.com/wins/jaz/backend/internal/tools/agent/status"
-	agentwait "github.com/wins/jaz/backend/internal/tools/agent/wait"
 	applypatch "github.com/wins/jaz/backend/internal/tools/applypatch"
 	exectool "github.com/wins/jaz/backend/internal/tools/exec"
 	viewimagetool "github.com/wins/jaz/backend/internal/tools/viewimage"
@@ -388,13 +382,7 @@ func NewToolRegistry(commandManager *exectool.CommandManager, workspace Workspac
 		&visualizetool.ShowWidgetTool{},
 		&widgettool.PublishTool{Publisher: widgetPublisher},
 		&viewimagetool.Tool{Workspace: string(workspace)},
-		&agentspawn.Tool{Manager: manager},
-		&agentsend.Tool{Manager: manager},
-		&agentstatus.Tool{Manager: manager},
-		&agentwait.Tool{Manager: manager},
-		&agentcancel.Tool{Manager: manager},
-		&agentoptions.Tool{Manager: manager},
-		&agentlist.Tool{Manager: manager},
+		&agentspawn.Tool{Service: manager},
 	)
 }
 

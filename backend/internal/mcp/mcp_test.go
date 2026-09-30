@@ -545,7 +545,7 @@ func (t nativeStubTool) Execute(context.Context, map[string]any) (tools.Result, 
 
 func TestBuiltinServerToolsUseBareNamesAndYieldToNativeTools(t *testing.T) {
 	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "jaztools", Version: "test"}, nil)
-	for _, name := range []string{"memory_search", "jazagent_spawn"} {
+	for _, name := range []string{"memory_search", "create_thread"} {
 		mcpsdk.AddTool(server, &mcpsdk.Tool{
 			Name:        name,
 			Description: name,
@@ -554,7 +554,7 @@ func TestBuiltinServerToolsUseBareNamesAndYieldToNativeTools(t *testing.T) {
 		})
 	}
 
-	registry := tools.NewRegistry(nativeStubTool{name: "jazagent_spawn"})
+	registry := tools.NewRegistry(nativeStubTool{name: "create_thread"})
 	manager := NewManager(&testStore{}, nil, registry, log.New(io.Discard), WithBuiltinServerProvider(mcpconfig.Server{
 		ID:      "jaztools",
 		Name:    "jaztools",
@@ -571,10 +571,10 @@ func TestBuiltinServerToolsUseBareNamesAndYieldToNativeTools(t *testing.T) {
 	if registry.InGroup(RegistryGroup, "memory_search") {
 		t.Fatal("builtin tool leaked into mcp group")
 	}
-	if registry.InGroup(BuiltinRegistryGroup, "jazagent_spawn") {
+	if registry.InGroup(BuiltinRegistryGroup, "create_thread") {
 		t.Fatal("builtin duplicate clobbered the native tool")
 	}
-	if _, ok := registry.Get("mcp_jaztools_jazagent_spawn"); ok {
+	if _, ok := registry.Get("mcp_jaztools_create_thread"); ok {
 		t.Fatal("builtin tool registered under mcp-prefixed name")
 	}
 
@@ -584,7 +584,7 @@ func TestBuiltinServerToolsUseBareNamesAndYieldToNativeTools(t *testing.T) {
 	}
 
 	manager.Close()
-	if _, ok := registry.Get("jazagent_spawn"); !ok {
+	if _, ok := registry.Get("create_thread"); !ok {
 		t.Fatal("native tool removed by manager close")
 	}
 	if _, ok := registry.Get("memory_search"); ok {
