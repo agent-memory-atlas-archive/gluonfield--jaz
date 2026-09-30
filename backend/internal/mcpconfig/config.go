@@ -62,6 +62,23 @@ type ServerInput struct {
 	OAuth             OAuthConfig `json:"oauth,omitempty"`
 }
 
+// Server is the server these settings describe.
+func (in ServerInput) Server(id string, createdAt, updatedAt time.Time) Server {
+	return Server{
+		ID:                id,
+		Name:              in.Name,
+		Transport:         TransportStreamableHTTP,
+		URL:               in.URL,
+		Enabled:           in.Enabled,
+		BearerTokenEnvVar: in.BearerTokenEnvVar,
+		BearerToken:       in.BearerToken,
+		Headers:           in.Headers,
+		OAuth:             in.OAuth,
+		CreatedAt:         createdAt,
+		UpdatedAt:         updatedAt,
+	}
+}
+
 type ServerTool struct {
 	Name        string `json:"name"`
 	RemoteName  string `json:"remote_name,omitempty"`
@@ -98,10 +115,12 @@ func Declare(store Store, raw string) error {
 			return fmt.Errorf("declared MCP server %q: %w", input.Name, err)
 		}
 		index := slices.IndexFunc(servers, func(server Server) bool { return strings.EqualFold(server.Name, input.Name) })
-		if index < 0 {
-			_, err = store.CreateMCPServer(input)
-		} else {
+		if index >= 0 {
 			_, err = store.UpdateMCPServer(servers[index].ID, input)
+		} else {
+			var created Server
+			created, err = store.CreateMCPServer(input)
+			servers = append(servers, created)
 		}
 		if err != nil {
 			return fmt.Errorf("declared MCP server %q: %w", input.Name, err)

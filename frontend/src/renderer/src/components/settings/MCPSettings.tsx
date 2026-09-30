@@ -462,7 +462,7 @@ function MCPServerForm({
   const oauthSet = Boolean(
     draft.oauth?.client_id || draft.oauth?.client_secret_env_var || draft.oauth?.issuer,
   )
-  const advancedCount = headerCount + Number(oauthSet) + Number(Boolean(draft.bearer_token_env_var))
+  const advancedCount = headerCount + [oauthSet, draft.bearer_token_env_var].filter(Boolean).length
   const [advanced, setAdvanced] = useState(advancedCount > 0)
 
   return (

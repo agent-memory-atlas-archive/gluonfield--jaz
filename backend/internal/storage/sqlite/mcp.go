@@ -50,19 +50,7 @@ func (s *Store) CreateMCPServer(input mcpconfig.ServerInput) (mcpconfig.Server, 
 		return mcpconfig.Server{}, err
 	}
 	now := time.Now().UTC()
-	server := mcpconfig.Server{
-		ID:                newMCPServerID(),
-		Name:              input.Name,
-		Transport:         mcpconfig.TransportStreamableHTTP,
-		URL:               input.URL,
-		Enabled:           input.Enabled,
-		BearerTokenEnvVar: input.BearerTokenEnvVar,
-		BearerToken:       input.BearerToken,
-		Headers:           input.Headers,
-		OAuth:             input.OAuth,
-		CreatedAt:         now,
-		UpdatedAt:         now,
-	}
+	server := input.Server(newMCPServerID(), now, now)
 	s.writeMu.Lock()
 	err = mcpdb.New(s.db).CreateMCPServer(context.Background(), mcpdb.CreateMCPServerParams{
 		ID:                server.ID,
@@ -138,19 +126,7 @@ func (s *Store) UpdateMCPServer(id string, input mcpconfig.ServerInput) (mcpconf
 	if err := tx.Commit(); err != nil {
 		return mcpconfig.Server{}, err
 	}
-	return mcpconfig.Server{
-		ID:                id,
-		Name:              input.Name,
-		Transport:         mcpconfig.TransportStreamableHTTP,
-		URL:               input.URL,
-		Enabled:           input.Enabled,
-		BearerTokenEnvVar: input.BearerTokenEnvVar,
-		BearerToken:       input.BearerToken,
-		Headers:           input.Headers,
-		OAuth:             input.OAuth,
-		CreatedAt:         msToTime(current.CreatedAtMs),
-		UpdatedAt:         now,
-	}, nil
+	return input.Server(id, msToTime(current.CreatedAtMs), now), nil
 }
 
 func (s *Store) DeleteMCPServer(id string) error {

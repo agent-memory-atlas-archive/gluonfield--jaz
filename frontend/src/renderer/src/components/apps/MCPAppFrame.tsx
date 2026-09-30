@@ -34,25 +34,6 @@ export function MCPApps({ activeKey }: { activeKey?: string }) {
     })
 }
 
-// useAppLink follows an app's links: a deep link to one of its own server's
-// sidebar apps opens that section at the linked page, and anything else opens
-// in the browser.
-function useAppLink(serverId: string) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  return (url: string) => {
-    const target = deepLinkTarget(url)
-    const entry = target && queryClient.getQueryData(mcpEntrypointsQuery.queryKey)?.find(
-      (point) => point.type === 'global' && point.server_id === serverId && point.tool === target.tool,
-    )
-    if (target && entry) {
-      void navigate({ to: '/apps/$serverId/$tool', params: { serverId, tool: entry.tool }, search: { path: target.path } })
-      return
-    }
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }
-}
-
 // Hosts one MCP App through the official AppBridge. An entrypoint opens by
 // calling its tool with {} or, for a file viewer, the opened file; an agent's
 // call shows inline with its own arguments and result. The app gets that
@@ -73,7 +54,8 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
   const frame = useRef<HTMLIFrameElement>(null)
   const bridge = useRef<AppBridge>(null)
   const html = query.data
-  const displayMode = call ? 'inline' : 'fullscreen'
+  const inline = call !== undefined
+  const displayMode = inline ? 'inline' : 'fullscreen'
   // The document paints before the app has the host theme, so it stays
   // transparent until the app reports ui/notifications/initialized.
   const [readyFor, setReadyFor] = useState<string>()
@@ -82,9 +64,23 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
   // An app that declares it can't render in this display mode stays hidden.
   const [unsupported, setUnsupported] = useState(false)
   const { refetch } = query
-  const openLink = useAppLink(serverId)
-  const followLink = useEffectEvent(openLink)
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const delivered = useEffectEvent(() => onDeepLink?.())
+
+  // A deep link to a sidebar app of the app's own server opens that section
+  // at the linked page; any other link opens in the browser.
+  const followLink = useEffectEvent((url: string) => {
+    const target = deepLinkTarget(url)
+    const entry = target && queryClient.getQueryData(mcpEntrypointsQuery.queryKey)?.find(
+      (point) => point.type === 'global' && point.server_id === serverId && point.tool === target.tool,
+    )
+    if (target && entry) {
+      void navigate({ to: '/apps/$serverId/$tool', params: { serverId, tool: entry.tool }, search: { path: target.path } })
+      return
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  })
 
   // The opening input and result: the agent's call, or a call to the entrypoint.
   const open = useEffectEvent(() => {
@@ -125,7 +121,7 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
         return {}
       }
       created.onsizechange = ({ height }) => {
-        if (displayMode === 'inline' && height !== undefined) setHeight(height)
+        if (inline && height !== undefined) setHeight(height)
       }
       if (file) serveFile(created, file)
       created.oninitialized = () => {
@@ -153,7 +149,7 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
       observer?.disconnect()
       void connected.then((created) => created?.close())
     }
-  }, [html, serverId, tool, file, displayMode])
+  }, [html, serverId, tool, file, inline, displayMode])
 
   // A deep link reaches the running app as a host-context change, then clears,
   // so following the same link again changes the context again.
@@ -167,7 +163,7 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
 
   if (unsupported) return null
   if (html === undefined && query.isError) {
-    return call ? null : (
+    return inline ? null : (
       <EmptyState title={`Couldn't open ${title}`}>
         <p>{query.error.message}</p>
       </EmptyState>
@@ -180,8 +176,8 @@ export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
       title={title}
       sandbox="allow-scripts allow-forms allow-popups"
       allow="clipboard-write"
-      style={call ? { height: height ?? 0 } : undefined}
-      className={`block border-0 transition-opacity duration-150 ${call ? 'w-full' : 'size-full'} ${ready ? '' : 'pointer-events-none opacity-0'}`}
+      style={inline ? { height: height ?? 0 } : undefined}
+      className={`block border-0 transition-opacity duration-150 ${inline ? 'w-full' : 'size-full'} ${ready ? '' : 'pointer-events-none opacity-0'}`}
     />
   )
 }

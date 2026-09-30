@@ -152,6 +152,14 @@ func TestMCPServerSettingsAPI(t *testing.T) {
 		t.Fatalf("server still enabled: %#v", loaded)
 	}
 
+	updateReq := httptest.NewRequest(http.MethodPut, "/v1/mcp/servers/"+created.ID, strings.NewReader(`{"name":"Docs","url":"https://mcp.example.com/mcp","bearer_token":"docs-key"}`))
+	updateRes := httptest.NewRecorder()
+	handler.ServeHTTP(updateRes, updateReq)
+	if updated, err := store.LoadMCPServer(created.ID); err != nil || updateRes.Code != http.StatusOK || updated.Enabled || updated.BearerToken != "docs-key" ||
+		!strings.Contains(updateRes.Body.String(), `"bearer_token":"docs-key"`) {
+		t.Fatalf("an update without enabled keeps the server disabled and saves its key: %d %s %#v", updateRes.Code, updateRes.Body.String(), updated)
+	}
+
 	deleteReq := httptest.NewRequest(http.MethodDelete, "/v1/mcp/servers/"+created.ID, nil)
 	deleteRes := httptest.NewRecorder()
 	handler.ServeHTTP(deleteRes, deleteReq)

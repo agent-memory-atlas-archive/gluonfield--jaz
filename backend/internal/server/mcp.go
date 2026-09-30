@@ -34,32 +34,19 @@ type mcpProxySessionStore interface {
 	LoadSession(string) (storage.Session, error)
 }
 
+// mcpServerInput is the settings a client sends, where a missing enabled
+// keeps the server's current state.
 type mcpServerInput struct {
-	Name              string                `json:"name"`
-	URL               string                `json:"url"`
-	Enabled           *bool                 `json:"enabled,omitempty"`
-	BearerTokenEnvVar string                `json:"bearer_token_env_var,omitempty"`
-	BearerToken       string                `json:"bearer_token,omitempty"`
-	Headers           []mcpconfig.Header    `json:"headers,omitempty"`
-	OAuth             mcpconfig.OAuthConfig `json:"oauth,omitempty"`
+	mcpconfig.ServerInput
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 type mcpServerView struct {
-	ID                string                 `json:"id"`
-	Name              string                 `json:"name"`
-	Transport         string                 `json:"transport"`
-	URL               string                 `json:"url"`
-	Enabled           bool                   `json:"enabled"`
-	BearerTokenEnvVar string                 `json:"bearer_token_env_var,omitempty"`
-	BearerToken       string                 `json:"bearer_token,omitempty"`
-	Headers           []mcpconfig.Header     `json:"headers,omitempty"`
-	OAuth             mcpconfig.OAuthConfig  `json:"oauth,omitempty"`
-	Status            string                 `json:"status"`
-	ToolCount         int                    `json:"tool_count"`
-	Tools             []mcpconfig.ServerTool `json:"tools,omitempty"`
-	Error             string                 `json:"error,omitempty"`
-	CreatedAt         time.Time              `json:"created_at"`
-	UpdatedAt         time.Time              `json:"updated_at"`
+	mcpconfig.Server
+	Status    string                 `json:"status"`
+	ToolCount int                    `json:"tool_count"`
+	Tools     []mcpconfig.ServerTool `json:"tools,omitempty"`
+	Error     string                 `json:"error,omitempty"`
 }
 
 func (s *Server) handleListMCPServers(w http.ResponseWriter, r *http.Request) {
@@ -176,13 +163,7 @@ func (s *Server) handleMCPServerPostAction(w http.ResponseWriter, r *http.Reques
 		}
 		if r.Body != nil && r.ContentLength != 0 {
 			if input, err := decodeMCPServerInput(r, &server); err == nil {
-				server.Name = input.Name
-				server.URL = input.URL
-				server.Enabled = input.Enabled
-				server.BearerTokenEnvVar = input.BearerTokenEnvVar
-				server.BearerToken = input.BearerToken
-				server.Headers = input.Headers
-				server.OAuth = input.OAuth
+				server = input.Server(server.ID, server.CreatedAt, server.UpdatedAt)
 			}
 		}
 		if s.MCP == nil {
@@ -265,22 +246,12 @@ func decodeMCPServerInput(r *http.Request, current *mcpconfig.Server) (mcpconfig
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		return mcpconfig.ServerInput{}, err
 	}
-	enabled := true
-	if current != nil {
-		enabled = current.Enabled
-	}
+	input := req.ServerInput
+	input.Enabled = current == nil || current.Enabled
 	if req.Enabled != nil {
-		enabled = *req.Enabled
+		input.Enabled = *req.Enabled
 	}
-	return mcpconfig.ValidateInput(mcpconfig.ServerInput{
-		Name:              req.Name,
-		URL:               req.URL,
-		Enabled:           enabled,
-		BearerTokenEnvVar: req.BearerTokenEnvVar,
-		BearerToken:       req.BearerToken,
-		Headers:           req.Headers,
-		OAuth:             req.OAuth,
-	})
+	return mcpconfig.ValidateInput(input)
 }
 
 func (s *Server) refreshMCP() {
@@ -326,21 +297,5 @@ func (s *Server) mcpServerView(server mcpconfig.Server) mcpServerView {
 			status = live
 		}
 	}
-	return mcpServerView{
-		ID:                server.ID,
-		Name:              server.Name,
-		Transport:         server.Transport,
-		URL:               server.URL,
-		Enabled:           server.Enabled,
-		BearerTokenEnvVar: server.BearerTokenEnvVar,
-		BearerToken:       server.BearerToken,
-		Headers:           server.Headers,
-		OAuth:             server.OAuth,
-		Status:            status.Status,
-		ToolCount:         status.ToolCount,
-		Tools:             status.Tools,
-		Error:             status.Error,
-		CreatedAt:         server.CreatedAt,
-		UpdatedAt:         server.UpdatedAt,
-	}
+	return mcpServerView{Server: server, Status: status.Status, ToolCount: status.ToolCount, Tools: status.Tools, Error: status.Error}
 }

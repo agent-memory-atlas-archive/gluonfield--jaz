@@ -42,6 +42,10 @@ func TestDeclareAppliesServersByName(t *testing.T) {
 	if len(moved) != 1 || moved[0].ID != first[0].ID || moved[0].URL != "http://tasks.internal:7400/mcp" || !moved[0].Enabled {
 		t.Fatalf("a restart should update the same server to the declared settings: %+v", moved)
 	}
+	twice := `[{"name":"Docs","url":"http://docs/mcp"},{"name":"docs","url":"http://docs2/mcp"}]`
+	if servers := declare(twice); len(servers) != 2 || servers[0].URL != "http://docs2/mcp" && servers[1].URL != "http://docs2/mcp" {
+		t.Fatalf("a name declared twice should make one server with the last settings: %+v", servers)
+	}
 	for _, bad := range []string{`{"name":"Tasks"}`, `[{"name":"Tasks","url":"ftp://tasks"}]`} {
 		if err := mcpconfig.Declare(store, bad); err == nil {
 			t.Fatalf("Declare(%s) should fail", bad)
