@@ -99,14 +99,9 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	errs := make(chan error, 1)
 	go func() {
 		call, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "ask_user", Arguments: AskUserInput{Questions: []UserQuestion{
-			{ID: "z_strategy", Header: "Strategy", Question: "Which migration approach?", Options: []sessionevents.ACPQuestionOption{
-				{Label: "Phased", Description: "Validate each domain before cutover"},
-				{Label: "Single cutover", Description: "Move the whole estate together"},
-			}},
+			{ID: "z_strategy", Question: "Which migration approach?", Options: []string{" Phased ", "Single cutover"}},
 			{ID: "a_constraints", Question: "What downtime is acceptable?"},
-			{ID: "workloads", Question: "Which workloads should move?", MultiSelect: true, Options: []sessionevents.ACPQuestionOption{
-				{Label: "SQL"}, {Label: "Spark"},
-			}},
+			{ID: "workloads", Question: "Which workloads should move?", MultiSelect: true, Options: []string{"SQL", "Spark"}},
 		}}})
 		if err != nil {
 			errs <- err
@@ -131,7 +126,7 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	if len(permission.Questions) != 3 || permission.Questions[0].ID != "z_strategy" ||
 		permission.Questions[1].ID != "a_constraints" || !permission.Questions[0].IsOther ||
 		permission.Questions[0].MultiSelect || !permission.Questions[2].MultiSelect || !permission.Questions[2].IsOther ||
-		permission.Questions[0].Options[0].Description != "Validate each domain before cutover" {
+		permission.Questions[0].Options[0] != (sessionevents.ACPQuestionOption{Label: "Phased"}) {
 		t.Fatalf("questions lost ordering or choices: %#v", permission)
 	}
 	select {
@@ -232,8 +227,8 @@ func TestAskUserRejectsInvalidRequestsBeforePublishing(t *testing.T) {
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: " "}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", MultiSelect: true}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?"}, {ID: " q ", Question: "Which?"}}},
-		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: " "}}}}},
-		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: "A"}, {Label: " A "}}}}},
+		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []string{" "}}}},
+		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []string{"A", " A "}}}},
 	} {
 		if _, err := manager.AskUser(ctx, test.sessionID, AskUserInput{Questions: test.questions}); err == nil {
 			t.Fatalf("accepted invalid request: %#v", test)

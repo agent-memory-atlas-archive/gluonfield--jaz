@@ -32,7 +32,7 @@ func NewMCPTools(service MCPService) *MCPTools {
 func (t *MCPTools) AddTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "ask_user",
-		Description: "Ask one or more questions in the current thread's UI and wait for the user's answers. Use for missing information, preferences, or decisions that change what you do next. Works outside plan mode. Provide concrete answer options whenever useful; use radio buttons for one answer or set multi_select for checkboxes allowing several answers. An open text field is always available alongside the choices. Ask only what is needed and do not request confirmation already given. Returns answers keyed by question id, or cancelled when the question is interrupted.",
+		Description: "Ask one or more questions in the current thread's UI and wait for the user's answers. Use for missing information, preferences, or decisions that change what you do next. Works outside plan mode. Provide short concrete options whenever useful. Ask only what is needed and do not request confirmation already given. Returns answers keyed by question id, or cancelled when the question is interrupted.",
 	}, t.AskUser)
 	mcp.AddTool(server, t.CreateDefinition(), t.Create)
 	mcp.AddTool(server, &mcp.Tool{
