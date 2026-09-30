@@ -39,7 +39,13 @@ type Coordinator struct {
 	Loops  LoopWriter
 	Boards BoardService
 	Card   CardSink
+	// Owner picks the bot that owns a new loop when the input names none.
+	Owner OwnerFunc
 }
+
+// OwnerFunc returns the bot thread that should own a loop created from
+// threadID (empty for surfaces with no thread).
+type OwnerFunc func(threadID string, in CreateLoop) (string, error)
 
 // Create validates boards, writes the loop, reconciles its board assignment,
 // then announces it on threadID. threadID is empty for surfaces with no thread
@@ -47,6 +53,13 @@ type Coordinator struct {
 func (c Coordinator) Create(in CreateLoop, boardIDs []string, threadID string) (Loop, error) {
 	if err := c.validateBoards(boardIDs); err != nil {
 		return Loop{}, err
+	}
+	if in.BotID == "" && c.Owner != nil {
+		owner, err := c.Owner(threadID, in)
+		if err != nil {
+			return Loop{}, err
+		}
+		in.BotID = owner
 	}
 	loop, err := c.Loops.Create(in)
 	if err != nil {

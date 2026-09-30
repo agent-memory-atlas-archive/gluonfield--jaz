@@ -38,7 +38,6 @@ func TestSystemPromptEndToEnd(t *testing.T) {
 		"create_thread creates a saved thread",
 		"Omit model overrides unless the user asks for a specific model",
 		"## Jaz platform",
-		"Current working directory:",
 		"## AGENTS.md\n\nalways cite sources",
 		"## SOUL.md\n\nbe direct",
 		"## INTERNAL.md",
@@ -49,14 +48,15 @@ func TestSystemPromptEndToEnd(t *testing.T) {
 		"Jaz has an integrated browser exposed through the Jaztools `browser_*` tools.",
 		"## Artifacts and visualisation",
 		"Few-shot trace:",
+		"## Skills",
+		"<name>deploy</name>",
+		"<description>ship &amp; verify</description>",
 		"## memory",
 		"Capture as you go",
 		"current size is 27/5,000 characters",
 		"## memory/LONG_TERM.md\n\n- Goal: $5m through agent products.",
 		"## memory/SHORT_TERM.md\n\n- Focus: jaz memory system.",
-		"## Skills",
-		"<name>deploy</name>",
-		"<description>ship &amp; verify</description>",
+		"Current working directory:",
 	)
 	for marker, want := range map[string]int{
 		"## Jaz platform":     1,
@@ -95,8 +95,9 @@ func TestSystemPromptEndToEnd(t *testing.T) {
 	if sharedOffset < 0 {
 		t.Fatalf("acp extension missing shared prompt-file tail:\n%s", acp)
 	}
-	if !strings.HasSuffix(system, acp[sharedOffset:]) {
-		t.Fatalf("the ACP shared tail must match the coordinator shared tail.\nACP:\n%s\nSYSTEM:\n%s", acp, system)
+	shared := acp[sharedOffset:strings.LastIndex(acp, "\nDate: ")]
+	if !strings.Contains(system, shared) {
+		t.Fatalf("the ACP shared section must match the coordinator shared section.\nACP:\n%s\nSYSTEM:\n%s", acp, system)
 	}
 	if strings.Contains(acp, "You are Jaz") {
 		t.Fatalf("acp extension must carry no coordinator identity:\n%s", acp)

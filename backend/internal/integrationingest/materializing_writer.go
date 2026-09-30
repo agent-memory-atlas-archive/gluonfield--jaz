@@ -2,6 +2,7 @@ package integrationingest
 
 import (
 	"context"
+	"sync"
 
 	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/sourcequeue"
@@ -12,7 +13,32 @@ type MaterializingWriter struct {
 	Raw             RawWriter
 	Projector       SourceProjector
 	ProjectionQueue PendingSourceStore
+	Observers       *Observers
 	Log             *log.Logger
+}
+
+// Observers hear every batch of records once it is stored.
+type Observers struct {
+	mu        sync.RWMutex
+	listeners []func(context.Context, []integrations.Record)
+}
+
+func NewObservers() *Observers {
+	return &Observers{}
+}
+
+func (o *Observers) Add(listener func(context.Context, []integrations.Record)) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.listeners = append(o.listeners, listener)
+}
+
+func (o *Observers) notify(ctx context.Context, records []integrations.Record) {
+	o.mu.RLock()
+	defer o.mu.RUnlock()
+	for _, listener := range o.listeners {
+		listener(ctx, records)
+	}
 }
 
 func (w MaterializingWriter) WriteRecords(ctx context.Context, records []integrations.Record) error {
@@ -22,6 +48,9 @@ func (w MaterializingWriter) WriteRecords(ctx context.Context, records []integra
 	}
 	if err := w.Raw.WriteRecords(ctx, prepared); err != nil {
 		return err
+	}
+	if w.Observers != nil {
+		w.Observers.notify(ctx, prepared)
 	}
 	sources, err := w.Projector.PlanRecords(ctx, prepared)
 	if err != nil {

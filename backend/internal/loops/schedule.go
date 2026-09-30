@@ -39,6 +39,14 @@ func NormalizeCreate(input CreateLoop, now time.Time) (CreateLoop, time.Time, er
 	if input.Prompt == "" {
 		return input, time.Time{}, fmt.Errorf("prompt is required")
 	}
+	trigger, err := normalizeTrigger(input.Trigger)
+	if err != nil {
+		return input, time.Time{}, err
+	}
+	input.Trigger = trigger
+	if trigger != nil {
+		input.Schedule = Schedule{Kind: ScheduleEvent}
+	}
 	schedule, next, err := NormalizeSchedule(input.Schedule, now)
 	if err != nil {
 		return input, time.Time{}, err
@@ -80,6 +88,9 @@ func NormalizeUpdate(current Loop, input UpdateLoop, now time.Time) (Loop, bool,
 	if input.Directory != nil {
 		next.Directory = strings.TrimSpace(*input.Directory)
 	}
+	if input.BotID != nil {
+		next.BotID = *input.BotID
+	}
 	if next.Status != StatusActive && next.Status != StatusPaused {
 		return next, false, fmt.Errorf("unsupported loop status %q", next.Status)
 	}
@@ -93,12 +104,23 @@ func NormalizeUpdate(current Loop, input UpdateLoop, now time.Time) (Loop, bool,
 		return next, false, fmt.Errorf("prompt is required")
 	}
 	reschedule := input.Reschedule
+	if input.Trigger != nil {
+		trigger, err := normalizeTrigger(input.Trigger)
+		if err != nil {
+			return next, false, err
+		}
+		next.Trigger = trigger
+		input.Schedule = &Schedule{Kind: ScheduleEvent}
+	}
 	if input.Schedule != nil {
 		schedule, _, err := NormalizeSchedule(*input.Schedule, now)
 		if err != nil {
 			return next, false, err
 		}
 		next.Schedule = schedule
+		if schedule.Kind == ScheduleCron {
+			next.Trigger = nil
+		}
 		reschedule = true
 	}
 	if next.Status == StatusActive && next.NextRunAt.IsZero() {
@@ -123,6 +145,9 @@ func NormalizeSchedule(schedule Schedule, now time.Time) (Schedule, time.Time, e
 	if schedule.Kind == "" {
 		schedule.Kind = ScheduleCron
 	}
+	if schedule.Kind == ScheduleEvent {
+		return Schedule{Kind: ScheduleEvent}, time.Time{}, nil
+	}
 	if schedule.Kind != ScheduleCron {
 		return schedule, time.Time{}, fmt.Errorf("unsupported schedule kind %q", schedule.Kind)
 	}
@@ -144,6 +169,24 @@ func NormalizeSchedule(schedule Schedule, now time.Time) (Schedule, time.Time, e
 		return schedule, time.Time{}, fmt.Errorf("cron expression produced no next run")
 	}
 	return schedule, next, nil
+}
+
+func normalizeTrigger(trigger *Trigger) (*Trigger, error) {
+	if trigger == nil {
+		return nil, nil
+	}
+	next := Trigger{
+		Kind:     strings.ToLower(strings.TrimSpace(trigger.Kind)),
+		From:     strings.TrimSpace(trigger.From),
+		Subject:  strings.TrimSpace(trigger.Subject),
+		Contains: strings.TrimSpace(trigger.Contains),
+	}
+	switch next.Kind {
+	case TriggerGmail, TriggerWhatsApp, TriggerTelegram, TriggerSlack, TriggerWebhook:
+		return &next, nil
+	default:
+		return nil, fmt.Errorf("unsupported trigger kind %q", trigger.Kind)
+	}
 }
 
 func NextRun(schedule Schedule, after time.Time) (time.Time, error) {

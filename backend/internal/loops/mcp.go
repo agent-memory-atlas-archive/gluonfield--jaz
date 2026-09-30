@@ -29,7 +29,8 @@ type MCPTools struct {
 	agentNames func() []string
 	// card, when its Store is set, emits a loop_created card into the calling
 	// thread after a successful create.
-	card CardSink
+	card  CardSink
+	owner OwnerFunc
 }
 
 // MCPOption configures optional MCPTools dependencies.
@@ -52,6 +53,11 @@ func WithEvents(store SessionEventAppender, bus SessionEventPublisher) MCPOption
 	return func(t *MCPTools) { t.card = CardSink{Store: store, Bus: bus} }
 }
 
+// WithOwner assigns every created loop to a bot; see Coordinator.Owner.
+func WithOwner(owner OwnerFunc) MCPOption {
+	return func(t *MCPTools) { t.owner = owner }
+}
+
 func NewMCPTools(service MCPService, opts ...MCPOption) *MCPTools {
 	t := &MCPTools{service: service}
 	for _, opt := range opts {
@@ -68,7 +74,7 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_list",
 		Title:       "List Jaz loops",
-		Description: "List active Jaz loops.",
+		Description: "List routines. A routine is a scheduled or event-triggered prompt owned by a Jaz bot; bot_id names the owner.",
 	}, t.List)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_get",
@@ -78,7 +84,7 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_create",
 		Title:       "Create Jaz loop",
-		Description: "Create a scheduled Jaz loop." + agentHint,
+		Description: "Create a routine: a prompt a Jaz bot runs on a schedule or when a trigger fires. Called from a bot's thread, the routine belongs to that bot and each run is a turn in that thread; otherwise pass bot, or a new bot named after the routine is created (acp_agent, model and directory configure that new bot)." + agentHint,
 	}, t.Create)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_update",
@@ -119,6 +125,7 @@ func (t *MCPTools) coordinator() Coordinator {
 		Loops:  t.service,
 		Boards: t.boards,
 		Card:   t.card,
+		Owner:  t.owner,
 	}
 }
 
@@ -201,6 +208,8 @@ type MCPCreateInput struct {
 	ReasoningEffort string   `json:"reasoning_effort,omitempty" jsonschema:"none, minimal, low, medium, high, xhigh, max"`
 	Directory       string   `json:"directory,omitempty" jsonschema:"workspace-relative or absolute directory for loop runs"`
 	BoardIDs        []string `json:"board_ids,omitempty" jsonschema:"board ids to place this loop's widget on; assignment is what enables the widget. Use loop_boards to list ids."`
+	Bot             string   `json:"bot,omitempty" jsonschema:"id of the bot that owns the routine; defaults to the calling bot"`
+	Trigger         *Trigger `json:"trigger,omitempty" jsonschema:"fire on an event instead of the schedule: kind gmail, whatsapp, telegram, slack or webhook, with optional from, subject (email subject or Slack #channel) and contains filters"`
 }
 
 func (t *MCPTools) Create(_ context.Context, req *mcp.CallToolRequest, input MCPCreateInput) (*mcp.CallToolResult, Loop, error) {
@@ -215,6 +224,8 @@ func (t *MCPTools) Create(_ context.Context, req *mcp.CallToolRequest, input MCP
 		Model:           input.Model,
 		ReasoningEffort: input.ReasoningEffort,
 		Directory:       input.Directory,
+		BotID:           strings.TrimSpace(input.Bot),
+		Trigger:         input.Trigger,
 	}, input.BoardIDs, mcpsession.SessionID(req))
 	return nil, loop, err
 }
@@ -231,6 +242,7 @@ type MCPUpdateInput struct {
 	Model           *string   `json:"model,omitempty"`
 	ReasoningEffort *string   `json:"reasoning_effort,omitempty" jsonschema:"none, minimal, low, medium, high, xhigh, max"`
 	Directory       *string   `json:"directory,omitempty"`
+	Trigger         *Trigger  `json:"trigger,omitempty" jsonschema:"switch the routine to an event trigger; setting schedule switches it back"`
 	// BoardIDs reassigns the loop's widget to exactly these boards. Omit to
 	// leave assignments untouched; pass an empty array to clear them.
 	BoardIDs *[]string `json:"board_ids,omitempty" jsonschema:"boards to place this loop's widget on; omit to leave unchanged, empty array to remove from all boards. Use loop_boards to list ids."`
@@ -252,6 +264,7 @@ func (t *MCPTools) Update(_ context.Context, _ *mcp.CallToolRequest, input MCPUp
 		Model:           input.Model,
 		ReasoningEffort: input.ReasoningEffort,
 		Directory:       input.Directory,
+		Trigger:         input.Trigger,
 	}, input.BoardIDs)
 	return nil, loop, err
 }

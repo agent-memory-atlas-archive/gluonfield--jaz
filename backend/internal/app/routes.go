@@ -10,6 +10,7 @@ import (
 	"github.com/wins/jaz/backend/internal/deviceauth"
 	feedcore "github.com/wins/jaz/backend/internal/feed"
 	agentsessionsapi "github.com/wins/jaz/backend/internal/httpapi/agentsessions"
+	botsapi "github.com/wins/jaz/backend/internal/httpapi/bots"
 	browserapi "github.com/wins/jaz/backend/internal/httpapi/browser"
 	computerapi "github.com/wins/jaz/backend/internal/httpapi/computer"
 	connectionsapi "github.com/wins/jaz/backend/internal/httpapi/connections"
@@ -214,6 +215,31 @@ func appendBrowserRoutes(routes server.Routes, settings *BrowserSettingsHandler,
 		)
 	}
 	return routes
+}
+
+func BotRoutes(handler *botsapi.Handler) server.Routes {
+	return server.Routes{
+		{Pattern: "GET /v1/bots", Handler: httpHandlerFunc(handler.List)},
+		{Pattern: "POST /v1/bots", Handler: httpHandlerFunc(handler.Create)},
+		{Pattern: "POST /v1/bots/groups", Handler: httpHandlerFunc(handler.CreateGroup)},
+		{Pattern: "GET /v1/bots/{bot}", Handler: httpHandlerFunc(handler.Get)},
+		{Pattern: "PATCH /v1/bots/{bot}", Handler: httpHandlerFunc(handler.Update)},
+		{Pattern: "DELETE /v1/bots/{bot}", Handler: httpHandlerFunc(handler.Delete)},
+		{Pattern: "POST /v1/bots/{bot}/messages", Handler: httpHandlerFunc(handler.Post)},
+	}
+}
+
+// BotWebhookRoute serves routine webhooks without the device key: each
+// routine authenticates its callers with its own secret.
+func BotWebhookRoute(handler *botsapi.Handler) server.PublicRoute {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/hooks/{routine}", handler.Webhook)
+	return server.PublicRoute{
+		Match: func(r *http.Request) bool {
+			return r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/hooks/")
+		},
+		Handler: mux,
+	}
 }
 
 func NewPublicRoutes(handler *previewapi.Handler) server.PublicRoutes {

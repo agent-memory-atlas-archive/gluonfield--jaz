@@ -230,6 +230,53 @@ func TestACPLoopRunCreatesHiddenThreadAndFinishesFromCallback(t *testing.T) {
 	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusOK)
 }
 
+func TestRoutineRunsAsHiddenTurnInItsBotThread(t *testing.T) {
+	store, err := sqlitestore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	bot, err := store.CreateSession(storage.CreateSession{Slug: "gimli", Title: "Gimli", Runtime: storage.RuntimeACP, SourceType: storage.SourceBot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &fakeACPManager{job: acp.Job{ID: bot.ID}}
+	srv := &Server{Store: store, ACP: manager}
+	service := newLoopServiceForTest(store, NewLoopRunner(srv))
+	loop, err := service.Create(loops.CreateLoop{
+		Name:     "Morning triage",
+		Prompt:   "check the inbox",
+		BotID:    bot.ID,
+		Schedule: loops.Schedule{Kind: loops.ScheduleCron, Expr: "30 8 * * 1-5", Timezone: "UTC"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	run, err := service.RunNow(context.Background(), loop.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusRunning)
+	manager.mu.Lock()
+	internal, spawned := manager.internal, manager.spawned
+	manager.mu.Unlock()
+	if internal.Session != bot.ID || !strings.HasPrefix(internal.Message, "[routine] Morning triage · ") || !strings.HasSuffix(internal.Message, "check the inbox") {
+		t.Fatalf("routine turn = %+v", internal)
+	}
+	if spawned.Slug != "" {
+		t.Fatalf("a bot routine spawned its own thread: %+v", spawned)
+	}
+	events, err := store.LoadSessionEvents(bot.ID)
+	if err != nil || len(events) == 0 || events[len(events)-1].BotActivity == nil || events[len(events)-1].BotActivity.Label != "Morning triage" {
+		t.Fatalf("bot thread events = %+v, %v", events, err)
+	}
+	if _, ok, err := service.FinishThread(bot.ID, loops.RunStatusOK, ""); err != nil || !ok {
+		t.Fatalf("finish routine turn = %v, %v", ok, err)
+	}
+	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusOK)
+}
+
 type fakeLoopExecutor struct {
 	started chan loops.Run
 }

@@ -168,3 +168,15 @@ sql:
         emit_interface: true
         emit_empty_slices: true
         omit_unused_structs: true
+  - engine: "sqlite"
+    schema: "internal/storage/sqlite/migrations"
+    queries: "internal/storage/sqlite/queries/botdb"
+    gen:
+      go:
+        package: "botdb"
+        out: "internal/storage/sqlite/generated/botdb"
+        sql_package: "database/sql"
+        emit_json_tags: true
+        emit_interface: true
+        emit_empty_slices: true
+        omit_unused_structs: true

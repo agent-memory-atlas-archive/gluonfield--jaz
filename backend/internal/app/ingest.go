@@ -32,10 +32,11 @@ func NewSourceProjectionQueue(layout runtimefiles.Layout) SourceProjectionQueue 
 	}}
 }
 
-func NewIntegrationMaterializingWriter(layout runtimefiles.Layout, raw integrationingest.RawWriter, queue SourceProjectionQueue, logger *log.Logger) integrationingest.MaterializingWriter {
+func NewIntegrationMaterializingWriter(layout runtimefiles.Layout, raw integrationingest.RawWriter, queue SourceProjectionQueue, observers *integrationingest.Observers, logger *log.Logger) integrationingest.MaterializingWriter {
 	return integrationingest.MaterializingWriter{
 		Raw:             raw,
 		ProjectionQueue: queue.Queue,
+		Observers:       observers,
 		Log:             logger,
 		Projector: integrationingest.SourceProjector{
 			RawRoot:   layout.Ingest,

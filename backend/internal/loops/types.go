@@ -27,8 +27,26 @@ const (
 )
 
 const (
-	ScheduleCron = "cron"
+	ScheduleCron  = "cron"
+	ScheduleEvent = "event"
 )
+
+const (
+	TriggerGmail    = "gmail"
+	TriggerWhatsApp = "whatsapp"
+	TriggerTelegram = "telegram"
+	TriggerSlack    = "slack"
+	TriggerWebhook  = "webhook"
+)
+
+// Trigger fires a routine on an outside event instead of a schedule. The
+// optional filters are case-insensitive substring matches.
+type Trigger struct {
+	Kind     string `json:"kind"`
+	From     string `json:"from,omitempty"`
+	Subject  string `json:"subject,omitempty"`
+	Contains string `json:"contains,omitempty"`
+}
 
 type Schedule struct {
 	Kind     string `json:"kind"`
@@ -59,6 +77,12 @@ type Loop struct {
 	LastError       string    `json:"last_error,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	// BotID is the thread of the bot that owns this routine.
+	BotID       string   `json:"bot_id"`
+	Trigger     *Trigger `json:"trigger,omitempty"`
+	WebhookHash string   `json:"-"`
+	// WebhookSecret is returned once, when a webhook trigger is created.
+	WebhookSecret string `json:"webhook_secret,omitempty"`
 }
 
 type Run struct {
@@ -84,6 +108,8 @@ type CreateLoop struct {
 	Model           string
 	ReasoningEffort string
 	Directory       string
+	BotID           string
+	Trigger         *Trigger
 }
 
 type UpdateLoop struct {
@@ -97,6 +123,8 @@ type UpdateLoop struct {
 	Model           *string
 	ReasoningEffort *string
 	Directory       *string
+	Trigger         *Trigger
+	BotID           *string
 	Reschedule      bool
 	RescheduleAt    time.Time
 }
@@ -143,8 +171,11 @@ type RunController interface {
 }
 
 type Execution struct {
-	Loop                   Loop
-	Run                    Run
+	Loop Loop
+	Run  Run
+	// Thread, when set, is the bot thread the run is a turn in; otherwise the
+	// run gets a thread of its own.
+	Thread                 string
 	Prompt                 string
 	SystemPromptExtensions promptmodule.Modules
 	ArtifactSurface        string

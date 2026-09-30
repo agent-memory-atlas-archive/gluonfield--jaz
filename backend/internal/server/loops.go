@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/wins/jaz/backend/internal/loops"
@@ -18,6 +19,9 @@ func (s *Server) handleListLoops(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
+	}
+	if bot := r.URL.Query().Get("bot_id"); bot != "" {
+		items = slices.DeleteFunc(items, func(loop loops.Loop) bool { return loop.BotID != bot })
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"loops": items})
 }
@@ -56,7 +60,7 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 // Boards come from the widget service; there is no card sink because REST
 // requests carry no thread to announce into.
 func (s *Server) loopCoordinator() loops.Coordinator {
-	coordinator := loops.Coordinator{Loops: s.Loops}
+	coordinator := loops.Coordinator{Loops: s.Loops, Owner: s.RoutineOwner}
 	if s.Widgets != nil {
 		coordinator.Boards = s.Widgets.LoopBoards()
 	}

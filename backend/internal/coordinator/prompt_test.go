@@ -23,7 +23,7 @@ func TestPromptCombinesCoordinatorFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertOrder(t, prompt, "You are Jaz", "## Jaz platform", "Date: June 2, 2026", "Time: 09:08:07 BST", "Timezone: BST (UTC+01:00)", "Weekday: Tuesday", "Current working directory: "+workspace, "Device: Desktop", "## Runtime paths", root+": runtime state", filepath.Join(root, "workspaces", "default")+": default workspace.", "## AGENTS.md\n\nagents", "## SOUL.md\n\nsoul", "## INTERNAL.md", "realizations", "skills")
+	assertOrder(t, prompt, "You are Jaz", "## Jaz platform", "## Runtime paths", root+": runtime state", filepath.Join(root, "workspaces", "default")+": default workspace.", "## AGENTS.md\n\nagents", "## SOUL.md\n\nsoul", "## INTERNAL.md", "realizations", "skills", "Date: June 2, 2026", "Time: 09:08:07 BST", "Timezone: BST (UTC+01:00)", "Weekday: Tuesday", "Current working directory: "+workspace, "Device: Desktop")
 }
 
 func TestPromptOmitsMissingFiles(t *testing.T) {

@@ -17,11 +17,15 @@ import (
 	"github.com/wins/jaz/backend/internal/acpadapter"
 	"github.com/wins/jaz/backend/internal/agent"
 	"github.com/wins/jaz/backend/internal/app"
+	"github.com/wins/jaz/backend/internal/bots"
 	"github.com/wins/jaz/backend/internal/computercontrol"
 	configloader "github.com/wins/jaz/backend/internal/config"
 	"github.com/wins/jaz/backend/internal/connections"
+	slackconnector "github.com/wins/jaz/backend/internal/connectors/slack"
 	"github.com/wins/jaz/backend/internal/coordinator"
 	"github.com/wins/jaz/backend/internal/deviceauth"
+	botsapi "github.com/wins/jaz/backend/internal/httpapi/bots"
+	"github.com/wins/jaz/backend/internal/integrationingest"
 	"github.com/wins/jaz/backend/internal/jaztools"
 	"github.com/wins/jaz/backend/internal/loops"
 	"github.com/wins/jaz/backend/internal/managedtool"
@@ -89,6 +93,7 @@ func serveOptions(args []string) []fx.Option {
 			app.NewIntegrationRawWriter,
 			app.NewMemorySourceQueue,
 			app.NewSourceProjectionQueue,
+			integrationingest.NewObservers,
 			app.NewIntegrationMaterializingWriter,
 			app.NewSourceProjectionRunner,
 			app.NewWhatsAppProvider,
@@ -251,6 +256,8 @@ func startServer(
 	runtimeAuthKey app.RuntimeAuthKey,
 	routes server.Routes,
 	publicRoutes server.PublicRoutes,
+	recordObservers *integrationingest.Observers,
+	ingestWriter integrationingest.MaterializingWriter,
 ) error {
 	authKey := string(runtimeAuthKey)
 	handler := &server.Server{
@@ -299,11 +306,19 @@ func startServer(
 		loops.WithPromptExtra(widgetService.LoopPromptExtra),
 		loops.WithArtifactSurface(widgetService.LoopArtifactSurface),
 	)
+	botService := bots.NewService(store, store, manager, loopService, events, logger)
 	jazTools.SetLoops(loopService,
 		loops.WithBoards(widgetService.LoopBoards()),
 		loops.WithAgentNames(manager.Agents),
 		loops.WithEvents(store, events),
+		loops.WithOwner(botService.RoutineOwner),
 	)
+	jazTools.SetBots(bots.NewMCPTools(botService))
+	botsAPI := botsapi.NewHandler(botService, loopService)
+	handler.Routes = append(handler.Routes, app.BotRoutes(botsAPI)...)
+	handler.PublicRoutes = append(handler.PublicRoutes, app.BotWebhookRoute(botsAPI))
+	handler.RoutineOwner = botService.RoutineOwner
+	recordObservers.Add(loopService.HandleRecords)
 	jazTools.SetThreads(threadService)
 	jazTools.SetAgents(manager)
 	handler.Loops = loopService
@@ -357,6 +372,20 @@ func startServer(
 			}
 			loopCtx, cancelLoops := context.WithCancel(context.Background())
 			stopLoops = cancelLoops
+			slackSync := &integrationingest.SlackSyncer{
+				Store:      store,
+				Writer:     ingestWriter,
+				Wanted:     func() bool { return loopService.Watching(loops.TriggerSlack) },
+				APIBaseURL: slackconnector.APIBaseURL,
+			}
+			go slackSync.Run(loopCtx, time.Minute, func(err error) {
+				logger.WithPrefix("slack-sync").Warn("slack sync failed", "error", err)
+			})
+			go func() {
+				if err := botService.AdoptLoops(loopCtx); err != nil {
+					logger.WithPrefix("bots").Error("adopting loops failed", "error", err)
+				}
+			}()
 			go func() {
 				if err := loops.StartScheduler(loopCtx, loopService, 30*time.Second); err != nil && loopCtx.Err() == nil {
 					logger.WithPrefix("loops").Error("scheduler stopped", "error", err)

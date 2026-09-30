@@ -44,6 +44,7 @@ type ACPManager interface {
 	Spawn(context.Context, acp.SpawnRequest) (acp.SpawnResult, error)
 	Send(context.Context, acp.SendRequest) (acp.Job, error)
 	StartInternalTurn(context.Context, acp.InternalTurnRequest) (acp.Job, error)
+	StartInternalTurnWhenIdle(context.Context, acp.InternalTurnRequest) (acp.Job, error)
 	ContinueGoal(context.Context, string) (acp.Job, error)
 	Compact(context.Context, acp.CompactRequest) (acp.Job, error)
 	Steer(context.Context, acp.SteerRequest) (acp.Job, error)
@@ -92,6 +93,7 @@ type Server struct {
 	Locks                *sessionlock.Locks
 	Events               *sessionevents.Bus
 	Loops                *loops.Service
+	RoutineOwner         loops.OwnerFunc
 	Threads              *threads.Service
 	Widgets              *widgets.Service
 	STT                  voice.STT
