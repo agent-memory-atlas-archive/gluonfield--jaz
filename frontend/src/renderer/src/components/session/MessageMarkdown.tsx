@@ -10,7 +10,7 @@ import {
   type MouseEvent,
   type ReactNode,
 } from 'react'
-import Markdown, { defaultUrlTransform, type Components, type ExtraProps } from 'react-markdown'
+import Markdown, { defaultUrlTransform, type Components, type ExtraProps, type Options } from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -142,7 +142,7 @@ type MarkdownNode = {
   children?: MarkdownNode[]
 }
 
-const FILE_REFERENCE_SKIP_NODES = new Set([
+const TEXT_REWRITE_SKIP_NODES = new Set([
   'code',
   'definition',
   'html',
@@ -157,24 +157,38 @@ const FILE_REFERENCE_SKIP_NODES = new Set([
 
 function remarkFileReferences() {
   return (tree: MarkdownNode) => {
-    linkifyFileReferenceNodes(tree)
+    rewriteTextNodes(tree, fileReferenceTextNodes)
   }
 }
 
-function linkifyFileReferenceNodes(node: MarkdownNode): void {
-  if (!node.children || FILE_REFERENCE_SKIP_NODES.has(node.type)) return
+function remarkLineBreaks() {
+  return (tree: MarkdownNode) => {
+    rewriteTextNodes(tree, lineBreakTextNodes)
+  }
+}
+
+function rewriteTextNodes(node: MarkdownNode, rewrite: (value: string) => MarkdownNode[] | null): void {
+  if (!node.children || TEXT_REWRITE_SKIP_NODES.has(node.type)) return
   for (let i = 0; i < node.children.length; i++) {
     const child = node.children[i]
     if (child.type === 'text' && typeof child.value === 'string') {
-      const replacement = fileReferenceTextNodes(child.value)
+      const replacement = rewrite(child.value)
       if (replacement) {
         node.children.splice(i, 1, ...replacement)
         i += replacement.length - 1
       }
       continue
     }
-    linkifyFileReferenceNodes(child)
+    rewriteTextNodes(child, rewrite)
   }
+}
+
+function lineBreakTextNodes(value: string): MarkdownNode[] | null {
+  const [first, ...rest] = value.split(/\r?\n|\r/)
+  if (!rest.length) {
+    return null
+  }
+  return [{ type: 'text', value: first }, ...rest.flatMap((line) => [{ type: 'break' }, { type: 'text', value: line }])]
 }
 
 function fileReferenceTextNodes(value: string): MarkdownNode[] | null {
@@ -212,14 +226,19 @@ const MarkdownTable: ComponentType<ComponentProps<'table'> & ExtraProps> = ({ no
   </div>
 )
 
+const REMARK_PLUGINS = [remarkGfm, [remarkMath, { singleDollarTextMath: false }], remarkFileReferences] satisfies Options['remarkPlugins']
+const USER_REMARK_PLUGINS = [...REMARK_PLUGINS, remarkLineBreaks]
+
 function BaseMarkdown({
   text,
   className,
   Link,
+  remarkPlugins = REMARK_PLUGINS,
 }: {
   text: string
   className: string
   Link: AnchorComponent
+  remarkPlugins?: Options['remarkPlugins']
 }) {
   const files = useContext(MarkdownFileContext)
   const prepared = useMemo(() => normalizeMath(text), [text])
@@ -227,7 +246,7 @@ function BaseMarkdown({
   return (
     <div className={className}>
       <Markdown
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: false }], remarkFileReferences]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={[rehypeKatex]}
         components={components}
         urlTransform={(url, key, node) => key === 'src' && node.tagName === 'img'
@@ -306,9 +325,10 @@ export const RenderedMarkdown = memo(function RenderedMarkdown({
 })
 
 // User messages already carry mentions as Markdown links, so they use the same
-// chat renderer without the assistant-only expansion of bare skill names.
+// chat renderer without the assistant-only expansion of bare skill names. Typed
+// line breaks are kept as <br>, since users press Enter to start a new line.
 export const UserMessageMarkdown = memo(function UserMessageMarkdown({ text }: { text: string }) {
-  return <BaseMarkdown text={text} className="chat-prose whitespace-pre-wrap" Link={MessageMarkdownLink} />
+  return <BaseMarkdown text={text} className="chat-prose" Link={MessageMarkdownLink} remarkPlugins={USER_REMARK_PLUGINS} />
 })
 
 // Shared renderer for assistant prose: GitHub-flavored Markdown + LaTeX via KaTeX.
