@@ -8,13 +8,20 @@ export type SelectOption = { value: string; label: string; description?: string 
 
 // Codex-style dropdown: a filled trigger chip and a portalled popover menu
 // (rows with a check on the selected item and optional descriptions). Portalled
-// to the body so the menu escapes the `overflow-hidden` settings cards.
+// to the body so the menu escapes the `overflow-hidden` settings cards. The
+// plain trigger is right-aligned text that fills the rest of a settings row.
+const TRIGGER = {
+  chip: 'h-7 justify-between rounded-full bg-ink/10 px-3 text-[12px] text-ink hover:bg-ink/15',
+  plain: 'min-w-0 flex-1 justify-end text-[13px] text-ink-2 hover:text-ink',
+}
+
 export function Select({
   value,
   options,
   onChange,
   disabled,
   className = '',
+  variant = 'chip',
   'aria-label': ariaLabel,
 }: {
   value: string
@@ -22,6 +29,7 @@ export function Select({
   onChange: (value: string) => void
   disabled?: boolean
   className?: string
+  variant?: keyof typeof TRIGGER
   'aria-label'?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -128,7 +136,7 @@ export function Select({
               break
           }
         }}
-        className={`flex h-7 items-center justify-between gap-2 rounded-full bg-ink/10 px-3 text-[12px] text-ink transition-colors duration-150 hover:bg-ink/15 disabled:cursor-default disabled:opacity-50 ${className}`}
+        className={`flex items-center gap-2 transition-colors duration-150 disabled:cursor-default disabled:opacity-50 ${TRIGGER[variant]} ${className}`}
       >
         <span className="truncate">{current?.label}</span>
         <ChevronDown size={13} className="shrink-0 text-ink-3" />

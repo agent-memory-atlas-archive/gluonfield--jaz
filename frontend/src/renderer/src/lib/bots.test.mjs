@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { botDoing, chatEntries } from './bots'
+import { botChat } from './bots'
 
 describe('bot chat log', () => {
   const self = { id: 'gimli', name: 'Gimli' }
@@ -14,7 +14,7 @@ describe('bot chat log', () => {
   const shape = (entries) => entries.map((entry) => entry.kind === 'activity' ? `· ${entry.event.bot_activity?.kind ?? entry.event.type}` : `${entry.kind}: ${entry.text}`)
 
   test('shows only what was typed and sent, never the work between', () => {
-    const entries = chatEntries(
+    const { entries } = botChat(
       [user(1, 1, 'move linkin park to in progress')],
       [wrote(2, 'Let me find the issue first.'), tool(3), said(4, 'Moved it.'), wrote(5, 'Done: DEM-6 is In Progress.')],
       self,
@@ -23,15 +23,15 @@ describe('bot chat log', () => {
     expect(shape(entries)).toEqual(['user: move linkin park to in progress', 'bot: Moved it.'])
   })
 
-  test('a finished turn that sent nothing falls back to its last reply', () => {
+  test('a finished turn that sent nothing falls back to its last reply, even after messaging a bot', () => {
     const messages = [user(1, 1, 'hi')]
-    const events = [wrote(2, 'Checking.'), tool(3), wrote(4, 'Hi! What should we work on?')]
-    expect(shape(chatEntries(messages, events, self, true))).toEqual(['user: hi'])
-    expect(shape(chatEntries(messages, events, self, false))).toEqual(['user: hi', 'bot: Hi! What should we work on?'])
+    const events = [wrote(2, 'Checking.'), woke(3, 'message_sent', 'Pip'), tool(4), wrote(5, 'Hi! What should we work on?')]
+    expect(shape(botChat(messages, events, self, true).entries)).toEqual(['user: hi', '· message_sent'])
+    expect(shape(botChat(messages, events, self, false).entries)).toEqual(['user: hi', '· message_sent', 'bot: Hi! What should we work on?'])
   })
 
   test('group turns and routine runs stay out of the chat unless the bot speaks', () => {
-    const entries = chatEntries(
+    const { entries } = botChat(
       [user(1, 1, 'hi')],
       [said(2, 'Hey.'), woke(3, 'group', 'Team'), wrote(4, 'PASS'), woke(5, 'routine', 'Digest'), wrote(6, 'Nothing new.'), woke(7, 'message_sent', 'dr eggbot'), event(8, { type: 'agent_switch', content: 'codex' })],
       self,
@@ -42,8 +42,8 @@ describe('bot chat log', () => {
 
   test('a working bot says what it is busy with until the user writes again', () => {
     const events = [said(2, 'Hey.'), woke(3, 'group', 'Team')]
-    expect(botDoing([user(1, 1, 'hi')], events)).toBe('working in Team')
-    expect(botDoing([user(1, 1, 'hi')], [...events, woke(4, 'routine', 'Say hi')])).toBe('running Say hi')
-    expect(botDoing([user(1, 1, 'hi'), user(2, 5, 'still there?')], events)).toBeUndefined()
+    expect(botChat([user(1, 1, 'hi')], events, self, true).doing).toBe('working in Team')
+    expect(botChat([user(1, 1, 'hi')], [...events, woke(4, 'routine', 'Say hi')], self, true).doing).toBe('running Say hi')
+    expect(botChat([user(1, 1, 'hi'), user(2, 5, 'still there?')], events, self, true).doing).toBeUndefined()
   })
 })

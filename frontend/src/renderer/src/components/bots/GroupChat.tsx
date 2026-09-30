@@ -13,7 +13,7 @@ import { botsQuery, sendGroupMessage } from '@/lib/api/bots'
 import { markThreadSeen } from '@/lib/api/feed'
 import { sessionEventsQuery } from '@/lib/api/sessions'
 import type { Bot } from '@/lib/api/types'
-import { botAvatars, chatEntries } from '@/lib/bots'
+import { botAvatars, botChat } from '@/lib/bots'
 import { modalDialogOpen } from '@/lib/dom/modal'
 import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
@@ -42,7 +42,7 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
   const { attachScroll, onScroll, pinToBottom } = useThreadAutoScroll({ resetKey: group.id })
   const [detailsOpen, setDetailsOpen] = useState(false)
   const entries = useMemo(
-    () => chatEntries([], coalesceSessionEvents([...(history.data?.events ?? []), ...live.data]), group, false),
+    () => botChat([], coalesceSessionEvents([...(history.data?.events ?? []), ...live.data]), group, false).entries,
     [history.data?.events, live.data, group],
   )
   // Members' status comes from the bot list, polled briskly while the room is

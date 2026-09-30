@@ -10,9 +10,6 @@ import type { AgentSessionConfigOption, AgentSessionState, Bot } from '@/lib/api
 import { keys } from '@/lib/query/keys'
 import { useUpdateBot } from './useUpdateBot'
 
-// A setting's value reads as plain text filling the rest of its row.
-const ROW_SELECT = 'min-w-0 flex-1 justify-end! bg-transparent! px-0! text-[13px]! text-ink-2 hover:text-ink'
-
 // The bot's agent and that agent's own model and reasoning options.
 export function BotAgentSettings({ bot, agentSession, working }: { bot: Bot; agentSession?: AgentSessionState; working: boolean }) {
   const options = agentSession?.config_options ?? []
@@ -57,7 +54,7 @@ function AgentSelect({ bot, working }: { bot: Bot; working: boolean }) {
   return (
     <Select
       aria-label="Agent"
-      className={ROW_SELECT}
+      variant="plain"
       value={current}
       options={choices.map((agent) => ({ value: agent, label: agentLabel(agent) }))}
       disabled={working || update.isPending}
@@ -85,7 +82,7 @@ function OptionSelect({ sessionId, option, working }: { sessionId: string; optio
   return (
     <Select
       aria-label={option.name}
-      className={ROW_SELECT}
+      variant="plain"
       value={option.current_value}
       options={option.options.map((value) => ({ value: value.value, label: value.name }))}
       disabled={working || update.isPending}

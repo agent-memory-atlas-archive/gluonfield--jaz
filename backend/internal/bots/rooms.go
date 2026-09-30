@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -69,8 +70,7 @@ func (s *Service) post(group storage.BotRecord, name string, message sessioneven
 func (s *Service) runRound(ctx context.Context, groupID, name string, responders []string) {
 	replies := 0
 	for range maxRounds {
-		var mu sync.Mutex
-		spoke := 0
+		var spoke atomic.Int64
 		var wg sync.WaitGroup
 		for _, member := range responders {
 			wg.Go(func() {
@@ -78,14 +78,12 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 				if err != nil && ctx.Err() == nil {
 					s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
 				}
-				mu.Lock()
-				spoke += len(said)
-				mu.Unlock()
+				spoke.Add(int64(len(said)))
 			})
 		}
 		wg.Wait()
-		replies += spoke
-		if ctx.Err() != nil || spoke == 0 || replies >= maxReplies {
+		replies += int(spoke.Load())
+		if ctx.Err() != nil || spoke.Load() == 0 || replies >= maxReplies {
 			return
 		}
 	}

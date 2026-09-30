@@ -1,4 +1,4 @@
-import type { Bot, BotAvatar, BotColor, BotShape, ChatMessage, SessionEvent } from '@/lib/api/types'
+import type { Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, SessionEvent } from '@/lib/api/types'
 import { messageText } from '@/lib/messageText'
 
 export const BOT_SHAPES: BotShape[] = ['circle', 'blob', 'squircle', 'pill', 'triangle', 'hex', 'cloud', 'drop']
@@ -67,66 +67,68 @@ export type ChatEntry =
   | { kind: 'bot'; key: string; at: string; botId?: string; name: string; text: string }
   | { kind: 'activity'; key: string; at: string; event: SessionEvent }
 
-type ChatTurn = { user: boolean; spoke: boolean; reply?: { key: string; at: string; text: string } }
+type ChatTurn = {
+  user: boolean
+  spoke: boolean
+  activity?: BotActivityEvent
+  reply?: { key: string; at: string; text: string }
+}
 
-const SHOWN_ACTIVITY = new Set(['message_sent', 'message_received'])
-
-// A bot's chat log: what people typed, what bots sent with send_message, and
-// the activity worth a row. Everything else in the thread is the bot's private
-// work. A finished turn the user started in which the bot sent nothing shows
-// its last written reply, so an answer is never lost.
-export function chatEntries(
+// A bot's chat, read from its thread in one pass: what people typed, what bots
+// sent with send_message and the activity worth a row. Everything else is the
+// bot's private work. A finished turn the user started in which the bot sent
+// nothing shows its last written reply, so an answer is never lost. `doing`
+// names what the bot is busy with when a group, another bot or a routine
+// opened its latest turn, whose output lands elsewhere.
+export function botChat(
   messages: ChatMessage[],
   events: SessionEvent[],
   self: { id: string; name: string },
   working: boolean,
-): ChatEntry[] {
+): { entries: ChatEntry[]; doing?: string } {
   const items = [
     ...messages.flatMap((message) =>
       message.role === 'user' ? [{ at: message.created_at, message, event: undefined }] : [],
     ),
     ...events.map((event) => ({ at: event.at, message: undefined, event })),
   ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-  const out: ChatEntry[] = []
+  const entries: ChatEntry[] = []
   let turn: ChatTurn | undefined
   const close = () => {
-    if (turn?.user && !turn.spoke && turn.reply) out.push({ kind: 'bot', name: self.name, botId: self.id, ...turn.reply })
+    if (turn?.user && !turn.spoke && turn.reply) entries.push({ kind: 'bot', name: self.name, botId: self.id, ...turn.reply })
   }
   for (const { at, message, event } of items) {
     if (message) {
       close()
-      out.push({ kind: 'user', key: `message:${message.seq}:${at}`, at, text: messageText(message) })
+      entries.push({ kind: 'user', key: `message:${message.seq}:${at}`, at, text: messageText(message) })
       turn = { user: true, spoke: false }
       continue
     }
     const key = `${event.session_id}:${event.seq ?? at}`
     const room = event.room_message
+    const activity = event.bot_activity
     if (room) {
-      if (room.speaker === 'user') out.push({ kind: 'user', key, at, text: room.text })
-      else out.push({ kind: 'bot', key, at, botId: room.bot_id, name: room.name, text: room.text })
+      if (room.speaker === 'user') entries.push({ kind: 'user', key, at, text: room.text })
+      else entries.push({ kind: 'bot', key, at, botId: room.bot_id, name: room.name, text: room.text })
       if (turn && room.speaker === 'bot') turn.spoke = true
-    } else if (event.bot_activity) {
-      close()
-      if (SHOWN_ACTIVITY.has(event.bot_activity.kind)) out.push({ kind: 'activity', key, at, event })
-      turn = { user: false, spoke: false }
+    } else if (activity) {
+      // Messaging another bot happens within a turn; anything else starts one.
+      const opens = activity.kind !== 'message_sent'
+      if (opens) close()
+      if (activity.kind === 'message_sent' || activity.kind === 'message_received') entries.push({ kind: 'activity', key, at, event })
+      if (opens) turn = { user: false, spoke: false, activity }
     } else if (event.loop_created || event.type === 'agent_switch') {
-      out.push({ kind: 'activity', key, at, event })
+      entries.push({ kind: 'activity', key, at, event })
     } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {
       turn.reply = { key, at, text: event.content.trim() }
     }
   }
   if (!working) close()
-  return out
+  return { entries, doing: busyWith(turn?.activity) }
 }
 
-// What a bot is busy with when a group, another bot or a routine opened its
-// latest turn, whose output lands elsewhere; undefined for the user's own.
-export function botDoing(messages: ChatMessage[], events: SessionEvent[]): string | undefined {
-  const opener = events.findLast((event) => event.bot_activity && event.bot_activity.kind !== 'message_sent')
-  const activity = opener?.bot_activity
-  if (!opener || !activity) return undefined
-  if (messages.some((message) => message.role === 'user' && Date.parse(message.created_at) > Date.parse(opener.at))) return undefined
-  switch (activity.kind) {
+function busyWith(activity?: BotActivityEvent): string | undefined {
+  switch (activity?.kind) {
     case 'group':
       return `working in ${activity.label}`
     case 'message_received':
@@ -136,4 +138,3 @@ export function botDoing(messages: ChatMessage[], events: SessionEvent[]): strin
   }
   return undefined
 }
-

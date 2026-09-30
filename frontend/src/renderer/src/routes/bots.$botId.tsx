@@ -8,7 +8,7 @@ import { GroupChat } from '@/components/bots/GroupChat'
 import { ThreadView } from '@/components/session/ThreadView'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { botsQuery } from '@/lib/api/bots'
-import { botDoing, chatEntries, rememberBot } from '@/lib/bots'
+import { botChat, rememberBot } from '@/lib/bots'
 
 declare module '@tanstack/history' {
   interface HistoryState {
@@ -38,14 +38,10 @@ function BotRoute() {
       details={(view) => <BotDetails bot={bot} focusName={newBot} {...view} />}
       openDetails={newBot}
       placeholder={`Message ${bot.name}`}
-      chat={({ messages, events, working }) => (
-        <ChatLog
-          entries={chatEntries(messages, events, bot, working)}
-          bots={bots.data ?? []}
-          named={false}
-          working={working ? [{ bot, doing: botDoing(messages, events) }] : []}
-        />
-      )}
+      chat={({ messages, events, working }) => {
+        const chat = botChat(messages, events, bot, working)
+        return <ChatLog entries={chat.entries} bots={bots.data ?? []} named={false} working={working ? [{ bot, doing: chat.doing }] : []} />
+      }}
     />
   )
 }
