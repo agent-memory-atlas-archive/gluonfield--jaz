@@ -80,20 +80,12 @@ func (s fakeACPService) Send(context.Context, acp.SendRequest) (acp.Job, error) 
 	return acp.Job{}, nil
 }
 
-func (s fakeACPService) Status(string) (acp.Job, error) {
-	return acp.Job{}, nil
-}
-
-func (s fakeACPService) Wait(context.Context, acp.WaitRequest) (acp.Job, error) {
-	return acp.Job{}, nil
+func (s fakeACPService) WaitThreads(context.Context, []string, time.Duration) (acp.ThreadResults, error) {
+	return acp.ThreadResults{}, nil
 }
 
 func (s fakeACPService) Cancel(context.Context, string) (acp.Job, error) {
 	return acp.Job{}, nil
-}
-
-func (s fakeACPService) List() []acp.Job {
-	return nil
 }
 
 func (s fakeACPService) Agents() []string {
@@ -205,12 +197,12 @@ func TestUnifiedServerMemoryAndLoopTools(t *testing.T) {
 	}
 	for _, name := range []string{
 		"memory_search", "memory_get_page",
-		"thread_context",
+		"read_thread", "list_threads", "search_threads",
 		"google_calendar_get_events", "google_calendar_create_event",
 		"gmail_get_profile", "gmail_search_threads", "gmail_read_thread", "gmail_create_draft", "gmail_create_reply_draft", "gmail_send_draft", "gmail_update_draft", "gmail_list_drafts", "gmail_read_attachment",
 		"whatsapp_search", "whatsapp_send_message", "telegram_search", "telegram_send_message",
 		"loop_list", "loop_get", "loop_create", "loop_update", "loop_run", "loop_delete",
-		"jazagent_spawn", "jazagent_send", "jazagent_status", "jazagent_wait", "jazagent_cancel", "jazagent_options", "jazagent_list",
+		"create_thread", "send_message_to_thread", "wait_threads", "stop_thread", "list_agent_options",
 		"create_goal", "get_goal", "update_goal",
 		"visualise_read_me", "visualise_show_widget",
 	} {
@@ -230,9 +222,38 @@ func TestUnifiedServerMemoryAndLoopTools(t *testing.T) {
 		t.Fatal("visualise_publish_widget must not be advertised on ordinary jaztools sessions")
 	}
 
+	for _, discovery := range []struct {
+		name string
+		args map[string]any
+	}{
+		{"list_threads", map[string]any{"limit": 20}},
+		{"search_threads", map[string]any{"query": "checkout"}},
+	} {
+		call, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: discovery.name, Arguments: discovery.args})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result := structured[threads.DiscoveryResponse](t, call)
+		found := false
+		for _, thread := range result.Threads {
+			if thread.ThreadID == target.ID {
+				found = true
+				if thread.Title != "Review target" {
+					t.Fatalf("lost thread title: %#v", thread)
+				}
+				if discovery.name == "search_threads" && thread.Snippet == "" {
+					t.Fatal("search did not return message evidence")
+				}
+			}
+		}
+		if !found {
+			t.Fatalf("%s omitted persisted thread with no live agent: %#v", discovery.name, result)
+		}
+	}
+
 	threadCall, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name:      "thread_context",
-		Arguments: map[string]any{"session": target.ID, "limit": 1},
+		Name:      "read_thread",
+		Arguments: map[string]any{"threadId": target.ID, "limit": 1},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -484,8 +505,8 @@ func TestPublishWidgetToolOnlyAdvertisedForWidgetSurfaceSessions(t *testing.T) {
 	if hasTool(t, base, "visualise_publish_widget") {
 		t.Fatal("base server advertised visualise_publish_widget")
 	}
-	if !hasTool(t, base, "jazagent_spawn") {
-		t.Fatal("base server did not advertise jazagent_spawn")
+	if !hasTool(t, base, "create_thread") {
+		t.Fatal("base server did not advertise create_thread")
 	}
 	widget, closeWidget := connectClient(t, service.server(widgetSurface))
 	defer closeWidget()
@@ -495,8 +516,8 @@ func TestPublishWidgetToolOnlyAdvertisedForWidgetSurfaceSessions(t *testing.T) {
 	if hasTool(t, widget, "visualise_show_widget") {
 		t.Fatal("widget server advertised thread artifact renderer")
 	}
-	if !hasTool(t, widget, "jazagent_spawn") {
-		t.Fatal("widget server did not advertise jazagent_spawn")
+	if !hasTool(t, widget, "create_thread") {
+		t.Fatal("widget server did not advertise create_thread")
 	}
 	if !hasTool(t, widget, "visualise_publish_widget") {
 		t.Fatal("widget server did not advertise visualise_publish_widget")
@@ -562,7 +583,7 @@ func TestSourceWorkerSurfaceIsRestrictedToMemoryTools(t *testing.T) {
 			t.Fatalf("source worker surface missing %s", name)
 		}
 	}
-	for _, name := range []string{"memory_search", "memory_get_page", "jazagent_spawn", "thread_context", "google_calendar_get_events", "gmail_search_threads", "loop_list", "visualise_read_me"} {
+	for _, name := range []string{"memory_search", "memory_get_page", "create_thread", "read_thread", "list_threads", "search_threads", "google_calendar_get_events", "gmail_search_threads", "loop_list", "visualise_read_me"} {
 		if hasTool(t, source, name) {
 			t.Fatalf("source worker surface must not advertise %s", name)
 		}
@@ -626,16 +647,16 @@ func TestWidgetSurfaceGetsAgentToolsAfterServerCreated(t *testing.T) {
 
 	widget, closeWidget := connectClient(t, service.server(widgetSurface))
 	defer closeWidget()
-	if hasTool(t, widget, "jazagent_spawn") {
-		t.Fatal("widget server advertised jazagent_spawn before agents were configured")
+	if hasTool(t, widget, "create_thread") {
+		t.Fatal("widget server advertised create_thread before agents were configured")
 	}
 	service.SetAgents(fakeACPService{spawned: make(chan acp.SpawnRequest, 1)})
-	if !hasTool(t, widget, "jazagent_spawn") {
-		t.Fatal("widget server did not advertise jazagent_spawn after agents were configured")
+	if !hasTool(t, widget, "create_thread") {
+		t.Fatal("widget server did not advertise create_thread after agents were configured")
 	}
 }
 
-func TestJazAgentSpawnToolSchemaAndAlias(t *testing.T) {
+func TestCreateThreadToolSchemaAndInitialPrompt(t *testing.T) {
 	store, err := sqlitestore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -666,33 +687,34 @@ func TestJazAgentSpawnToolSchemaAndAlias(t *testing.T) {
 
 	session, closeSession := connectClient(t, service.Server())
 	defer closeSession()
-	tool := findTool(t, session, "jazagent_spawn")
+	tool := findTool(t, session, "create_thread")
 	if tool == nil {
-		t.Fatal("jazagent_spawn not advertised")
+		t.Fatal("create_thread not advertised")
 	}
 	schema, _ := tool.InputSchema.(map[string]any)
 	properties, _ := schema["properties"].(map[string]any)
-	for _, name := range []string{"acp_agent", "agent_name", "model_provider", "model", "reasoning_effort"} {
+	for _, name := range []string{"agent", "modelProvider", "model", "thinking", "prompt"} {
 		if _, ok := properties[name]; !ok {
-			t.Fatalf("jazagent_spawn schema missing %s: %#v", name, properties)
+			t.Fatalf("create_thread schema missing %s: %#v", name, properties)
 		}
 	}
 
 	call, err := session.CallTool(context.Background(), &mcp.CallToolParams{
-		Name: "jazagent_spawn",
+		Name: "create_thread",
 		Arguments: map[string]any{
-			"agent_name":       acp.AgentCodex,
-			"slug":             "child",
-			"model_provider":   "openai",
-			"model":            "gpt-5.5",
-			"reasoning_effort": "high",
+			"agent":         acp.AgentCodex,
+			"prompt":        "Review changes",
+			"slug":          "child",
+			"modelProvider": "openai",
+			"model":         "gpt-5.5",
+			"thinking":      "high",
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if call.IsError {
-		t.Fatalf("jazagent_spawn returned error: %#v", call)
+		t.Fatalf("create_thread returned error: %#v", call)
 	}
 	select {
 	case req := <-agentService.spawned:
@@ -700,7 +722,7 @@ func TestJazAgentSpawnToolSchemaAndAlias(t *testing.T) {
 			t.Fatalf("spawn request = %#v", req)
 		}
 	case <-time.After(time.Second):
-		t.Fatal("jazagent_spawn did not reach ACP service")
+		t.Fatal("create_thread did not reach ACP service")
 	}
 }
 
@@ -755,7 +777,7 @@ func TestSearchWorkerSurfaceOnlyAdvertisesRawMemoryTools(t *testing.T) {
 			t.Fatalf("worker server missing %s", name)
 		}
 	}
-	for _, name := range []string{"memory_search", "memory_get_page", "thread_context", "loop_list", "jazagent_spawn", "visualise_read_me", "visualise_show_widget", "visualise_publish_widget"} {
+	for _, name := range []string{"memory_search", "memory_get_page", "read_thread", "list_threads", "search_threads", "loop_list", "create_thread", "visualise_read_me", "visualise_show_widget", "visualise_publish_widget"} {
 		if hasTool(t, worker, name) {
 			t.Fatalf("worker server advertised %s", name)
 		}

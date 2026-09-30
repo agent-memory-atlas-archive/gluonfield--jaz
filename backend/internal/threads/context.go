@@ -23,12 +23,13 @@ const (
 )
 
 type ContextStore interface {
+	ListSessions(storage.SessionFilter) ([]storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	LoadMessageRecords(string) ([]storage.Message, error)
 }
 
 type ContextRequest struct {
-	Session      string `json:"session" jsonschema:"Jaz thread id or thread slug"`
+	Session      string `json:"threadId" jsonschema:"Jaz thread ID or slug from list_threads, search_threads, or create_thread"`
 	Query        string `json:"query,omitempty" jsonschema:"optional search query; returns matching message neighborhoods when set"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"maximum returned messages, 1-60; defaults to 16"`
 	Context      int    `json:"context,omitempty" jsonschema:"messages before and after each query hit, 0-4; defaults to 0"`
@@ -40,7 +41,7 @@ type ContextRequest struct {
 }
 
 type ContextResponse struct {
-	Session       ContextSession   `json:"session"`
+	Session       ContextSession   `json:"thread"`
 	Mode          string           `json:"mode"`
 	Query         string           `json:"query,omitempty"`
 	Messages      []ContextMessage `json:"messages"`
@@ -54,7 +55,7 @@ type ContextResponse struct {
 }
 
 type ContextSession struct {
-	ID           string    `json:"id"`
+	ID           string    `json:"threadId"`
 	Slug         string    `json:"slug"`
 	Title        string    `json:"title,omitempty"`
 	ParentID     string    `json:"parent_id,omitempty"`
@@ -100,7 +101,7 @@ func (s *Service) Context(ctx context.Context, req ContextRequest) (ContextRespo
 	}
 	sessionRef := strings.TrimSpace(req.Session)
 	if sessionRef == "" {
-		return ContextResponse{}, errors.New("session is required")
+		return ContextResponse{}, errors.New("threadId is required")
 	}
 	if queryHasCursor(req) {
 		return ContextResponse{}, errors.New("query cannot be combined with before_seq, after_seq, or around_seq")

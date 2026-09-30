@@ -672,7 +672,7 @@ func TestBackfillMissingThreadErrorsFromFailedToolResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	call := provider.FunctionToolCall("call_1", "jazagent_send", `{"session":"codex"}`)
+	call := provider.FunctionToolCall("call_1", "send_message_to_thread", `{"threadId":"codex","prompt":"continue"}`)
 	if err := store.SaveMessages(session.ID, []provider.Message{
 		provider.UserMessage("ask codex"),
 		provider.AssistantMessage("", []provider.ToolCall{call}),
@@ -693,7 +693,7 @@ func TestBackfillMissingThreadErrorsFromFailedToolResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.Error != "jazagent_send failed: context canceled" {
+	if loaded.Error != "send_message_to_thread failed: context canceled" {
 		t.Fatalf("error = %q", loaded.Error)
 	}
 }

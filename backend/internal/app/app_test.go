@@ -79,7 +79,7 @@ func TestNewToolRegistryAllowsApplyPatchAbsolutePaths(t *testing.T) {
 	registry := NewToolRegistry(
 		exectool.NewCommandManager(),
 		Workspace(t.TempDir()),
-		nil,
+		acp.NewManager(store, acp.Config{}, nil),
 		store,
 		sessionevents.New(),
 		nil,
