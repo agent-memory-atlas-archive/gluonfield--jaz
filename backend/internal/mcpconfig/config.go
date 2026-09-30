@@ -39,7 +39,6 @@ type Server struct {
 	BearerTokenEnvVar string      `json:"bearer_token_env_var,omitempty"`
 	Headers           []Header    `json:"headers,omitempty"`
 	OAuth             OAuthConfig `json:"oauth,omitempty"`
-	ShowInUI          bool        `json:"show_in_ui"`
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
 }
@@ -51,7 +50,6 @@ type ServerInput struct {
 	BearerTokenEnvVar string      `json:"bearer_token_env_var,omitempty"`
 	Headers           []Header    `json:"headers,omitempty"`
 	OAuth             OAuthConfig `json:"oauth,omitempty"`
-	ShowInUI          bool        `json:"show_in_ui"`
 }
 
 type ServerTool struct {

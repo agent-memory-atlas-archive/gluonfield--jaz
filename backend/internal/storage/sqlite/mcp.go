@@ -59,7 +59,6 @@ func (s *Store) CreateMCPServer(input mcpconfig.ServerInput) (mcpconfig.Server, 
 		BearerTokenEnvVar: input.BearerTokenEnvVar,
 		Headers:           input.Headers,
 		OAuth:             input.OAuth,
-		ShowInUI:          input.ShowInUI,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -74,7 +73,6 @@ func (s *Store) CreateMCPServer(input mcpconfig.ServerInput) (mcpconfig.Server, 
 		HeadersJson:       headers,
 		EnvHeadersJson:    emptyMCPEnvHeadersJSON,
 		OauthJson:         oauth,
-		ShowInUi:          boolInt(server.ShowInUI),
 		CreatedAtMs:       timeToMs(server.CreatedAt),
 		UpdatedAtMs:       timeToMs(server.UpdatedAt),
 	})
@@ -120,7 +118,6 @@ func (s *Store) UpdateMCPServer(id string, input mcpconfig.ServerInput) (mcpconf
 		HeadersJson:       headers,
 		EnvHeadersJson:    emptyMCPEnvHeadersJSON,
 		OauthJson:         oauth,
-		ShowInUi:          boolInt(input.ShowInUI),
 		UpdatedAtMs:       timeToMs(now),
 		ID:                id,
 	})
@@ -147,7 +144,6 @@ func (s *Store) UpdateMCPServer(id string, input mcpconfig.ServerInput) (mcpconf
 		BearerTokenEnvVar: input.BearerTokenEnvVar,
 		Headers:           input.Headers,
 		OAuth:             input.OAuth,
-		ShowInUI:          input.ShowInUI,
 		CreatedAt:         msToTime(current.CreatedAtMs),
 		UpdatedAt:         now,
 	}, nil
@@ -203,7 +199,6 @@ func decodeMCPServer(row mcpdb.GetMCPServerRow) (mcpconfig.Server, error) {
 		URL:               row.Url,
 		Enabled:           row.Enabled != 0,
 		BearerTokenEnvVar: row.BearerTokenEnvVar.String,
-		ShowInUI:          row.ShowInUi != 0,
 		CreatedAt:         msToTime(row.CreatedAtMs),
 		UpdatedAt:         msToTime(row.UpdatedAtMs),
 	}

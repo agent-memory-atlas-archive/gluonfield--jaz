@@ -62,7 +62,6 @@ func TestManagerServesMCPAppEntrypoints(t *testing.T) {
 		Transport: mcpconfig.TransportStreamableHTTP,
 		URL:       httpServer.URL,
 		Enabled:   true,
-		ShowInUI:  true,
 	}}}
 	registry := tools.NewRegistry()
 	manager := NewManager(store, nil, registry, log.New(io.Discard))
@@ -111,10 +110,6 @@ func TestManagerServesMCPAppEntrypoints(t *testing.T) {
 		t.Fatalf("app calling a model-only tool: err = %v", err)
 	}
 
-	store.servers[0].ShowInUI = false
-	if points, _ := manager.Entrypoints(context.Background()); len(points) != 2 || points[0].Type != "thread" || points[1].Type != "file" {
-		t.Fatalf("an unpinned server keeps thread and file entrypoints only: %#v", points)
-	}
 	if _, err := manager.ReadApp(context.Background(), "missing", "library"); err != ErrAppNotFound {
 		t.Fatalf("ReadApp(missing) err = %v", err)
 	}

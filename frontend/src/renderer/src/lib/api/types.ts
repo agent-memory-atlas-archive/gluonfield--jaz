@@ -1020,7 +1020,6 @@ export interface MCPServer {
   bearer_token_env_var?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
-  show_in_ui: boolean
   status: 'connected' | 'disabled' | 'error' | 'needs_auth' | 'unknown'
   tool_count: number
   tools?: MCPTool[]
@@ -1042,7 +1041,6 @@ export interface MCPServerInput {
   bearer_token_env_var?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
-  show_in_ui?: boolean
 }
 
 // MCPEntrypoint is an MCP App a person opens directly, as OpenAI's MCP

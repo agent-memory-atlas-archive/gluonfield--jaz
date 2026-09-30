@@ -21,7 +21,6 @@ INSERT INTO mcp_servers (
   headers_json,
   env_headers_json,
   oauth_json,
-  show_in_ui,
   created_at_ms,
   updated_at_ms
 ) VALUES (
@@ -35,8 +34,7 @@ INSERT INTO mcp_servers (
   ?8,
   ?9,
   ?10,
-  ?11,
-  ?12
+  ?11
 )
 `
 
@@ -50,7 +48,6 @@ type CreateMCPServerParams struct {
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
-	ShowInUi          int64          `json:"show_in_ui"`
 	CreatedAtMs       int64          `json:"created_at_ms"`
 	UpdatedAtMs       int64          `json:"updated_at_ms"`
 }
@@ -66,7 +63,6 @@ func (q *Queries) CreateMCPServer(ctx context.Context, arg CreateMCPServerParams
 		arg.HeadersJson,
 		arg.EnvHeadersJson,
 		arg.OauthJson,
-		arg.ShowInUi,
 		arg.CreatedAtMs,
 		arg.UpdatedAtMs,
 	)
@@ -97,7 +93,6 @@ SELECT
   headers_json,
   env_headers_json,
   oauth_json,
-  show_in_ui,
   created_at_ms,
   updated_at_ms
 FROM mcp_servers
@@ -115,7 +110,6 @@ type GetMCPServerRow struct {
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
-	ShowInUi          int64          `json:"show_in_ui"`
 	CreatedAtMs       int64          `json:"created_at_ms"`
 	UpdatedAtMs       int64          `json:"updated_at_ms"`
 }
@@ -133,7 +127,6 @@ func (q *Queries) GetMCPServer(ctx context.Context, id string) (GetMCPServerRow,
 		&i.HeadersJson,
 		&i.EnvHeadersJson,
 		&i.OauthJson,
-		&i.ShowInUi,
 		&i.CreatedAtMs,
 		&i.UpdatedAtMs,
 	)
@@ -151,7 +144,6 @@ SELECT
   headers_json,
   env_headers_json,
   oauth_json,
-  show_in_ui,
   created_at_ms,
   updated_at_ms
 FROM mcp_servers
@@ -168,7 +160,6 @@ type ListMCPServersRow struct {
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
-	ShowInUi          int64          `json:"show_in_ui"`
 	CreatedAtMs       int64          `json:"created_at_ms"`
 	UpdatedAtMs       int64          `json:"updated_at_ms"`
 }
@@ -192,7 +183,6 @@ func (q *Queries) ListMCPServers(ctx context.Context) ([]ListMCPServersRow, erro
 			&i.HeadersJson,
 			&i.EnvHeadersJson,
 			&i.OauthJson,
-			&i.ShowInUi,
 			&i.CreatedAtMs,
 			&i.UpdatedAtMs,
 		); err != nil {
@@ -242,9 +232,8 @@ SET
   headers_json = ?6,
   env_headers_json = ?7,
   oauth_json = ?8,
-  show_in_ui = ?9,
-  updated_at_ms = ?10
-WHERE id = ?11
+  updated_at_ms = ?9
+WHERE id = ?10
 `
 
 type UpdateMCPServerParams struct {
@@ -256,7 +245,6 @@ type UpdateMCPServerParams struct {
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
-	ShowInUi          int64          `json:"show_in_ui"`
 	UpdatedAtMs       int64          `json:"updated_at_ms"`
 	ID                string         `json:"id"`
 }
@@ -271,7 +259,6 @@ func (q *Queries) UpdateMCPServer(ctx context.Context, arg UpdateMCPServerParams
 		arg.HeadersJson,
 		arg.EnvHeadersJson,
 		arg.OauthJson,
-		arg.ShowInUi,
 		arg.UpdatedAtMs,
 		arg.ID,
 	)

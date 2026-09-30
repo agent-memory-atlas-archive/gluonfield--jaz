@@ -122,10 +122,9 @@ func toolTitle(tool *mcpsdk.Tool) string {
 	return tool.Name
 }
 
-// Entrypoints lists the MCP Apps people can open from connected servers:
-// sidebar apps of servers pinned to the sidebar, and every thread and file
-// entrypoint. It waits for the first full refresh, so a client asking as Jaz
-// starts gets them instead of an empty list.
+// Entrypoints lists the MCP Apps people can open from connected servers. It
+// waits for the first full refresh, so a client asking as Jaz starts gets
+// them instead of an empty list.
 func (m *Manager) Entrypoints(ctx context.Context) ([]Entrypoint, error) {
 	select {
 	case <-m.refreshed:
@@ -140,14 +139,8 @@ func (m *Manager) Entrypoints(ctx context.Context) ([]Entrypoint, error) {
 	defer m.mu.RUnlock()
 	out := []Entrypoint{}
 	for _, server := range servers {
-		session := m.sessions[server.ID]
-		if session == nil {
-			continue
-		}
-		for _, point := range session.apps.entrypoints {
-			if point.Type != "global" || server.ShowInUI {
-				out = append(out, point)
-			}
+		if session := m.sessions[server.ID]; session != nil {
+			out = append(out, session.apps.entrypoints...)
 		}
 	}
 	return out, nil

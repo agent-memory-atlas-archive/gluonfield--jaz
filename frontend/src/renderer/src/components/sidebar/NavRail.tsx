@@ -25,7 +25,7 @@ export function railTab(pathname: string, settingsOpen: boolean): RailTab {
 }
 
 // Everything beside Chat takes the whole content card: the built-in sections,
-// then each sidebar app of the MCP servers the user pinned.
+// then each sidebar app a connected MCP server declares.
 export function useRailSections() {
   const apps = (useQuery(mcpEntrypointsQuery).data ?? []).filter((entry) => entry.type === 'global')
   return [

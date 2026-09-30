@@ -41,7 +41,6 @@ type mcpServerInput struct {
 	BearerTokenEnvVar string                `json:"bearer_token_env_var,omitempty"`
 	Headers           []mcpconfig.Header    `json:"headers,omitempty"`
 	OAuth             mcpconfig.OAuthConfig `json:"oauth,omitempty"`
-	ShowInUI          *bool                 `json:"show_in_ui,omitempty"`
 }
 
 type mcpServerView struct {
@@ -53,7 +52,6 @@ type mcpServerView struct {
 	BearerTokenEnvVar string                 `json:"bearer_token_env_var,omitempty"`
 	Headers           []mcpconfig.Header     `json:"headers,omitempty"`
 	OAuth             mcpconfig.OAuthConfig  `json:"oauth,omitempty"`
-	ShowInUI          bool                   `json:"show_in_ui"`
 	Status            string                 `json:"status"`
 	ToolCount         int                    `json:"tool_count"`
 	Tools             []mcpconfig.ServerTool `json:"tools,omitempty"`
@@ -265,16 +263,11 @@ func decodeMCPServerInput(r *http.Request, current *mcpconfig.Server) (mcpconfig
 		return mcpconfig.ServerInput{}, err
 	}
 	enabled := true
-	showInUI := false
 	if current != nil {
 		enabled = current.Enabled
-		showInUI = current.ShowInUI
 	}
 	if req.Enabled != nil {
 		enabled = *req.Enabled
-	}
-	if req.ShowInUI != nil {
-		showInUI = *req.ShowInUI
 	}
 	return mcpconfig.ValidateInput(mcpconfig.ServerInput{
 		Name:              req.Name,
@@ -283,7 +276,6 @@ func decodeMCPServerInput(r *http.Request, current *mcpconfig.Server) (mcpconfig
 		BearerTokenEnvVar: req.BearerTokenEnvVar,
 		Headers:           req.Headers,
 		OAuth:             req.OAuth,
-		ShowInUI:          showInUI,
 	})
 }
 
@@ -339,7 +331,6 @@ func (s *Server) mcpServerView(server mcpconfig.Server) mcpServerView {
 		BearerTokenEnvVar: server.BearerTokenEnvVar,
 		Headers:           server.Headers,
 		OAuth:             server.OAuth,
-		ShowInUI:          server.ShowInUI,
 		Status:            status.Status,
 		ToolCount:         status.ToolCount,
 		Tools:             status.Tools,
