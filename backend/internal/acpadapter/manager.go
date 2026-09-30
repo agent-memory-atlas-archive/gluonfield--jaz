@@ -30,8 +30,6 @@ type Status struct {
 	BytesDownloaded int64
 	BytesTotal      int64
 	ProgressPercent int
-	StartedAt       time.Time
-	FinishedAt      time.Time
 }
 
 type Manager struct {
@@ -41,10 +39,7 @@ type Manager struct {
 	localManifestPath string
 	client            *http.Client
 	installMu         sync.Mutex
-	manifestMu        sync.Mutex
 	mu                sync.Mutex
-	manifest          manifest
-	hasManifest       bool
 	status            map[string]Status
 }
 
@@ -170,47 +165,43 @@ func (m *Manager) setResolveErrorStatus(adapter string, err error) {
 		state = StateUnsupported
 	}
 	m.setStatus(adapter, Status{
-		Adapter:    adapter,
-		Platform:   platform,
-		State:      state,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
+		Adapter:  adapter,
+		Platform: platform,
+		State:    state,
+		Message:  err.Error(),
 	})
 }
 
 func downloadingStatus(spec adapterSpec) Status {
 	return Status{
-		Adapter:   spec.Adapter,
-		Version:   spec.Version,
-		Platform:  spec.Platform,
-		Path:      spec.Command,
-		State:     StateDownloading,
-		Message:   "Downloading " + displayName(spec.Adapter) + " adapter",
-		StartedAt: time.Now().UTC(),
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateDownloading,
+		Message:  "Downloading " + displayName(spec.Adapter) + " adapter",
 	}
 }
 
 func readyStatus(spec adapterSpec) Status {
 	return Status{
-		Adapter:    spec.Adapter,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateReady,
-		Message:    displayName(spec.Adapter) + " adapter is ready",
-		FinishedAt: time.Now().UTC(),
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateReady,
+		Message:  displayName(spec.Adapter) + " adapter is ready",
 	}
 }
 
 func failedStatus(spec adapterSpec, err error) Status {
 	return Status{
-		Adapter:    spec.Adapter,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateFailed,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateFailed,
+		Message:  err.Error(),
 	}
 }
 

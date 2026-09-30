@@ -62,15 +62,15 @@ func (m *Manager) resolveSpec(ctx context.Context, name string) (adapterSpec, er
 	if err != nil {
 		return adapterSpec{}, err
 	}
-	manifest, err := m.fetchManifest(ctx)
+	source, err := m.fetchManifest(ctx)
 	if err != nil {
 		return adapterSpec{}, err
 	}
-	return m.specFromManifest(manifest, name, platform)
+	return m.specFromManifest(source, name, platform)
 }
 
-func (m *Manager) specFromManifest(manifest manifest, name, platform string) (adapterSpec, error) {
-	adapter, ok := manifest.Adapters[name]
+func (m *Manager) specFromManifest(source manifest, name, platform string) (adapterSpec, error) {
+	adapter, ok := source.Adapters[name]
 	if !ok {
 		return adapterSpec{}, fmt.Errorf("managed acp adapter %q is not in the manifest", name)
 	}
@@ -102,50 +102,30 @@ func (m *Manager) specFromManifest(manifest manifest, name, platform string) (ad
 	return spec, nil
 }
 
+// fetchManifest reads the dev manifest, or refreshes the release manifest
+// cache and falls back to it when the network fails.
 func (m *Manager) fetchManifest(ctx context.Context) (manifest, error) {
-	out, err := m.fetchManifestSource(ctx)
-	if err == nil {
-		m.cacheManifest(out)
-		_ = m.writeManifestCache(out)
-		return out, nil
-	}
-	if cached, ok := m.cachedManifest(); ok {
-		if !m.cacheAllowedForFetchFailure() {
-			return manifest{}, err
-		}
-		return cached, nil
-	}
-	if cached, ok := m.readManifestCache(); ok {
-		if !m.cacheAllowedForFetchFailure() {
-			return manifest{}, err
-		}
-		m.cacheManifest(cached)
-		return cached, nil
-	}
-	return manifest{}, err
-}
-
-// offlineManifest is the manifest already on hand, without network.
-func (m *Manager) offlineManifest() (manifest, bool) {
-	if m.localManifestPath == "" {
-		return m.readManifestCache()
-	}
-	out, err := readLocalManifest(m.localManifestPath)
-	return out, err == nil
-}
-
-func (m *Manager) cacheAllowedForFetchFailure() bool {
-	return m.localManifestPath == ""
-}
-
-func (m *Manager) fetchManifestSource(ctx context.Context) (manifest, error) {
 	if m.localManifestPath != "" {
 		return readLocalManifest(m.localManifestPath)
 	}
-	if m.manifestURL == "" {
-		return manifest{}, fmt.Errorf("managed acp adapter manifest URL is not configured")
+	out, err := m.fetchRemoteManifest(ctx)
+	if err != nil {
+		if cached, ok := m.readManifestCache(); ok {
+			return cached, nil
+		}
+		return manifest{}, err
 	}
-	return m.fetchRemoteManifest(ctx)
+	_ = m.writeManifestCache(out)
+	return out, nil
+}
+
+// offlineManifest is fetchManifest without the network.
+func (m *Manager) offlineManifest() (manifest, bool) {
+	if m.localManifestPath != "" {
+		out, err := readLocalManifest(m.localManifestPath)
+		return out, err == nil
+	}
+	return m.readManifestCache()
 }
 
 func readLocalManifest(file string) (manifest, error) {
@@ -181,19 +161,6 @@ func (m *Manager) fetchRemoteManifest(ctx context.Context) (manifest, error) {
 		return manifest{}, err
 	}
 	return out, nil
-}
-
-func (m *Manager) cacheManifest(out manifest) {
-	m.manifestMu.Lock()
-	defer m.manifestMu.Unlock()
-	m.manifest = out
-	m.hasManifest = true
-}
-
-func (m *Manager) cachedManifest() (manifest, bool) {
-	m.manifestMu.Lock()
-	defer m.manifestMu.Unlock()
-	return m.manifest, m.hasManifest
 }
 
 func (m *Manager) writeManifestCache(out manifest) error {

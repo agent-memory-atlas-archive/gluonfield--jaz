@@ -245,9 +245,11 @@ func TestFetchManifestRejectsStaleCacheWhenLocalManifestIsInvalid(t *testing.T) 
 	}
 	manager := NewForTest(root, "", nil)
 	manager.localManifestPath = manifestPath
-	manager.cacheManifest(manifest{Adapters: map[string]manifestAdapter{
+	if err := manager.writeManifestCache(manifest{Adapters: map[string]manifestAdapter{
 		"claude": {Version: "cached", Assets: map[string]manifestAsset{}},
-	}})
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := manager.fetchManifest(context.Background()); err == nil {
 		t.Fatal("expected invalid local manifest to reject cache fallback")
