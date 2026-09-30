@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
@@ -26,6 +27,7 @@ type ContextStore interface {
 	ListSessions(storage.SessionFilter) ([]storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	LoadMessageRecords(string) ([]storage.Message, error)
+	LoadSessionEvents(string) ([]sessionevents.Event, error)
 }
 
 type ContextRequest struct {
@@ -33,9 +35,9 @@ type ContextRequest struct {
 	Query        string `json:"query,omitempty" jsonschema:"optional search query; returns matching message neighborhoods when set"`
 	Limit        int    `json:"limit,omitempty" jsonschema:"maximum returned messages, 1-60; defaults to 16"`
 	Context      int    `json:"context,omitempty" jsonschema:"messages before and after each query hit, 0-4; defaults to 0"`
-	BeforeSeq    int64  `json:"before_seq,omitempty" jsonschema:"return the page before this message sequence"`
-	AfterSeq     int64  `json:"after_seq,omitempty" jsonschema:"return the page after this message sequence"`
-	AroundSeq    int64  `json:"around_seq,omitempty" jsonschema:"return a page centered near this message sequence"`
+	BeforeSeq    int64  `json:"before_seq,omitempty" jsonschema:"return the page before this sequence from a previous read_thread result"`
+	AfterSeq     int64  `json:"after_seq,omitempty" jsonschema:"return the page after this sequence from a previous read_thread result"`
+	AroundSeq    int64  `json:"around_seq,omitempty" jsonschema:"return a page centered near this sequence from a previous read_thread result"`
 	IncludeTools string `json:"include_tools,omitempty" jsonschema:"none or summary; defaults to summary"`
 	MaxTextChars int    `json:"max_text_chars,omitempty" jsonschema:"per-message text limit; max 8000; defaults to 2000"`
 }
@@ -122,11 +124,17 @@ func (s *Service) Context(ctx context.Context, req ContextRequest) (ContextRespo
 		return ContextResponse{}, err
 	}
 	visible := visibleContextRecords(records, opts)
+	events, err := s.context.LoadSessionEvents(session.ID)
+	if err != nil {
+		return ContextResponse{}, err
+	}
+	counts := ToolCounts(records)
+	visible = mergeContextEvents(session.ID, visible, events, opts, counts)
 	response := ContextResponse{
 		Session:    contextSession(session, len(visible)),
 		Mode:       "tail",
 		Messages:   []ContextMessage{},
-		ToolCounts: ToolCounts(records),
+		ToolCounts: counts,
 	}
 	query := strings.TrimSpace(req.Query)
 	if query != "" {

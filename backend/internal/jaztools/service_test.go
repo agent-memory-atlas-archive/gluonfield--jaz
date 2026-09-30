@@ -173,14 +173,22 @@ func TestUnifiedServerMemoryAndLoopTools(t *testing.T) {
 	service.SetThreads(threads.NewService(sqlitestore.NewSearchQueries(store), store))
 	service.SetAgents(fakeACPService{spawned: make(chan acp.SpawnRequest, 1)})
 
-	target, err := store.CreateSession(storage.CreateSession{Slug: "review-target", Title: "Review target"})
+	target, err := store.CreateSession(storage.CreateSession{
+		Slug: "review-target", Title: "Review target", Runtime: storage.RuntimeACP,
+		RuntimeRef: &storage.RuntimeRef{Type: storage.RuntimeACP, Agent: acp.AgentCodex},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := store.AppendMessageRecords(target.ID,
 		storage.Message{Role: "user", Content: "Please review the checkout bug."},
-		storage.Message{Role: "assistant", Content: "Patched checkout and verified tests."},
 	); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendSessionEvents(target.ID, sessionevents.Event{
+		Type: sessionevents.TypeACPMessage, Content: "Patched checkout and verified tests.",
+		ACP: &sessionevents.ACPEvent{ID: target.ID, TextRunID: "message:answer"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -227,7 +235,7 @@ func TestUnifiedServerMemoryAndLoopTools(t *testing.T) {
 		args map[string]any
 	}{
 		{"list_threads", map[string]any{"limit": 20}},
-		{"search_threads", map[string]any{"query": "checkout"}},
+		{"search_threads", map[string]any{"query": "patched"}},
 	} {
 		call, err := session.CallTool(context.Background(), &mcp.CallToolParams{Name: discovery.name, Arguments: discovery.args})
 		if err != nil {

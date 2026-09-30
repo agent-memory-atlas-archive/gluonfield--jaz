@@ -7,6 +7,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/wins/jaz/backend/internal/codexcompat"
 	"github.com/wins/jaz/backend/internal/storage/sqlite/generated/search"
 )
 
@@ -118,6 +119,9 @@ func (s *Service) Search(ctx context.Context, query SearchQuery) ([]SearchResult
 }
 
 func addMessageRow(byThread map[string]*searchAccumulator, row search.SearchThreadMessagesRow) {
+	if codexcompat.IsHiddenWarning(row.EventPrefix) {
+		return
+	}
 	score := -row.Score * 1_000_000
 	addSearchHit(byThread, SearchResult{
 		ThreadID:        row.ID,
