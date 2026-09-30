@@ -3,8 +3,9 @@ import { ApiError, readAPIResponse } from './response'
 
 const { Response } = globalThis
 
-test('an empty 204 acknowledges a completed write', async () => {
+test('an empty 204 or 202 acknowledges a write', async () => {
   await expect(readAPIResponse(new Response(null, { status: 204 }))).resolves.toBeUndefined()
+  await expect(readAPIResponse(new Response(null, { status: 202 }))).resolves.toBeUndefined()
 })
 
 test('JSON acknowledgements and server errors retain their existing contracts', async () => {

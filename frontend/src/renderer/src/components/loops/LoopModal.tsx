@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import { ChevronRight } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Fragment, useState } from 'react'
@@ -7,19 +6,11 @@ import { BoardsStep, PromptStep, ScheduleStep } from '@/components/loops/LoopFor
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { boardsQuery } from '@/lib/api/boards'
-import { createLoop, runLoopNow, updateLoop } from '@/lib/api/loops'
+import { createLoop, runLoopNow } from '@/lib/api/loops'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import type { Loop } from '@/lib/api/types'
-import { clientRuntime } from '@/lib/clientRuntime'
 import { keys } from '@/lib/query/keys'
-import {
-  type LoopDraft,
-  canSaveLoop,
-  emptyLoopDraft,
-  loopDraftFromLoop,
-  loopDraftToInput,
-  stepValid,
-} from './loopDraft'
+import { type LoopDraft, canSaveLoop, emptyLoopDraft, loopDraftToInput, stepValid } from './loopDraft'
 
 // Step presentation in order; indices line up with stepValid in loopDraft.
 const STEPS = [
@@ -29,54 +20,35 @@ const STEPS = [
 ]
 const LAST_STEP = STEPS.length - 1
 
-// One modal for both create (no `loop`) and edit (`loop` provided), walked as a
-// Prompt → Schedule → Boards stepper. Edit never happens inline on the detail
-// page — it always opens here.
+// Creates a loop from a board, walked as a Prompt → Schedule → Boards stepper.
+// Creating stays in place and reports the loop so the board can scroll its
+// new tile into view.
 export function LoopModal({
   open,
   onClose,
-  loop,
-  boardIds,
   onCreated,
 }: {
   open: boolean
   onClose: () => void
-  loop?: Loop
-  // Current board assignments when editing (from the loop detail response).
-  boardIds?: string[]
-  // When set, creating stays in place (no navigation) and reports the loop —
-  // the board scrolls its new tile into view instead.
-  onCreated?: (loop: Loop) => void
+  onCreated: (loop: Loop) => void
 }) {
-  const isEdit = !!loop
-  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const settingsQuery = useQuery(agentSettingsQuery)
-  const boards = useQuery({ ...boardsQuery, enabled: open && !isEdit })
+  const boards = useQuery({ ...boardsQuery, enabled: open })
   const [draft, setDraft] = useState<LoopDraft | null>(null)
   const [step, setStep] = useState(0)
-  const createBoardIds = boards.data?.map((board) => board.id) ?? []
-  const createBoardsLoading = !isEdit && boards.isPending
-  const current = draft ?? (loop ? loopDraftFromLoop(loop, boardIds) : emptyLoopDraft(createBoardIds))
+  const current = draft ?? emptyLoopDraft(boards.data?.map((board) => board.id) ?? [])
   const set = (patch: Partial<LoopDraft>) => setDraft({ ...current, ...patch })
 
   const save = useMutation<Loop, Error, { run: boolean }>({
-    mutationFn: ({ run: _run }: { run: boolean }) =>
-      isEdit
-        ? updateLoop(loop.id, loopDraftToInput(current, settingsQuery.data))
-        : createLoop(loopDraftToInput(current, settingsQuery.data), { runAfterCreate: _run }),
+    mutationFn: ({ run }: { run: boolean }) =>
+      createLoop(loopDraftToInput(current, settingsQuery.data), { runAfterCreate: run }),
     onSuccess: (saved, { run }) => {
-      if (!isEdit && run) void runLoopNow(saved.id).catch(() => {})
+      if (run) void runLoopNow(saved.id).catch(() => {})
       queryClient.invalidateQueries({ queryKey: keys.loops })
       queryClient.invalidateQueries({ queryKey: keys.boards })
-      if (isEdit) queryClient.invalidateQueries({ queryKey: keys.loopDetail(loop.id) })
       close()
-      if (!isEdit) {
-        if (onCreated) onCreated(saved)
-        // Board OS windows never navigate; the new loop opens in the main app.
-        else if (clientRuntime.windowKind === 'board') clientRuntime.openInMain?.(`/loops/${saved.id}`)
-        else navigate({ to: '/loops/$loopId', params: { loopId: saved.id } })
-      }
+      onCreated(saved)
     },
   })
 
@@ -88,7 +60,7 @@ export function LoopModal({
   }
 
   const onLastStep = step === LAST_STEP
-  const canSubmit = canSaveLoop(current) && !save.isPending && !createBoardsLoading
+  const canSubmit = canSaveLoop(current) && !save.isPending && !boards.isPending
   const reduce = useReducedMotion()
 
   return (
@@ -96,7 +68,7 @@ export function LoopModal({
       open={open}
       onClose={close}
       size="md"
-      title={isEdit ? 'Edit loop' : 'New loop'}
+      title="New loop"
       headerAccessory={<StepNav step={step} onJump={setStep} />}
       footer={
         <>
@@ -121,15 +93,6 @@ export function LoopModal({
                 onClick={() => setStep(step + 1)}
               >
                 Next
-              </Button>
-            ) : isEdit ? (
-              <Button
-                variant="primary"
-                size="md"
-                disabled={!canSubmit}
-                onClick={() => save.mutate({ run: false })}
-              >
-                {save.isPending ? 'Saving…' : 'Save changes'}
               </Button>
             ) : (
               <>

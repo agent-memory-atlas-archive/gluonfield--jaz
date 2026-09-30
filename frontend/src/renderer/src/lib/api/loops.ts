@@ -43,38 +43,24 @@ export const TONE_DOT: Record<LoopTone, string> = {
   active: 'bg-primary',
 }
 
+const listLoops = async (query = '') => (await get<{ loops: Loop[] | null }>(`/v1/loops${query}`)).loops ?? []
+
+// Tighten the poll while a run is in flight so status surfaces live.
+const runPoll = (query: { state: { data?: Loop[] } }) =>
+  query.state.data?.some((loop) => activeRunStatus(loop.last_run_status)) ? 3_000 : 20_000
+
 export const loopsQuery = queryOptions({
   queryKey: keys.loops,
-  queryFn: async () => {
-    const data = await get<{ loops: Loop[] | null }>('/v1/loops')
-    return data.loops ?? []
-  },
-  // Tighten the poll while a run is in flight so status surfaces live.
-  refetchInterval: (query) =>
-    query.state.data?.some((loop) => activeRunStatus(loop.last_run_status)) ? 3_000 : 20_000,
+  queryFn: () => listLoops(),
+  refetchInterval: runPoll,
 })
 
-export interface LoopDetail {
-  loop: Loop
-  runs: LoopRun[]
-  boardIds: string[]
-}
-
-export const loopDetailQuery = (id: string) =>
+// A bot's routines are the loops it owns.
+export const botRoutinesQuery = (botId: string) =>
   queryOptions({
-    queryKey: keys.loopDetail(id),
-    queryFn: async () => {
-      const data = await get<{ loop: Loop; runs: LoopRun[] | null; board_ids?: string[] }>(
-        `/v1/loops/${id}`,
-      )
-      return {
-        loop: data.loop,
-        runs: data.runs ?? [],
-        boardIds: data.board_ids ?? [],
-      } satisfies LoopDetail
-    },
-    refetchInterval: (query) =>
-      activeRunStatus(query.state.data?.runs[0]?.status) ? 2_000 : false,
+    queryKey: keys.botRoutines(botId),
+    queryFn: () => listLoops(`?bot_id=${encodeURIComponent(botId)}`),
+    refetchInterval: runPoll,
   })
 
 export async function createLoop(input: LoopInput, options: { runAfterCreate?: boolean } = {}): Promise<Loop> {

@@ -9,20 +9,23 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/loops"
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
 type LoopRunner struct {
-	store storage.Store
-	acp   ACPManager
-	log   *log.Logger
+	store  storage.Store
+	acp    ACPManager
+	events *sessionevents.Bus
+	log    *log.Logger
 }
 
 func NewLoopRunner(server *Server) *LoopRunner {
 	return &LoopRunner{
-		store: server.Store,
-		acp:   server.ACP,
-		log:   server.logger().WithPrefix("loops"),
+		store:  server.Store,
+		acp:    server.ACP,
+		events: server.Events,
+		log:    server.logger().WithPrefix("loops"),
 	}
 }
 
@@ -41,6 +44,10 @@ func (r *LoopRunner) startACPLoopRun(execution loops.Execution) {
 		r.finishLoopRun(execution, loops.RunStatusError, "acp manager is not configured")
 		return
 	}
+	if execution.Thread != "" {
+		r.startBotTurn(execution)
+		return
+	}
 	loop := execution.Loop
 	run := execution.Run
 	startCtx, cancel := serverACPBootstrapContext()
@@ -56,6 +63,7 @@ func (r *LoopRunner) startACPLoopRun(execution loops.Execution) {
 		ACPAgent:               agent,
 		Slug:                   loopRunSlug(loop, run),
 		Title:                  loop.Name,
+		ParentID:               loop.BotID,
 		Directory:              directory,
 		ModelProvider:          loop.ModelProvider,
 		Model:                  loop.Model,
@@ -80,6 +88,34 @@ func (r *LoopRunner) startACPLoopRun(execution loops.Execution) {
 		Completion: acp.CompletionAsync,
 	}); err != nil {
 		r.finishLoopRun(execution, loops.RunStatusError, err.Error())
+	}
+}
+
+// startBotTurn runs a routine as a hidden turn in its bot's thread once the
+// thread is free. The run closes when that turn finishes, like any loop run.
+func (r *LoopRunner) startBotTurn(execution loops.Execution) {
+	loop := execution.Loop
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
+	defer cancel()
+	job, err := r.acp.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: execution.Thread, Message: execution.Prompt})
+	if err != nil {
+		r.finishLoopRun(execution, loops.RunStatusError, err.Error())
+		return
+	}
+	r.announce(execution.Thread, sessionevents.BotActivityEvent{Kind: "routine", Label: loop.Name})
+	if err := execution.Controller.MarkRunning(execution.Run.ID, job.ID); err != nil {
+		r.logger().Error("mark routine run running failed", "run", execution.Run.ID, "bot", execution.Thread, "error", err)
+	}
+}
+
+func (r *LoopRunner) announce(threadID string, activity sessionevents.BotActivityEvent) {
+	event := sessionevents.Event{SessionID: threadID, Type: sessionevents.TypeBotActivity, BotActivity: &activity, At: time.Now().UTC()}
+	if err := r.store.AppendSessionEvents(threadID, event); err != nil {
+		r.logger().Warn("append bot activity failed", "thread", threadID, "error", err)
+		return
+	}
+	if r.events != nil {
+		r.events.Publish(event)
 	}
 }
 

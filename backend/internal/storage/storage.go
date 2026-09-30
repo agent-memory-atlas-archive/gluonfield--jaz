@@ -24,6 +24,7 @@ const (
 
 const (
 	SourceLoopRun      = "loop_run"
+	SourceBot          = "bot"
 	SourceMemoryDream  = "memory_dream"
 	SourceMemorySearch = "memory_search"
 	SourceMemorySource = "memory_source"

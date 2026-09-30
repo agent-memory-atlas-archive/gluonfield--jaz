@@ -4,18 +4,20 @@ import { useMetaHeld } from '@/lib/hooks/useMetaHeld'
 import { KeyboardShortcut } from '@/components/ui/KeyboardShortcut'
 import type { SidePanelMode } from '@/lib/sidePanelTabs'
 
-export function SidePanelControl({ open, mode, onToggle }: {
+export function SidePanelControl({ open, mode, modes = ['tabs', 'overview'], overviewLabel = 'Overview', onToggle }: {
   open: boolean
   mode: SidePanelMode
+  modes?: SidePanelMode[]
+  overviewLabel?: string
   onToggle: (mode: SidePanelMode) => void
 }) {
   const isMobile = useIsMobile()
   const metaHeld = useMetaHeld(!isMobile)
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {(['tabs', 'overview'] as const).map((option) => {
+      {modes.map((option) => {
         const active = open && mode === option
-        const label = option === 'tabs' ? 'Side Panel' : 'Overview'
+        const label = option === 'tabs' ? 'Side Panel' : overviewLabel
         const Icon = option === 'tabs' ? PanelRight : LayoutList
         return (
           <button

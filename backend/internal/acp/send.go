@@ -50,6 +50,7 @@ type sendOptions struct {
 	transcript            sendTranscriptMode
 	requireCompactSupport bool
 	requireActiveGoal     bool
+	waitIdle              bool
 }
 
 type InternalTurnRequest struct {
@@ -79,6 +80,16 @@ func (m *Manager) StartInternalTurn(ctx context.Context, req InternalTurnRequest
 	}, sendOptions{transcript: sendTranscriptHidden})
 }
 
+// StartInternalTurnWhenIdle starts a hidden turn as soon as the thread's
+// current turn, if any, ends.
+func (m *Manager) StartInternalTurnWhenIdle(ctx context.Context, req InternalTurnRequest) (Job, error) {
+	return m.send(ctx, SendRequest{
+		Session:    req.Session,
+		Message:    req.Message,
+		Completion: CompletionAsync,
+	}, sendOptions{transcript: sendTranscriptHidden, waitIdle: true})
+}
+
 func (m *Manager) Compact(ctx context.Context, req CompactRequest) (Job, error) {
 	return m.send(ctx, SendRequest{
 		Session:    req.Session,
@@ -98,7 +109,7 @@ func (m *Manager) send(ctx context.Context, req SendRequest, opts sendOptions) (
 		}
 		job, err := m.sendOnce(ctx, req, opts)
 		var active *turnInProgressError
-		if !errors.As(err, &active) || !active.finishing {
+		if !errors.As(err, &active) || !(active.finishing || opts.waitIdle) {
 			return job, err
 		}
 		select {

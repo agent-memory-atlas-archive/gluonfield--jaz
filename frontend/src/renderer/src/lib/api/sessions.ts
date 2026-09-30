@@ -63,6 +63,17 @@ export const sessionQuery = (id: string) =>
     staleTime: 30_000,
   })
 
+// Live events a mounted thread receives over SSE (useSessionEvents writes
+// them here); there is nothing to fetch, and the cache outlives the page.
+export const sessionEventsQuery = (id: string) =>
+  queryOptions<SessionEvent[]>({
+    queryKey: keys.sessionEvents(id),
+    queryFn: () => [],
+    initialData: [],
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+
 export interface SideChatMessageInput {
   id: string
   message: string

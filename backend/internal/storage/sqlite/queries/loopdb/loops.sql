@@ -21,7 +21,10 @@ INSERT INTO loops (
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 ) VALUES (
   sqlc.arg(id),
   sqlc.arg(name),
@@ -44,7 +47,10 @@ INSERT INTO loops (
   sqlc.arg(directory),
   sqlc.arg(memory_path),
   sqlc.arg(model_provider),
-  sqlc.arg(model)
+  sqlc.arg(model),
+  sqlc.arg(bot_id),
+  sqlc.arg(event_trigger),
+  sqlc.arg(webhook_hash)
 )
 ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -60,6 +66,9 @@ ON CONFLICT(id) DO UPDATE SET
   memory_path = excluded.memory_path,
   model_provider = excluded.model_provider,
   model = excluded.model,
+  bot_id = excluded.bot_id,
+  event_trigger = excluded.event_trigger,
+  webhook_hash = excluded.webhook_hash,
   next_run_at_ms = excluded.next_run_at_ms,
   last_run_at_ms = excluded.last_run_at_ms,
   last_run_id = excluded.last_run_id,
@@ -92,7 +101,10 @@ SELECT
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 FROM loops
 WHERE id = sqlc.arg(id)
 LIMIT 1;
@@ -120,7 +132,10 @@ SELECT
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 FROM loops
 WHERE status <> sqlc.arg(deleted_status)
 ORDER BY updated_at_ms DESC;

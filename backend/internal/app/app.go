@@ -14,6 +14,7 @@ import (
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/acpadapter"
 	"github.com/wins/jaz/backend/internal/agent"
+	"github.com/wins/jaz/backend/internal/bots"
 	"github.com/wins/jaz/backend/internal/connections"
 	"github.com/wins/jaz/backend/internal/coordinator"
 	"github.com/wins/jaz/backend/internal/jazagent"
@@ -349,6 +350,8 @@ func NewACPConfig(cfg Config, store *sqlitestore.Store, workspace Workspace, pro
 				return nil, nil
 			}
 			return promptBuilder.ForRun(session.SourceID, time.Now().UTC())
+		case storage.SourceBot:
+			return bots.Prompt(store, session)
 		default:
 			return nil, nil
 		}

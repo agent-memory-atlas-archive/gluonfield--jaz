@@ -19,9 +19,15 @@ func TestMaterializingWriterWritesObservedRecordsAndQueuesProjection(t *testing.
 	rawRoot := t.TempDir()
 	now := time.Date(2026, 6, 27, 18, 30, 0, 0, time.UTC)
 	projection := &fakePendingSourceStore{}
+	observers := NewObservers()
+	var heard []Incoming
+	observers.Add(func(_ context.Context, messages []Incoming) {
+		heard = append(heard, messages...)
+	})
 	writer := MaterializingWriter{
 		Raw:             RawWriter{Root: rawRoot, Now: func() time.Time { return now }},
 		ProjectionQueue: projection,
+		Observers:       observers,
 		Projector: SourceProjector{
 			RawRoot:   rawRoot,
 			Projector: fakeSourceProjector{},
@@ -43,6 +49,9 @@ func TestMaterializingWriterWritesObservedRecordsAndQueuesProjection(t *testing.
 	rawPath := filepath.Join(rawRoot, "telegram", "acct", "messages", "2026", "06", "27", "messages.jsonl")
 	if _, err := os.Stat(rawPath); err != nil {
 		t.Fatal(err)
+	}
+	if len(heard) != 1 || heard[0].Provider != "telegram" || heard[0].Text != "hello" {
+		t.Fatalf("observers heard %+v", heard)
 	}
 	if len(projection.sources) != 1 || projection.sources[0].Path != "sources/telegram/acct/conversations/test/2026/06/27.md" || projection.sources[0].Kind != "chat_day" || projection.sources[0].Provider != "telegram" || len(projection.sources[0].Replay.Scopes) != 1 {
 		t.Fatalf("projection sources = %#v", projection.sources)

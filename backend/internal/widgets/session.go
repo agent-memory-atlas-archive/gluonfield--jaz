@@ -1,7 +1,7 @@
 package widgets
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/wins/jaz/backend/internal/loops"
 	"github.com/wins/jaz/backend/internal/storage"
@@ -36,6 +36,9 @@ func (p *SessionPublisher) PublishForSession(sessionID string, input PublishInpu
 
 func (p *SessionPublisher) RequirePublishedForSession(sessionID string) error {
 	loop, run, err := p.resolve(sessionID)
+	if errors.Is(err, errNotLoopRun) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -52,13 +55,15 @@ func (p *SessionPublisher) WidgetSurfaceForSession(sessionID string) bool {
 		visualize.NormalizeSurface(session.RuntimeRef.ArtifactSurface) == visualize.SurfaceWidget
 }
 
+var errNotLoopRun = errors.New("widget publishing is only available to loop runs")
+
 func (p *SessionPublisher) resolve(sessionID string) (loops.Loop, loops.Run, error) {
 	session, err := p.Sessions.LoadSession(sessionID)
 	if err != nil {
 		return loops.Loop{}, loops.Run{}, err
 	}
 	if session.SourceType != storage.SourceLoopRun || session.SourceID == "" {
-		return loops.Loop{}, loops.Run{}, fmt.Errorf("widget publishing is only available to loop runs")
+		return loops.Loop{}, loops.Run{}, errNotLoopRun
 	}
 	run, err := p.Loops.LoadRun(session.SourceID)
 	if err != nil {

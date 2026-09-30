@@ -8,6 +8,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/acp"
+	"github.com/wins/jaz/backend/internal/bots"
 	"github.com/wins/jaz/backend/internal/browsercontrol"
 	"github.com/wins/jaz/backend/internal/computercontrol"
 	"github.com/wins/jaz/backend/internal/connections"
@@ -61,6 +62,7 @@ type Service struct {
 	computerBackend  computercontrol.Backend
 
 	loopTools       *loops.MCPTools
+	botTools        *bots.MCPTools
 	agentTools      *acp.MCPTools
 	threadTools     *threads.Service
 	goalTools       *sessiongoal.MCPTools
@@ -161,6 +163,10 @@ func (s *Service) SetLoops(service loops.MCPService, opts ...loops.MCPOption) {
 	s.loopTools = loops.NewMCPTools(service, opts...)
 }
 
+func (s *Service) SetBots(tools *bots.MCPTools) {
+	s.botTools = tools
+}
+
 func (s *Service) SetAgents(service acp.MCPService) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -244,6 +250,9 @@ func (s *Service) newServer(surface toolSurface) *mcp.Server {
 		return server
 	}
 	s.loopTools.AddTo(server)
+	if s.botTools != nil {
+		s.botTools.AddTo(server)
+	}
 	if surface == threadSurface && s.goalTools != nil {
 		s.goalTools.AddTo(server)
 	}

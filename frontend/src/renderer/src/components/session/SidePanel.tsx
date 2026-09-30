@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { Attachment, QueuedAction, Session, SessionEvent } from '@/lib/api/types'
 import type { BrowserAnnotation } from '@/lib/messageContext'
 import type { ProviderSubagentView } from '@/lib/providerSubagents'
@@ -17,7 +18,7 @@ import type { useSidePanelState } from '@/components/session/SidePanelState'
 export function SidePanel({
   session, panel, progress, subagents, spawnedThreads, working,
   sideChatAvailable, sideChatEvents, onAddBrowserAnnotation, onUploadAttachment,
-  onSend, onQueuePrompt, onQueueAction, onSendSideChat,
+  onSend, onQueuePrompt, onQueueAction, onSendSideChat, overview,
 }: {
   session: Session
   panel: ReturnType<typeof useSidePanelState>
@@ -33,10 +34,11 @@ export function SidePanel({
   onQueuePrompt: SendMessageHandler
   onQueueAction: (action: QueuedAction, label: string) => Promise<void>
   onSendSideChat: (sideChatID: string, message: string, options?: SendMessageOptions) => Promise<void>
+  overview?: ReactNode
 }) {
   return (
     <>
-      {panel.open && panel.mode === 'overview' ? (
+      {panel.open && panel.mode === 'overview' ? overview ?? (
         <OverviewPanel
           session={session}
           progress={progress}

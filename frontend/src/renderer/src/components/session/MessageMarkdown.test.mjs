@@ -70,6 +70,17 @@ test('inline links use website favicons and keep local file icons', async () => 
   }
 })
 
+test('bot mentions keep their bot: target through link sanitizing', async () => {
+  const { MessageMarkdown, UserMessageMarkdown } = await import('./MessageMarkdown')
+  for (const component of [MessageMarkdown, UserMessageMarkdown]) {
+    const html = renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() },
+      createElement(component, { text: 'Ask [@Inbox bot](bot:20260930T101500-abcdef12) first.' }),
+    ))
+
+    expect(html).toContain('<span>@Inbox bot</span>')
+  }
+})
+
 test.each(['user', 'assistant'])('saved %s messages show their timestamp beside copy and omit unknown dates', async (role) => {
   const { Bubble } = await import('./Bubble')
   const created = '2026-09-10T08:26:13Z'

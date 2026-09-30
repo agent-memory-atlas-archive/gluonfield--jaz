@@ -1,0 +1,94 @@
+package bots
+
+import (
+	"context"
+	"time"
+
+	"github.com/wins/jaz/backend/internal/acp"
+	"github.com/wins/jaz/backend/internal/loops"
+	"github.com/wins/jaz/backend/internal/sessionevents"
+	"github.com/wins/jaz/backend/internal/storage"
+)
+
+const (
+	KindBot   = "bot"
+	KindGroup = "group"
+)
+
+var (
+	shapes = []string{"circle", "blob", "squircle", "pill", "triangle", "hex", "cloud", "drop"}
+	colors = []string{"white", "brown", "red", "orange", "amber", "green", "teal", "blue", "purple", "pink", "gray"}
+)
+
+type Avatar struct {
+	Shape string `json:"shape"`
+	Color string `json:"color"`
+}
+
+type Bot struct {
+	ID        string    `json:"id"`
+	Kind      string    `json:"kind"`
+	Name      string    `json:"name"`
+	Avatar    Avatar    `json:"avatar"`
+	Pinned    bool      `json:"pinned"`
+	Unread    bool      `json:"unread"`
+	Status    string    `json:"status"`
+	Preview   string    `json:"preview,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Agent     string    `json:"agent,omitempty"`
+	Model     string    `json:"model,omitempty"`
+	Directory string    `json:"directory,omitempty"`
+	Members   []string  `json:"members,omitempty"`
+	Routines  int       `json:"routines,omitempty"`
+}
+
+type CreateBot struct {
+	Name      string  `json:"name"`
+	Avatar    *Avatar `json:"avatar,omitempty"`
+	Agent     string  `json:"agent,omitempty"`
+	Model     string  `json:"model,omitempty"`
+	Directory string  `json:"directory,omitempty"`
+}
+
+type UpdateBot struct {
+	Name    *string   `json:"name,omitempty"`
+	Avatar  *Avatar   `json:"avatar,omitempty"`
+	Members *[]string `json:"members,omitempty"`
+}
+
+// Threads is the agent runtime bot threads run on.
+type Threads interface {
+	CreateSession(context.Context, acp.SpawnRequest) (storage.Session, error)
+	StartInternalTurnWhenIdle(context.Context, acp.InternalTurnRequest) (acp.Job, error)
+	Wait(context.Context, acp.WaitRequest) (acp.Job, error)
+}
+
+// Store keeps bot records and the threads they live in.
+type Store interface {
+	BotLoader
+	SaveBot(storage.BotRecord) error
+	ListBots() ([]storage.BotRecord, error)
+	CreateSession(storage.CreateSession) (storage.Session, error)
+	LoadSession(string) (storage.Session, error)
+	ListSessions(storage.SessionFilter) ([]storage.Session, error)
+	UpdateSessionTitle(id, title string) error
+	SetArchived(id string, archived bool) error
+	LoadSessionEvents(id string) ([]sessionevents.Event, error)
+	AppendSessionEvents(id string, events ...sessionevents.Event) error
+	LoadLatestACPTurn(ctx context.Context, id string) ([]sessionevents.Event, error)
+}
+
+type BotLoader interface {
+	LoadBot(threadID string) (storage.BotRecord, error)
+}
+
+// Routines is the loop service seen as a bot's routines.
+type Routines interface {
+	List() ([]loops.Loop, error)
+	Update(string, loops.UpdateLoop) (loops.Loop, error)
+	Delete(string) error
+}
+
+type Publisher interface {
+	Publish(sessionevents.Event)
+}

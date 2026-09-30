@@ -14,10 +14,12 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import { layoutRect, layoutViewport } from '@/lib/dom/zoom'
+import { botsQuery } from '@/lib/api/bots'
 import { searchThreads } from '@/lib/api/search'
 import { projectsQuery, workspaceFilesQuery } from '@/lib/api/sessions'
 import { skillsQuery } from '@/lib/api/skills'
 import type { AgentSessionCommand, ThreadSearchResult } from '@/lib/api/types'
+import { botAvatars, botTarget } from '@/lib/bots'
 import { keys } from '@/lib/query/keys'
 import { threadSearchTitle } from '@/lib/threadDisplay'
 import { ComposerSuggestions, type SuggestionItem, type SuggestionSection } from './ComposerSuggestions'
@@ -37,6 +39,7 @@ import { useComposerDraft, type ComposerDraft, type ComposerDraftStorage } from 
 const MAX_SUGGESTIONS = 20
 const MAX_PROJECT_SUGGESTIONS = 3
 const MAX_THREAD_SUGGESTIONS = 4
+const MAX_BOT_SUGGESTIONS = 6
 
 // Shared by the textarea and its token-highlight mirror — any drift in these
 // box/text metrics would misalign the caret with the painted glyphs.
@@ -150,6 +153,7 @@ export function useMentionInput({
     enabled: fileRoot !== undefined && focused,
   })
   const projects = useQuery({ ...projectsQuery, enabled: focused })
+  const bots = useQuery({ ...botsQuery, enabled: focused })
   const threadQuery = menuTrigger?.trigger === '@' ? menuTrigger.query : ''
   const threadSearchEnabled = focused && threadQuery.length >= 2
   const threadSearch = useQuery({
@@ -238,6 +242,24 @@ export function useMentionInput({
               insert: `@${project.path}`,
               expansion: encodeMention('@', project.path, project.path),
             }))
+    const botItems = (bots.data ?? [])
+      .flatMap((bot) => {
+        const match = fuzzyMatch(query, bot.name)
+        return match ? [{ bot, match }] : []
+      })
+      .sort((a, b) => b.match.score - a.match.score)
+      .slice(0, MAX_BOT_SUGGESTIONS)
+      .map(({ bot, match }) => {
+        const label = mentionLabelText(bot.name)
+        return {
+          kind: 'bot' as const,
+          label: bot.name,
+          indices: match.indices,
+          avatars: botAvatars(bot, bots.data ?? []),
+          insert: `@${label}`,
+          expansion: encodeMention('@', label, botTarget(bot.id)),
+        }
+      })
     const threadItems =
       threadSearchEnabled && threadSearch.data
         ? threadSearch.data.map((result) => {
@@ -267,7 +289,7 @@ export function useMentionInput({
                 a.entry.path.length - b.entry.path.length ||
                 a.entry.path.localeCompare(b.entry.path),
             )
-            .slice(0, Math.max(0, MAX_SUGGESTIONS - projectItems.length - threadItems.length))
+            .slice(0, Math.max(0, MAX_SUGGESTIONS - botItems.length - projectItems.length - threadItems.length))
             .map(({ entry, match }) => ({
               kind: entry.dir ? ('dir' as const) : ('file' as const),
               label: entry.path,
@@ -277,11 +299,12 @@ export function useMentionInput({
             }))
         : []
     const sections: SuggestionSection[] = []
+    if (botItems.length > 0) sections.push({ title: 'Bots', items: botItems })
     if (projectItems.length > 0) sections.push({ title: 'Projects', items: projectItems })
     if (threadItems.length > 0) sections.push({ title: 'Threads', items: threadItems })
     if (fileItems.length > 0) sections.push({ title: 'Files', items: fileItems })
     return sections
-  }, [commands, menuTrigger, skills.data, projects.data, threadSearch.data, threadSearchEnabled, fileIndex.data])
+  }, [commands, menuTrigger, skills.data, projects.data, bots.data, threadSearch.data, threadSearchEnabled, fileIndex.data])
 
   const flatItems = useMemo(() => sections.flatMap((section) => section.items), [sections])
   const menuOpen = menuTrigger !== null && flatItems.length > 0 && focused

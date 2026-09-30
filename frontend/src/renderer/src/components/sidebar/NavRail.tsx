@@ -1,16 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
-import { Clock3, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
+import { Bot, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { AppIcon } from '@/components/apps/AppIcon'
 import { entrypointKey, mcpEntrypointsQuery } from '@/lib/api/mcp'
 
 export const RAIL_WIDTH = 48
 
-// The sections beside Chat. Each takes the whole content card; Chat is the one
-// tab that keeps the thread panel.
+// The sections beside Chat. Bots keeps the thread panel for its own list;
+// the rest take the whole content card.
 export const SECTIONS = [
-  { to: '/loops', label: 'Scheduled', Icon: Clock3 },
+  { to: '/bots', label: 'Bots', Icon: Bot },
   { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
 ] as const
 

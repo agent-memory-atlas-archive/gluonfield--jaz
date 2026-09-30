@@ -25,6 +25,7 @@ type Service struct {
 	// RunFinished fires after a run reaches a terminal status.
 	RunFinished func(Loop, Run)
 	mu          sync.Mutex
+	fired       map[string]struct{}
 }
 
 type RuntimePromptBuilder struct {
@@ -116,7 +117,10 @@ func (s *Service) Create(input CreateLoop) (Loop, error) {
 		NextRunAt:       nextRun,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		BotID:           input.BotID,
+		Trigger:         input.Trigger,
 	}
+	ensureWebhookSecret(&loop)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.assignMemoryPathLocked(&loop); err != nil {
@@ -152,10 +156,13 @@ func (s *Service) Update(id string, input UpdateLoop) (Loop, error) {
 		return Loop{}, err
 	}
 	next.UpdatedAt = now
+	ensureWebhookSecret(&next)
 	if err := s.Repo.SaveLoop(next); err != nil {
 		return Loop{}, err
 	}
-	return s.Repo.LoadLoop(id)
+	saved, err := s.Repo.LoadLoop(id)
+	saved.WebhookSecret = next.WebhookSecret
+	return saved, err
 }
 
 func (s *Service) Delete(id string) error {
@@ -238,7 +245,7 @@ func (s *Service) StartDue(ctx context.Context) (bool, error) {
 	if err != nil || !ok {
 		return ok, err
 	}
-	s.start(ctx, loop, run, now)
+	s.start(ctx, loop, run, now, "")
 	return true, nil
 }
 
@@ -257,6 +264,12 @@ func (s *Service) StartDueAll(ctx context.Context) (int, error) {
 }
 
 func (s *Service) RunNow(ctx context.Context, loopID string) (Run, error) {
+	return s.RunTriggered(ctx, loopID, "")
+}
+
+// RunTriggered starts a run outside the schedule; event describes what fired
+// it and is passed to the run.
+func (s *Service) RunTriggered(ctx context.Context, loopID, event string) (Run, error) {
 	now := s.now()
 	s.mu.Lock()
 	loop, run, err := s.startManualRunLocked(loopID, now)
@@ -264,7 +277,7 @@ func (s *Service) RunNow(ctx context.Context, loopID string) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	s.start(ctx, loop, run, now)
+	s.start(ctx, loop, run, now, event)
 	return run, nil
 }
 
@@ -342,7 +355,7 @@ func (s *Service) notifyRunFinished(run Run) {
 	go s.RunFinished(loop, run)
 }
 
-func (s *Service) start(ctx context.Context, loop Loop, run Run, now time.Time) {
+func (s *Service) start(ctx context.Context, loop Loop, run Run, now time.Time, event string) {
 	if s.Executor == nil {
 		_ = s.Finish(run.ID, RunStatusError, "loop executor is not configured")
 		return
@@ -352,10 +365,15 @@ func (s *Service) start(ctx context.Context, loop Loop, run Run, now time.Time) 
 	if s.ArtifactSurface != nil {
 		artifactSurface = strings.TrimSpace(s.ArtifactSurface(loop, run))
 	}
+	thread := ""
+	if loop.BotID != "" && artifactSurface == "" {
+		thread = loop.BotID
+	}
 	go s.Executor.StartLoopRun(context.WithoutCancel(ctx), Execution{
 		Loop:                   loop,
 		Run:                    run,
-		Prompt:                 loop.Prompt,
+		Prompt:                 runPrompt(loop, now, event, thread != ""),
+		Thread:                 thread,
 		SystemPromptExtensions: systemPromptExtensions,
 		ArtifactSurface:        artifactSurface,
 		Controller:             s,

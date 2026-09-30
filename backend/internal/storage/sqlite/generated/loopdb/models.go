@@ -31,6 +31,9 @@ type Loop struct {
 	MemoryPath      string         `json:"memory_path"`
 	ModelProvider   string         `json:"model_provider"`
 	Model           string         `json:"model"`
+	BotID           string         `json:"bot_id"`
+	EventTrigger    string         `json:"event_trigger"`
+	WebhookHash     string         `json:"webhook_hash"`
 }
 
 type LoopRun struct {

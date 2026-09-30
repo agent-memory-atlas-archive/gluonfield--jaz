@@ -1,18 +1,19 @@
 import { Link } from '@tanstack/react-router'
 import { Search, Settings, SquarePen } from 'lucide-react'
-import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
+import { BotsPanel } from '@/components/bots/BotsPanel'
 import { ConnectionFooterButton } from '@/components/connection/ConnectionFooterButton'
 import { UpdatePanel } from '@/components/update/UpdatePanel'
-import { useRailSections } from './NavRail'
+import { NAV_LINK_CLASS, PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from './SidebarScroll'
 import { SidebarSessions } from './SidebarSessions'
 
-const NAV_LINK_CLASS =
-  'group flex h-[30px] items-center gap-2 rounded-lg px-2.5 text-[13px] font-medium text-ink transition-colors duration-150 hover:bg-list-hover max-sm:h-11 max-sm:px-3 max-sm:text-[15px]'
-
+// The thread panel beside the content: Chat's threads, or the Bots list on
+// the Bots tab.
 export function Sidebar({
   open,
   width,
   mobile = false,
+  bots = false,
   onDismiss,
   resizing,
   onResizeStart,
@@ -24,6 +25,7 @@ export function Sidebar({
   open: boolean
   width: number
   mobile?: boolean
+  bots?: boolean
   onDismiss?: () => void
   resizing?: boolean
   onResizeStart: (e: ReactPointerEvent) => void
@@ -32,42 +34,6 @@ export function Sidebar({
   onOpenSettings: () => void
   onOpenConnect: () => void
 }) {
-  const navRef = useRef<HTMLElement | null>(null)
-  const sections = useRailSections()
-  const [navEdge, setNavEdge] = useState({ scrollable: false, scrolled: false })
-  const updateNavEdge = useCallback(() => {
-    const nav = navRef.current
-    const scrollable = Boolean(nav && nav.scrollHeight - nav.clientHeight > 1)
-    const scrolled = Boolean(scrollable && nav && nav.scrollTop > 1)
-    setNavEdge((current) =>
-      current.scrollable === scrollable && current.scrolled === scrolled
-        ? current
-        : { scrollable, scrolled },
-    )
-  }, [])
-
-  useEffect(() => {
-    updateNavEdge()
-    const nav = navRef.current
-    if (!nav) return
-
-    const resizeObserver = new ResizeObserver(updateNavEdge)
-    resizeObserver.observe(nav)
-    const mutationObserver = new MutationObserver(updateNavEdge)
-    mutationObserver.observe(nav, { childList: true, subtree: true })
-    window.addEventListener('resize', updateNavEdge)
-    const frame = window.requestAnimationFrame(updateNavEdge)
-
-    return () => {
-      window.cancelAnimationFrame(frame)
-      window.removeEventListener('resize', updateNavEdge)
-      mutationObserver.disconnect()
-      resizeObserver.disconnect()
-    }
-  }, [updateNavEdge])
-
-  const showNavEdge = navEdge.scrollable && navEdge.scrolled
-
   return (
     <aside
       onClick={
@@ -80,64 +46,31 @@ export function Sidebar({
       className="relative flex h-full shrink-0 flex-col border-r border-border bg-panel max-sm:w-full!"
       style={{ width }}
     >
-      <div className="flex shrink-0 flex-col pl-1.5 pr-3 pt-1.5 pb-px max-sm:px-4 max-sm:pt-2">
-        <div className="flex items-center gap-px">
-          <Link
-            to="/new"
-            className={`${NAV_LINK_CLASS} min-w-0 flex-1`}
-          >
-            <span className="grid size-[18px] shrink-0 place-items-center">
-              <SquarePen size={15} className="text-ink-2 max-sm:size-[18px]" />
-            </span>
-            <span className="flex-1">New task</span>
-          </Link>
-          <button
-            type="button"
-            onClick={onOpenCommandPalette}
-            aria-label="Open search"
-            className="grid size-[30px] shrink-0 place-items-center rounded-lg text-ink-3 transition-colors duration-150 hover:bg-list-hover hover:text-ink focus-visible:bg-list-hover focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:size-11"
-          >
-            <Search size={15} className="max-sm:size-[18px]" />
-          </button>
-        </div>
-      </div>
-
-      <div
-        aria-hidden
-        className={`pointer-events-none relative z-[1] h-0 shrink-0 transition-opacity duration-150 ${
-          showNavEdge ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
-        <div className="h-px bg-border/70" />
-        <div className="absolute inset-x-0 top-px h-5 bg-gradient-to-b from-panel to-transparent" />
-      </div>
-
-      <nav
-        ref={navRef}
-        onScroll={updateNavEdge}
-        className="scrollbar-quiet flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pl-1.5 pr-3 pt-4 max-sm:gap-6 max-sm:px-4"
-      >
-        {/* Phones have no rail, so its tabs ride at the top of the drawer. */}
-        {mobile && (
-          <div className="flex flex-col gap-px">
-            {sections.map((section) => (
-              <Link
-                key={section.path}
-                {...section.link}
-                className={NAV_LINK_CLASS}
-                activeProps={{ className: 'bg-list-active!' }}
-              >
-                <span className="grid size-[18px] shrink-0 place-items-center text-ink-2 [&_svg]:size-[18px]">
-                  {section.icon}
-                </span>
-                <span className="flex-1">{section.label}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        <SidebarSessions open={open} />
-      </nav>
+      {bots ? (
+        <BotsPanel mobile={mobile} />
+      ) : (
+        <>
+          <SidebarHeader>
+            <Link to="/new" className={`${NAV_LINK_CLASS} min-w-0 flex-1`}>
+              <span className="grid size-[18px] shrink-0 place-items-center">
+                <SquarePen size={15} className="text-ink-2 max-sm:size-[18px]" />
+              </span>
+              <span className="flex-1">New task</span>
+            </Link>
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              aria-label="Open search"
+              className={PANEL_ICON_BUTTON_CLASS}
+            >
+              <Search size={15} className="max-sm:size-[18px]" />
+            </button>
+          </SidebarHeader>
+          <SidebarScroll mobile={mobile}>
+            <SidebarSessions open={open} />
+          </SidebarScroll>
+        </>
+      )}
 
       <div className="flex shrink-0 flex-col gap-0.5 border-t border-border pl-1.5 pr-3 py-1.5 empty:hidden max-sm:pl-3">
         <UpdatePanel />

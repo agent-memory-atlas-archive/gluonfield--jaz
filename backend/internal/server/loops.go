@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/wins/jaz/backend/internal/loops"
@@ -18,6 +19,9 @@ func (s *Server) handleListLoops(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
+	}
+	if bot := r.URL.Query().Get("bot_id"); bot != "" {
+		items = slices.DeleteFunc(items, func(loop loops.Loop) bool { return loop.BotID != bot })
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"loops": items})
 }
@@ -44,6 +48,8 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 		Model:           req.Model,
 		ReasoningEffort: req.ReasoningEffort,
 		Directory:       req.Directory,
+		BotID:           req.BotID,
+		Trigger:         req.Trigger,
 	}, req.BoardIDs, "")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -56,7 +62,7 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 // Boards come from the widget service; there is no card sink because REST
 // requests carry no thread to announce into.
 func (s *Server) loopCoordinator() loops.Coordinator {
-	coordinator := loops.Coordinator{Loops: s.Loops}
+	coordinator := loops.Coordinator{Loops: s.Loops, Owner: s.RoutineOwner}
 	if s.Widgets != nil {
 		coordinator.Boards = s.Widgets.LoopBoards()
 	}
@@ -180,6 +186,8 @@ type loopRequest struct {
 	Model           string         `json:"model,omitempty"`
 	ReasoningEffort string         `json:"reasoning_effort,omitempty"`
 	Directory       string         `json:"directory,omitempty"`
+	BotID           string         `json:"bot_id,omitempty"`
+	Trigger         *loops.Trigger `json:"trigger,omitempty"`
 	// BoardIDs assigns the loop's widget to boards; assignment is what enables
 	// widget publishing (there is no separate toggle).
 	BoardIDs []string `json:"board_ids,omitempty"`

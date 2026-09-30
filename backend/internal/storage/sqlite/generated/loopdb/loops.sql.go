@@ -88,7 +88,10 @@ SELECT
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 FROM loops
 WHERE id = ?1
 LIMIT 1
@@ -120,6 +123,9 @@ func (q *Queries) GetLoop(ctx context.Context, id string) (Loop, error) {
 		&i.MemoryPath,
 		&i.ModelProvider,
 		&i.Model,
+		&i.BotID,
+		&i.EventTrigger,
+		&i.WebhookHash,
 	)
 	return i, err
 }
@@ -251,7 +257,10 @@ SELECT
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 FROM loops
 WHERE status <> ?1
 ORDER BY updated_at_ms DESC
@@ -289,6 +298,9 @@ func (q *Queries) ListLoops(ctx context.Context, deletedStatus string) ([]Loop, 
 			&i.MemoryPath,
 			&i.ModelProvider,
 			&i.Model,
+			&i.BotID,
+			&i.EventTrigger,
+			&i.WebhookHash,
 		); err != nil {
 			return nil, err
 		}
@@ -381,7 +393,10 @@ INSERT INTO loops (
   directory,
   memory_path,
   model_provider,
-  model
+  model,
+  bot_id,
+  event_trigger,
+  webhook_hash
 ) VALUES (
   ?1,
   ?2,
@@ -404,7 +419,10 @@ INSERT INTO loops (
   ?19,
   ?20,
   ?21,
-  ?22
+  ?22,
+  ?23,
+  ?24,
+  ?25
 )
 ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -420,6 +438,9 @@ ON CONFLICT(id) DO UPDATE SET
   memory_path = excluded.memory_path,
   model_provider = excluded.model_provider,
   model = excluded.model,
+  bot_id = excluded.bot_id,
+  event_trigger = excluded.event_trigger,
+  webhook_hash = excluded.webhook_hash,
   next_run_at_ms = excluded.next_run_at_ms,
   last_run_at_ms = excluded.last_run_at_ms,
   last_run_id = excluded.last_run_id,
@@ -453,6 +474,9 @@ type UpsertLoopParams struct {
 	MemoryPath      string         `json:"memory_path"`
 	ModelProvider   string         `json:"model_provider"`
 	Model           string         `json:"model"`
+	BotID           string         `json:"bot_id"`
+	EventTrigger    string         `json:"event_trigger"`
+	WebhookHash     string         `json:"webhook_hash"`
 }
 
 func (q *Queries) UpsertLoop(ctx context.Context, arg UpsertLoopParams) error {
@@ -479,6 +503,9 @@ func (q *Queries) UpsertLoop(ctx context.Context, arg UpsertLoopParams) error {
 		arg.MemoryPath,
 		arg.ModelProvider,
 		arg.Model,
+		arg.BotID,
+		arg.EventTrigger,
+		arg.WebhookHash,
 	)
 	return err
 }

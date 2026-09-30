@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/loops"
@@ -192,6 +193,9 @@ func upsertLoop(ctx context.Context, q *loopdb.Queries, loop loops.Loop) error {
 		LastError:       nullDBString(loop.LastError),
 		CreatedAtMs:     loopTimeToMs(loop.CreatedAt),
 		UpdatedAtMs:     loopTimeToMs(loop.UpdatedAt),
+		BotID:           loop.BotID,
+		EventTrigger:    encodeTrigger(loop.Trigger),
+		WebhookHash:     loop.WebhookHash,
 	})
 }
 
@@ -231,7 +235,29 @@ func loopFromDB(row loopdb.Loop) loops.Loop {
 		LastError:       row.LastError.String,
 		CreatedAt:       msToTime(row.CreatedAtMs),
 		UpdatedAt:       msToTime(row.UpdatedAtMs),
+		BotID:           row.BotID,
+		Trigger:         decodeTrigger(row.EventTrigger),
+		WebhookHash:     row.WebhookHash,
 	}
+}
+
+func encodeTrigger(trigger *loops.Trigger) string {
+	if trigger == nil {
+		return ""
+	}
+	raw, _ := json.Marshal(trigger)
+	return string(raw)
+}
+
+func decodeTrigger(raw string) *loops.Trigger {
+	if raw == "" {
+		return nil
+	}
+	var trigger loops.Trigger
+	if json.Unmarshal([]byte(raw), &trigger) != nil {
+		return nil
+	}
+	return &trigger
 }
 
 func runFromDB(row loopdb.LoopRun) loops.Run {

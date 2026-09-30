@@ -17,6 +17,8 @@ const (
 	TypeArtifact         = "artifact"
 	TypeSession          = "session"
 	TypeLoopCreated      = "loop_created"
+	TypeBotActivity      = "bot_activity"
+	TypeRoomMessage      = "room_message"
 	TypeMCPApp           = "mcp_app"
 	TypeSideChatMessage  = "side_chat_message"
 	TypeProviderSubagent = "provider_subagent"
@@ -46,6 +48,8 @@ type Event struct {
 	Permission       *ACPPermission         `json:"permission,omitempty"`
 	Artifact         *ArtifactEvent         `json:"artifact,omitempty"`
 	LoopCreated      *LoopCreatedEvent      `json:"loop_created,omitempty"`
+	BotActivity      *BotActivityEvent      `json:"bot_activity,omitempty"`
+	RoomMessage      *RoomMessageEvent      `json:"room_message,omitempty"`
 	MCPApp           *MCPAppEvent           `json:"mcp_app,omitempty"`
 	SideChat         *SideChatEvent         `json:"side_chat,omitempty"`
 	AgentSession     *AgentSession          `json:"agent_session,omitempty"`
@@ -116,6 +120,23 @@ type LoopCreatedEvent struct {
 	Boards    []LoopBoardRef `json:"boards,omitempty"`
 }
 
+// BotActivityEvent is a one-line row in a bot's thread naming what woke the
+// bot: a routine, another bot's message, or a group chat turn.
+type BotActivityEvent struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+	BotID string `json:"bot_id,omitempty"`
+}
+
+// RoomMessageEvent is one message in a group chat, spoken by the user or a
+// member bot.
+type RoomMessageEvent struct {
+	Speaker string `json:"speaker"`
+	BotID   string `json:"bot_id,omitempty"`
+	Name    string `json:"name"`
+	Text    string `json:"text"`
+}
+
 type LoopBoardRef struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
@@ -182,6 +203,10 @@ func (e *Event) NormalizePayload() {
 			e.LoopCreated = &loop
 			e.Content = ""
 		}
+	case TypeBotActivity:
+		decodeContent(e, &e.BotActivity)
+	case TypeRoomMessage:
+		decodeContent(e, &e.RoomMessage)
 	case TypeMCPApp:
 		if e.MCPApp != nil {
 			e.Content = ""
@@ -271,6 +296,10 @@ func (e Event) StorageContent() string {
 		if data, err := json.Marshal(e.LoopCreated); err == nil {
 			return string(data)
 		}
+	case TypeBotActivity:
+		return encodeContent(e.Content, e.BotActivity)
+	case TypeRoomMessage:
+		return encodeContent(e.Content, e.RoomMessage)
 	case TypeMCPApp:
 		if e.MCPApp == nil {
 			return e.Content
@@ -587,4 +616,27 @@ func (b *Bus) Publish(event Event) {
 		delete(b.subs, event.SessionID)
 	}
 	b.mu.Unlock()
+}
+
+func decodeContent[T any](e *Event, target **T) {
+	if *target == nil && e.Content != "" {
+		var payload T
+		if json.Unmarshal([]byte(e.Content), &payload) != nil {
+			return
+		}
+		*target = &payload
+	}
+	if *target != nil {
+		e.Content = ""
+	}
+}
+
+func encodeContent[T any](content string, payload *T) string {
+	if payload == nil {
+		return content
+	}
+	if data, err := json.Marshal(payload); err == nil {
+		return string(data)
+	}
+	return content
 }
