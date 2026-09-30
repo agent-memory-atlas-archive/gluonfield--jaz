@@ -37,7 +37,6 @@ type Bot struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	Agent     string    `json:"agent,omitempty"`
 	Model     string    `json:"model,omitempty"`
-	Directory string    `json:"directory,omitempty"`
 	Members   []string  `json:"members,omitempty"`
 	Routines  int       `json:"routines,omitempty"`
 }

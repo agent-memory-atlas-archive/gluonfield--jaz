@@ -206,7 +206,7 @@ func (fakeThreads) SwitchAgent(context.Context, string, string) error {
 }
 
 func newTestService(world *fakeWorld) *Service {
-	world.service = NewService(world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
+	world.service = NewService(world, fakeThreads{world: world}, world, world, log.New(nil))
 	return world.service
 }
 

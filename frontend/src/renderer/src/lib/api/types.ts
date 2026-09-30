@@ -717,7 +717,6 @@ export interface Bot {
   updated_at: string
   agent?: string
   model?: string
-  directory?: string
   members?: string[]
   routines?: number
 }
