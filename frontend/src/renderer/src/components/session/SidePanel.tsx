@@ -1,6 +1,7 @@
 import type { Attachment, QueuedAction, Session, SessionEvent } from '@/lib/api/types'
 import type { BrowserAnnotation } from '@/lib/messageContext'
 import type { ProviderSubagentView } from '@/lib/providerSubagents'
+import { MCPAppFrame } from '@/components/apps/MCPAppFrame'
 import { BrowserPanelSlot } from '@/components/browser/BrowserWorkspace'
 import type { SendMessageHandler, SendMessageOptions } from '@/lib/sendMessage'
 import type { SpawnedThreadView } from '@/lib/spawnedThreads'
@@ -76,6 +77,8 @@ export function SidePanel({
                 <FileReaderPanel sessionId={session.id} fileRef={tab.file} visible={visible} onOpenFile={panel.openFile} />
               ) : tab.kind === 'diff' ? (
                 <CodeDiffPanel sessionId={session.id} visible={visible} />
+              ) : tab.kind === 'app' ? (
+                <MCPAppFrame entry={tab.app} file={tab.file} active={visible} />
               ) : (
                 <SideChatPanel
                   sessionId={session.id}

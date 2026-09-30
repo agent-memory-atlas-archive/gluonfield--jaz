@@ -2,7 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { keys } from '../query/keys'
 import { del, get, post, put } from './client'
 import type { CallToolResult } from '@modelcontextprotocol/client'
-import type { MCPApp, MCPServer, MCPServerInput, MCPServerStatus } from './types'
+import type { MCPEntrypoint, MCPServer, MCPServerInput, MCPServerStatus } from './types'
 
 function normalizeServer(server: MCPServer): MCPServer {
   return {
@@ -76,24 +76,35 @@ export function authorizeMCPServer(id: string): Promise<MCPServerStatus> {
   return post<MCPServerStatus>(`/v1/mcp/servers/${id}/authorize`)
 }
 
-export const mcpAppsQuery = queryOptions({
+export const mcpEntrypointsQuery = queryOptions({
   queryKey: keys.mcpApps,
-  queryFn: async () => (await get<{ apps: MCPApp[] }>('/v1/mcp/apps')).apps,
+  queryFn: async () => (await get<{ entrypoints: MCPEntrypoint[] }>('/v1/mcp/apps')).entrypoints,
 })
 
-// Opening the section picks up a new app version; unchanged HTML keeps the
+// Opening an entrypoint picks up a new app version; unchanged HTML keeps the
 // running app as it is.
-export function mcpAppQuery(serverId: string) {
+export function mcpAppQuery(serverId: string, tool: string) {
   return queryOptions({
-    queryKey: keys.mcpApp(serverId),
-    queryFn: async () => (await get<{ html: string }>(`/v1/mcp/apps/${serverId}/resource`)).html,
+    queryKey: keys.mcpApp(serverId, tool),
+    queryFn: async () => (await get<{ html: string }>(`/v1/mcp/apps/${serverId}/resource?tool=${encodeURIComponent(tool)}`)).html,
     refetchOnWindowFocus: false,
   })
 }
 
 export function callMCPAppTool(
   serverId: string,
-  params: { name: string; arguments?: Record<string, unknown> },
+  params: { name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> },
 ): Promise<CallToolResult> {
   return post<CallToolResult>(`/v1/mcp/apps/${serverId}/tools/call`, params)
+}
+
+// entrypointKey names an entrypoint in routes and panel tab ids.
+export function entrypointKey(entry: Pick<MCPEntrypoint, 'server_id' | 'tool'>): string {
+  return `${entry.server_id}/${encodeURIComponent(entry.tool)}`
+}
+
+// fileEntrypoint is the viewer a connected server offers for a file path.
+export function fileEntrypoint(entrypoints: MCPEntrypoint[], path: string): MCPEntrypoint | undefined {
+  const name = path.toLowerCase()
+  return entrypoints.find((entry) => entry.type === 'file' && entry.extensions?.some((ext) => name.endsWith(ext)))
 }

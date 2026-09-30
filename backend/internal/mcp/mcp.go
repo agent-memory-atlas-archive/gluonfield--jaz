@@ -116,7 +116,7 @@ type serverSession struct {
 	*serverConnection
 	key   [32]byte
 	tools []remoteTool
-	app   *serverApp
+	apps  *serverApps
 }
 
 type remoteTool struct {

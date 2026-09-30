@@ -2,6 +2,11 @@ package server
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -16,6 +21,9 @@ import (
 )
 
 const sessionFileReadLimit = 1024 * 1024
+
+// sessionFileWriteLimit caps a save from a file viewer app.
+var sessionFileWriteLimit = 10 * 1024 * 1024
 
 type sessionFileResponse struct {
 	Path         string `json:"path"`
@@ -77,6 +85,86 @@ func (s *Server) handleSessionFile(w http.ResponseWriter, r *http.Request, sessi
 		resp.Content = string(data)
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type sessionFileWrite struct {
+	Path    string  `json:"path"`
+	Text    *string `json:"text"`
+	Blob    *string `json:"blob"`
+	IfMatch string  `json:"if_match"`
+}
+
+// sessionFileWriteResult is OpenAI's openai/resources/write result, which the
+// file viewer apps saving through this endpoint receive as it is.
+type sessionFileWriteResult struct {
+	Outcome  string `json:"outcome"`
+	ETag     string `json:"etag,omitempty"`
+	MaxBytes int    `json:"maxBytes,omitempty"`
+}
+
+// handleWriteSessionFile saves a file a viewer app opened. With if_match, it
+// saves only while the file still has that version, so edits made elsewhere
+// in the meantime are reported as a conflict instead of overwritten.
+func (s *Server) handleWriteSessionFile(w http.ResponseWriter, r *http.Request) {
+	session, err := s.Store.LoadSession(r.PathValue("session"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	var in sessionFileWrite
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, int64(sessionFileWriteLimit)*2+64*1024)).Decode(&in); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	abs, _, err := resolveSessionFile(session, in.Path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	var data []byte
+	switch {
+	case in.Text != nil:
+		data = []byte(*in.Text)
+	case in.Blob != nil:
+		if data, err = base64.StdEncoding.DecodeString(*in.Blob); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+	default:
+		writeError(w, http.StatusBadRequest, errors.New("text or blob is required"))
+		return
+	}
+	if len(data) > sessionFileWriteLimit {
+		writeJSON(w, http.StatusOK, sessionFileWriteResult{Outcome: "too-large", MaxBytes: sessionFileWriteLimit})
+		return
+	}
+	info, err := os.Stat(abs)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err)
+		return
+	}
+	if in.IfMatch != "" {
+		current, err := os.ReadFile(abs)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if tag := fileETag(current); tag != in.IfMatch {
+			writeJSON(w, http.StatusOK, sessionFileWriteResult{Outcome: "conflict", ETag: tag})
+			return
+		}
+	}
+	if err := os.WriteFile(abs, data, info.Mode().Perm()); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, sessionFileWriteResult{Outcome: "saved", ETag: fileETag(data)})
+}
+
+// fileETag versions file contents: the hex SHA-256 of the bytes.
+func fileETag(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func rawSessionFileRequested(r *http.Request) bool {

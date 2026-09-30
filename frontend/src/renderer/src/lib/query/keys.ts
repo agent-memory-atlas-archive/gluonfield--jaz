@@ -38,7 +38,7 @@ export const keys = {
   mcp: ['mcp'] as const,
   mcpServers: ['mcp', 'servers'] as const,
   mcpApps: ['mcp', 'apps'] as const,
-  mcpApp: (serverId: string) => ['mcp', 'apps', serverId] as const,
+  mcpApp: (serverId: string, tool: string) => ['mcp', 'apps', serverId, tool] as const,
   acpAgents: ['acp', 'agents'] as const,
   openRouterModels: ['openrouter', 'models'] as const,
   providerStatuses: ['model-providers', 'status'] as const,

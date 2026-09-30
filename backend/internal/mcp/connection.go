@@ -140,12 +140,12 @@ func (m *Manager) connectionKey(ctx context.Context, server mcpconfig.Server) ([
 	return sha256.Sum256(data), err
 }
 
-// loadCatalog reads the server's agent tools and, when it publishes one, its app.
+// loadCatalog reads the server's agent tools and what its tools declare for MCP Apps.
 func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Server) (*serverSession, error) {
 	var items []remoteTool
-	var appURI string
-	appTools := map[string]bool{}
 	session := c.current()
+	apps := newServerApps()
+	icon := serverIcon(session.InitializeResult())
 	for tool, err := range session.Tools(ctx, nil) {
 		if err != nil {
 			return nil, err
@@ -153,14 +153,8 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 		if tool == nil || tool.Name == "" {
 			continue
 		}
-		model, app, resourceURI := toolUI(tool)
-		if appURI == "" {
-			appURI = resourceURI
-		}
-		if app {
-			appTools[tool.Name] = true
-		}
-		if !model {
+		apps.add(tool, icon)
+		if model, _, _ := toolUI(tool); !model {
 			continue
 		}
 		items = append(items, remoteTool{
@@ -172,6 +166,5 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 			inputSchema: inputSchema(tool.InputSchema),
 		})
 	}
-	app := newServerApp(session.InitializeResult(), appURI, appTools)
-	return &serverSession{serverConnection: c, tools: items, app: app}, nil
+	return &serverSession{serverConnection: c, tools: items, apps: apps}, nil
 }

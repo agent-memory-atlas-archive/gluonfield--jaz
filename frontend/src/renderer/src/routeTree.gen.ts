@@ -18,7 +18,7 @@ import { Route as BoardsIndexRouteImport } from './routes/boards.index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
 import { Route as LoopsLoopIdRouteImport } from './routes/loops.$loopId'
 import { Route as BoardsBoardIdRouteImport } from './routes/boards.$boardId'
-import { Route as AppsServerIdRouteImport } from './routes/apps.$serverId'
+import { Route as AppsServerIdToolRouteImport } from './routes/apps.$serverId.$tool'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
@@ -65,9 +65,9 @@ const BoardsBoardIdRoute = BoardsBoardIdRouteImport.update({
   path: '/boards/$boardId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppsServerIdRoute = AppsServerIdRouteImport.update({
-  id: '/apps/$serverId',
-  path: '/apps/$serverId',
+const AppsServerIdToolRoute = AppsServerIdToolRouteImport.update({
+  id: '/apps/$serverId/$tool',
+  path: '/apps/$serverId/$tool',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -76,24 +76,24 @@ export interface FileRoutesByFullPath {
   '/feed': typeof FeedRoute
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
-  '/apps/$serverId': typeof AppsServerIdRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards/': typeof BoardsIndexRoute
   '/loops/': typeof LoopsIndexRoute
+  '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/feed': typeof FeedRoute
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
-  '/apps/$serverId': typeof AppsServerIdRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards': typeof BoardsIndexRoute
   '/loops': typeof LoopsIndexRoute
+  '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -101,12 +101,12 @@ export interface FileRoutesById {
   '/feed': typeof FeedRoute
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
-  '/apps/$serverId': typeof AppsServerIdRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
   '/loops/$loopId': typeof LoopsLoopIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards/': typeof BoardsIndexRoute
   '/loops/': typeof LoopsIndexRoute
+  '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -115,36 +115,36 @@ export interface FileRouteTypes {
     | '/feed'
     | '/launcher'
     | '/new'
-    | '/apps/$serverId'
     | '/boards/$boardId'
     | '/loops/$loopId'
     | '/sessions/$sessionId'
     | '/boards/'
     | '/loops/'
+    | '/apps/$serverId/$tool'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/feed'
     | '/launcher'
     | '/new'
-    | '/apps/$serverId'
     | '/boards/$boardId'
     | '/loops/$loopId'
     | '/sessions/$sessionId'
     | '/boards'
     | '/loops'
+    | '/apps/$serverId/$tool'
   id:
     | '__root__'
     | '/'
     | '/feed'
     | '/launcher'
     | '/new'
-    | '/apps/$serverId'
     | '/boards/$boardId'
     | '/loops/$loopId'
     | '/sessions/$sessionId'
     | '/boards/'
     | '/loops/'
+    | '/apps/$serverId/$tool'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -152,12 +152,12 @@ export interface RootRouteChildren {
   FeedRoute: typeof FeedRoute
   LauncherRoute: typeof LauncherRoute
   NewRoute: typeof NewRoute
-  AppsServerIdRoute: typeof AppsServerIdRoute
   BoardsBoardIdRoute: typeof BoardsBoardIdRoute
   LoopsLoopIdRoute: typeof LoopsLoopIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   BoardsIndexRoute: typeof BoardsIndexRoute
   LoopsIndexRoute: typeof LoopsIndexRoute
+  AppsServerIdToolRoute: typeof AppsServerIdToolRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -225,11 +225,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BoardsBoardIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/apps/$serverId': {
-      id: '/apps/$serverId'
-      path: '/apps/$serverId'
-      fullPath: '/apps/$serverId'
-      preLoaderRoute: typeof AppsServerIdRouteImport
+    '/apps/$serverId/$tool': {
+      id: '/apps/$serverId/$tool'
+      path: '/apps/$serverId/$tool'
+      fullPath: '/apps/$serverId/$tool'
+      preLoaderRoute: typeof AppsServerIdToolRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -240,12 +240,12 @@ const rootRouteChildren: RootRouteChildren = {
   FeedRoute: FeedRoute,
   LauncherRoute: LauncherRoute,
   NewRoute: NewRoute,
-  AppsServerIdRoute: AppsServerIdRoute,
   BoardsBoardIdRoute: BoardsBoardIdRoute,
   LoopsLoopIdRoute: LoopsLoopIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   BoardsIndexRoute: BoardsIndexRoute,
   LoopsIndexRoute: LoopsIndexRoute,
+  AppsServerIdToolRoute: AppsServerIdToolRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

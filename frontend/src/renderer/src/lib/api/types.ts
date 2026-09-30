@@ -1045,11 +1045,16 @@ export interface MCPServerInput {
   show_in_ui?: boolean
 }
 
-// A connected server's MCP App, pinned to the rail as a full-card section.
-export interface MCPApp {
+// MCPEntrypoint is an MCP App a person opens directly, as OpenAI's MCP
+// extensions declare on its tool: a sidebar app, a thread tab, or a viewer for
+// files with the given extensions.
+export interface MCPEntrypoint {
   server_id: string
-  name: string
+  tool: string
+  type: 'global' | 'thread' | 'file'
+  title: string
   icon?: string
+  extensions?: string[]
 }
 
 export interface MCPServerStatus {

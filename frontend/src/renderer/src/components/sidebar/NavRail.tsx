@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
 import { Clock3, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
 import { useState } from 'react'
-import { mcpAppsQuery } from '@/lib/api/mcp'
-import type { MCPApp } from '@/lib/api/types'
+import { AppIcon } from '@/components/apps/AppIcon'
+import { entrypointKey, mcpEntrypointsQuery } from '@/lib/api/mcp'
 
 export const RAIL_WIDTH = 48
 
@@ -14,43 +14,29 @@ export const SECTIONS = [
   { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
 ] as const
 
-export type RailTab = 'chat' | 'settings' | (typeof SECTIONS)[number]['to'] | `/apps/${string}`
+export type RailTab = 'chat' | 'settings' | (typeof SECTIONS)[number]['to'] | `/apps/${string}/${string}`
 
 // Settings rides in the URL search over any page, so it outranks the path.
 export function railTab(pathname: string, settingsOpen: boolean): RailTab {
   if (settingsOpen) return 'settings'
-  const app = /^\/apps\/([^/]+)/.exec(pathname)?.[1]
-  if (app) return `/apps/${app}`
+  const app = /^\/apps\/([^/]+\/[^/]+)/.exec(pathname)?.[1]
+  if (app) return `/apps/${app}` as RailTab
   return SECTIONS.find(({ to }) => pathname.startsWith(to))?.to ?? 'chat'
 }
 
 // Everything beside Chat takes the whole content card: the built-in sections,
-// then each connected MCP App the user pinned.
+// then each sidebar app of the MCP servers the user pinned.
 export function useRailSections() {
-  const apps = useQuery(mcpAppsQuery).data ?? []
+  const apps = (useQuery(mcpEntrypointsQuery).data ?? []).filter((entry) => entry.type === 'global')
   return [
     ...SECTIONS.map(({ to, label, Icon }) => ({ path: to, label, icon: <Icon aria-hidden />, link: linkOptions({ to }) })),
     ...apps.map((app) => ({
-      path: `/apps/${app.server_id}`,
-      label: app.name,
+      path: `/apps/${entrypointKey(app)}`,
+      label: app.title,
       icon: <AppIcon app={app} />,
-      link: linkOptions({ to: '/apps/$serverId', params: { serverId: app.server_id } }),
+      link: linkOptions({ to: '/apps/$serverId/$tool', params: { serverId: app.server_id, tool: app.tool } }),
     })),
   ]
-}
-
-// A server's icon is drawn as a mask in the current text colour, so it dims,
-// brightens and themes like the built-in glyphs; its initial stands in when
-// the server publishes none.
-function AppIcon({ app }: { app: MCPApp }) {
-  if (!app.icon) return <span className="text-[13px] font-semibold leading-none">{app.name.slice(0, 1).toUpperCase()}</span>
-  return (
-    <span
-      aria-hidden
-      className="size-[18px] shrink-0 bg-current"
-      style={{ maskImage: `url("${app.icon}")`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center' }}
-    />
-  )
 }
 
 const TAB_CLASS =

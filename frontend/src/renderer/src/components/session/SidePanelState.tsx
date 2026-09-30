@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { clientRuntime } from '@/lib/clientRuntime'
@@ -6,10 +7,12 @@ import { modalDialogOpen } from '@/lib/dom/modal'
 import { isMobileViewport } from '@/lib/hooks/useIsMobile'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
 import { isHTMLPath, parseFileReference, type FileReference } from '@shared/fileReader'
+import { entrypointKey, fileEntrypoint, mcpEntrypointsQuery } from '@/lib/api/mcp'
 import { previewDisplayUrl } from '@/lib/api/preview'
+import { openedFile } from '@/lib/mcpAppFiles'
 import { useBrowserSessions, useSessionPreview } from '@/lib/browserSessions'
 import { SidebarVisibility } from '@/lib/sidebar'
-import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type SidePanelMode, type SidePanelTab, type SidePanelTabs } from '@/lib/sidePanelTabs'
+import { OVERVIEW_PANEL_WIDTH, sidePanelTabs, type NewSidePanelTab, type SidePanelMode, type SidePanelTab, type SidePanelTabs } from '@/lib/sidePanelTabs'
 
 const PANEL_OPEN_KEY = 'jaz.sessionPanel'
 const PANEL_MAX_WIDTH = 1180
@@ -32,6 +35,7 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   const saved = panels.get(sessionId)
   const setSidebarOpen = useContext(SidebarVisibility)
   const browsers = useBrowserSessions()
+  const entrypoints = useQuery(mcpEntrypointsQuery).data
   const [state, dispatch] = useReducer(sidePanelTabs, undefined, () => {
     if (saved) {
       return saved.state
@@ -117,10 +121,11 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   }, [openTab, sessionId])
   useSessionPreview(sessionId, showPreview)
 
-  const addTab = useCallback((kind: SidePanelTab['kind'], after?: string) => {
-    openTab(kind === 'preview' ? { id: browsers.openTab(sessionId), kind }
-      : kind === 'file' ? { id: 'file', kind, file: null }
-        : { id: kind, kind }, after)
+  const addTab = useCallback((tab: NewSidePanelTab, after?: string) => {
+    openTab(typeof tab === 'object' ? { id: `app:${entrypointKey(tab)}`, kind: 'app', app: tab }
+      : tab === 'preview' ? { id: browsers.openTab(sessionId), kind: tab }
+        : tab === 'file' ? { id: 'file', kind: tab, file: null }
+          : { id: tab, kind: tab }, after)
   }, [browsers, openTab, sessionId])
   const duplicateTab = useCallback((id: string) => {
     openTab({ id: browsers.duplicate(sessionId, id), kind: 'preview' }, id)
@@ -134,13 +139,17 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
     if (!ref) {
       return false
     }
-    if (isHTMLPath(ref.path)) {
+    // A connected server's file viewer opens its files in place of the default one.
+    const viewer = fileEntrypoint(entrypoints ?? [], ref.path)
+    if (viewer) {
+      openTab({ id: `app:${entrypointKey(viewer)}:${ref.path}`, kind: 'app', app: viewer, file: openedFile(sessionId, ref.path) })
+    } else if (isHTMLPath(ref.path)) {
       openTab({ id: browsers.openTab(sessionId, ref.path), kind: 'preview' })
     } else {
       openTab({ id: `file:${ref.path}`, kind: 'file', file: ref })
     }
     return true
-  }, [browsers, openTab, sessionId])
+  }, [browsers, entrypoints, openTab, sessionId])
   const openPreview = useCallback((url: string) => {
     const display = previewDisplayUrl(url) ?? url
     if (openFile(display)) {

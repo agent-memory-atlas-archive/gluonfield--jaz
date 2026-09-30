@@ -175,3 +175,56 @@ func TestSessionFileRead(t *testing.T) {
 	get("/v1/sessions/"+session.ID+"/file?path="+url.QueryEscape(missing), http.StatusNotFound)
 	get("/v1/sessions/"+noCwd.ID+"/file?path=src/previewWebview.ts", http.StatusBadRequest)
 }
+
+func TestSessionFileWrite(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "part.stl")
+	if err := os.WriteFile(file, []byte("solid a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := store.CreateSession(storage.CreateSession{Slug: "write", RuntimeRef: &storage.RuntimeRef{Type: storage.RuntimeACP, Cwd: dir}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := (&Server{Store: store}).Handler()
+	save := func(body string) sessionFileWriteResult {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPut, "/v1/sessions/"+session.ID+"/file", strings.NewReader(body))
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("PUT %s = %d; body = %s", body, res.Code, res.Body.String())
+		}
+		var out sessionFileWriteResult
+		if err := json.Unmarshal(res.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+
+	first := save(`{"path":"part.stl","text":"solid b\n","if_match":"` + fileETag([]byte("solid a\n")) + `"}`)
+	if first.Outcome != "saved" || first.ETag != fileETag([]byte("solid b\n")) {
+		t.Fatalf("save = %#v", first)
+	}
+	if data, _ := os.ReadFile(file); string(data) != "solid b\n" {
+		t.Fatalf("file = %q", data)
+	}
+	if stale := save(`{"path":"part.stl","text":"solid c\n","if_match":"` + fileETag([]byte("solid a\n")) + `"}`); stale.Outcome != "conflict" || stale.ETag != first.ETag {
+		t.Fatalf("a save against an old version = %#v", stale)
+	}
+	if data, _ := os.ReadFile(file); string(data) != "solid b\n" {
+		t.Fatalf("a conflict overwrote the file: %q", data)
+	}
+	if blob := save(`{"path":"` + file + `","blob":"c29saWQgZA=="}`); blob.Outcome != "saved" {
+		t.Fatalf("blob save = %#v", blob)
+	}
+	sessionFileWriteLimit = 4
+	t.Cleanup(func() { sessionFileWriteLimit = 10 * 1024 * 1024 })
+	if big := save(`{"path":"part.stl","text":"too long"}`); big.Outcome != "too-large" || big.MaxBytes != 4 {
+		t.Fatalf("an oversized save = %#v", big)
+	}
+}

@@ -1,13 +1,16 @@
 import { Copy, FileSpreadsheet, FileText, FolderGit2, Globe, MessageCirclePlus, Plus, RotateCw, Terminal, X, type LucideIcon } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { motion, Reorder } from 'motion/react'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { AppIcon } from '@/components/apps/AppIcon'
 import { IconButton } from '@/components/ui/IconButton'
 import { ContextMenu, MenuRow, Popover } from '@/components/ui/Popover'
 import { Favicon } from '@/components/ui/Favicon'
 import { isSpreadsheetPath } from '@shared/fileReader'
+import { entrypointKey, mcpEntrypointsQuery } from '@/lib/api/mcp'
 import { useBrowserSessions } from '@/lib/browserSessions'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
-import type { SidePanelTab } from '@/lib/sidePanelTabs'
+import type { NewSidePanelTab, SidePanelTab } from '@/lib/sidePanelTabs'
 
 const TAB_TYPES = {
   file: { label: 'Files', icon: FileText },
@@ -17,25 +20,32 @@ const TAB_TYPES = {
   diff: { label: 'Code diff', icon: FolderGit2 },
 }
 
+// The new-tab menu lists the built-in tabs, then the thread apps of connected
+// MCP servers.
 export function SidePanelTabMenu({ sideChatAvailable, onAdd, empty = false }: {
   sideChatAvailable: boolean
-  onAdd: (kind: SidePanelTab['kind']) => void
+  onAdd: (tab: NewSidePanelTab) => void
   empty?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const options = (Object.keys(TAB_TYPES) as SidePanelTab['kind'][]).filter((kind) => kind !== 'side-chat' || sideChatAvailable)
-  const rows = options.map((kind) => {
-    const { label, icon: Icon } = TAB_TYPES[kind]
-    return (
-      <button type="button" className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] text-ink-2 hover:bg-surface-2 hover:text-ink pointer-coarse:h-10" key={kind} onClick={() => {
-        onAdd(kind)
-        setOpen(false)
-      }}>
-        <Icon size={14} className="shrink-0 text-ink-3" />
-        {label}
-      </button>
-    )
-  })
+  const apps = (useQuery(mcpEntrypointsQuery).data ?? []).filter((entry) => entry.type === 'thread')
+  const options = (Object.keys(TAB_TYPES) as (keyof typeof TAB_TYPES)[]).filter((kind) => kind !== 'side-chat' || sideChatAvailable)
+  const row = (key: string, tab: NewSidePanelTab, icon: ReactNode, label: string) => (
+    <button type="button" className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-[13px] text-ink-2 hover:bg-surface-2 hover:text-ink pointer-coarse:h-10" key={key} onClick={() => {
+      onAdd(tab)
+      setOpen(false)
+    }}>
+      <span className="grid size-3.5 shrink-0 place-items-center text-ink-3">{icon}</span>
+      {label}
+    </button>
+  )
+  const rows = [
+    ...options.map((kind) => {
+      const { label, icon: Icon } = TAB_TYPES[kind]
+      return row(kind, kind, <Icon size={14} />, label)
+    }),
+    ...apps.map((app) => row(entrypointKey(app), app, <AppIcon app={app} size={14} />, app.title)),
+  ]
   if (empty) {
     return <div className="m-auto w-52 p-2">{rows}</div>
   }
@@ -57,7 +67,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
   onSelect: (id: string) => void
   onReorder: (ids: string[]) => void
   onClose: (id: string) => void
-  onAdd: (kind: SidePanelTab['kind'], after?: string) => void
+  onAdd: (tab: NewSidePanelTab, after?: string) => void
   onDuplicate: (id: string) => void
 }) {
   const sessions = useBrowserSessions()
@@ -96,7 +106,7 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
     <div className="flex h-9 min-w-0 flex-1 items-center gap-1 px-1 pointer-coarse:h-11">
       <Reorder.Group as="div" axis="x" values={tabs.map((tab) => tab.id)} onReorder={onReorder} layoutScroll ref={list} role="tablist" aria-label="Side panel tabs" className="flex min-w-0 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-webkit-app-region:no-drag]">
         {tabs.map((tab, index) => {
-          const { label, icon: Icon } = TAB_TYPES[tab.kind]
+          const { label, icon: Icon } = tab.kind === 'app' ? { label: tab.file?.name ?? tab.app.title, icon: null } : TAB_TYPES[tab.kind]
           const target = browsers.find((browser) => browser.id === tab.id)?.target
           const title = tab.kind === 'file' ? tab.file?.path.split('/').pop() || label : target?.title || target?.displayUrl || label
           const active = activeId === tab.id
@@ -141,8 +151,9 @@ export function SidePanelTabs({ tabs, activeId, sideChatAvailable, onSelect, onR
                 className="flex h-7 min-w-0 max-w-44 touch-none cursor-grab items-center gap-1.5 rounded-lg pl-2 pr-1 text-xs active:cursor-grabbing pointer-coarse:h-10"
               >
                 {tab.kind === 'preview' ? <Favicon url={target?.displayUrl || ''} iconUrl={target?.favicon} />
-                  : tab.kind === 'file' && tab.file && isSpreadsheetPath(tab.file.path) ? <FileSpreadsheet size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                    : <Icon size={14} className="shrink-0 text-ink-3" aria-hidden />}
+                  : tab.kind === 'app' ? <span className="text-ink-3"><AppIcon app={tab.app} size={14} /></span>
+                    : tab.kind === 'file' && tab.file && isSpreadsheetPath(tab.file.path) ? <FileSpreadsheet size={14} className="shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                      : Icon ? <Icon size={14} className="shrink-0 text-ink-3" aria-hidden /> : null}
                 <span className="truncate">{title}</span>
               </motion.button>
               <button type="button" aria-label={`Close ${title}`} title={`Close ${title}`} onPointerDownCapture={(event) => event.stopPropagation()} onClick={() => closeTabs([tab])} className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-lg pointer-coarse:size-10 text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink">

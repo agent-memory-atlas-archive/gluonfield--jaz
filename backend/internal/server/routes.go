@@ -15,6 +15,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/sessions/", s.handleGetSession)
 	mux.HandleFunc("POST /v1/sessions", s.handleCreateSession)
 	mux.HandleFunc("POST /v1/sessions/{session}/side-chat", s.handleSessionSideChat)
+	mux.HandleFunc("PUT /v1/sessions/{session}/file", s.handleWriteSessionFile)
 	mux.HandleFunc("POST /v1/sessions/", s.handleSessionAction)
 	for _, route := range s.Routes {
 		mux.Handle(route.Pattern, route.Handler)
