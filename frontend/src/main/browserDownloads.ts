@@ -16,7 +16,7 @@ export function installBrowserDownloads(): void {
     if (!Array.isArray(saved) || !saved.every(isDownload)) {
       throw new Error('Invalid download history')
     }
-    downloads = saved.slice(0, 50).map((record) => ({ ...record, state: record.state === 'progressing' ? 'interrupted' : record.state }))
+    downloads = saved.slice(0, 50).map((record) => ({ ...record, state: record.state === 'progressing' || record.state === 'interrupted' ? 'failed' : record.state }))
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') {
       error = 'Download history could not be loaded.'
@@ -67,7 +67,7 @@ export function installBrowserDownloads(): void {
     item.on('updated', (_event, next) => update(next))
     item.once('done', (_event, next) => {
       active.delete(record.id)
-      update(next)
+      update(next === 'interrupted' ? 'failed' : next)
     })
   })
 
@@ -117,5 +117,5 @@ function isDownload(value: unknown): value is BrowserDownload {
   return typeof record.id === 'string' && typeof record.name === 'string' && typeof record.path === 'string' &&
     Number.isFinite(record.startedAt) && record.startedAt >= 0 &&
     Number.isFinite(record.receivedBytes) && record.receivedBytes >= 0 && Number.isFinite(record.totalBytes) && record.totalBytes >= 0 &&
-    ['progressing', 'completed', 'cancelled', 'interrupted'].includes(record.state)
+    ['progressing', 'interrupted', 'completed', 'cancelled', 'failed'].includes(record.state)
 }

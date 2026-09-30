@@ -71,7 +71,7 @@ export function BrowserDownloads({ api, onBack }: { api: BrowserDownloadAPI; onB
                 {download.state === 'completed' ? <>
                   <Button size="sm" variant="ghost" className="min-h-10" disabled={busy} aria-label={`Open ${download.name}`} onClick={() => void act({ kind: 'open', id: download.id })}>Open</Button>
                   <Button size="sm" variant="ghost" className="min-h-10" disabled={busy} aria-label={`Show ${download.name} in folder`} onClick={() => void act({ kind: 'reveal', id: download.id })}>Show in folder</Button>
-                </> : download.state === 'progressing' ? <Button size="sm" variant="ghost" className="min-h-10" disabled={busy} aria-label={`Cancel download of ${download.name}`} onClick={() => void act({ kind: 'cancel', id: download.id })}>Cancel</Button> : null}
+                </> : download.state === 'progressing' || download.state === 'interrupted' ? <Button size="sm" variant="ghost" className="min-h-10" disabled={busy} aria-label={`Cancel download of ${download.name}`} onClick={() => void act({ kind: 'cancel', id: download.id })}>Cancel</Button> : null}
               </div>
             </div>
           </div>

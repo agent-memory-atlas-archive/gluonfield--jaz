@@ -8,6 +8,7 @@ import { installBrowserControl } from '@main/browserControl'
 import { attachWindowOpenHandler } from '@main/browserPopups'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
 import { installBrowserPasswords } from '@main/browserPasswords'
+import { installBrowserDownloads } from '@main/browserDownloads'
 import { BrowserPasswordStore } from '@main/browserPasswordStore'
 import { PREVIEW_PARTITION } from '@shared/preview'
 import { assertUntrustedProfileCaller, prepareProfileFixture } from './profiles'
@@ -149,6 +150,7 @@ server.listen(0, '127.0.0.1', async () => {
   }
   await app.whenReady()
   configurePreviewSession()
+  installBrowserDownloads()
   process.env.ELECTRON_RENDERER_URL = `http://127.0.0.1:${address.port}`
   const cert = await readFile(join(process.env.JAZ_BROWSER_SMOKE_DIR!, 'cert.pem'))
   const fingerprint = new X509Certificate(cert).fingerprint256

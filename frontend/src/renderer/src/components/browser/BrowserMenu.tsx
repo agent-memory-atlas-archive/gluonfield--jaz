@@ -44,7 +44,7 @@ export function BrowserMenu({ webContentsId, visible }: { webContentsId: number 
   }, [api, webContentsId])
 
   useEffect(() => {
-    setView(state.pending?.id || (state.origin && state.error) ? 'passwords' : null)
+    setView((current) => state.pending?.id || (state.origin && state.error) ? 'passwords' : current === 'passwords' ? null : current)
   }, [state.pending?.id, state.origin, state.error])
 
   if (!api) {

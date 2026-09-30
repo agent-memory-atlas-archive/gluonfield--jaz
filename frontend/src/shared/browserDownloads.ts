@@ -6,7 +6,7 @@ export type BrowserDownload = {
   name: string
   path: string
   startedAt: number
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted'
+  state: 'progressing' | 'interrupted' | 'completed' | 'cancelled' | 'failed'
   receivedBytes: number
   totalBytes: number
 }

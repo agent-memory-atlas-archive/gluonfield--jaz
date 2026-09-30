@@ -106,7 +106,21 @@ if (process.env.JAZ_DOWNLOAD_TEST_CHILD === '1') {
     expect((await invoke()).downloads[0].state).toBe('cancelled')
     download('unfinished.pdf')
     reload()
-    expect((await invoke()).downloads.map((record) => record.state)).toEqual(['interrupted', 'cancelled'])
+    expect((await invoke()).downloads.map((record) => record.state)).toEqual(['failed', 'cancelled'])
+  })
+
+  test('an interrupted transfer stays cancellable until its terminal event', async () => {
+    const item = download()
+    const id = (await invoke()).downloads[0].id
+    item.emit('updated', {}, 'interrupted')
+    expect((await invoke()).downloads[0].state).toBe('interrupted')
+    await invoke({ kind: 'cancel', id })
+    expect((await invoke()).downloads[0].state).toBe('cancelled')
+    const failed = download('failed.pdf')
+    failed.emit('done', {}, 'interrupted')
+    expect((await invoke()).downloads[0].state).toBe('failed')
+    reload()
+    expect((await invoke()).downloads[0].state).toBe('failed')
   })
 
   test('retains older active transfers while bounding finished history', async () => {
