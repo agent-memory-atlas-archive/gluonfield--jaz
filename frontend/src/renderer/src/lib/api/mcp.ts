@@ -98,6 +98,15 @@ export function callMCPAppTool(
   return post<CallToolResult>(`/v1/mcp/apps/${serverId}/tools/call`, params)
 }
 
+// deepLinkTarget reads OpenAI's MCP extensions deep link to a global
+// entrypoint: {scheme}://plugins/{pluginId}/app/{toolName}?path=….
+export function deepLinkTarget(url: string): { tool: string; path: string } | undefined {
+  const match = /^(?:codex|chatgpt):\/\/plugins\/[^/?#]+\/app\/([^/?#]+)(?:\?([^#]*))?$/.exec(url)
+  if (!match) return undefined
+  const path = new URLSearchParams(match[2] ?? '').get('path') ?? '/'
+  return path.startsWith('/') ? { tool: decodeURIComponent(match[1]), path } : undefined
+}
+
 // entrypointKey names an entrypoint in routes and panel tab ids.
 export function entrypointKey(entry: Pick<MCPEntrypoint, 'server_id' | 'tool'>): string {
   return `${entry.server_id}/${encodeURIComponent(entry.tool)}`

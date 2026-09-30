@@ -81,7 +81,7 @@ function itemKey(item: TimelineItem): string {
 // Result cards read as a turn's outcome, so they anchor to the end of the turn
 // rather than folding into its work.
 function isResultCard(item: TimelineItem): boolean {
-  return item.kind === 'event' && item.event.type === 'loop_created'
+  return item.kind === 'event' && (item.event.type === 'loop_created' || item.event.type === 'mcp_app')
 }
 
 function trailingErrorEventIndex(chronological: TimelineItem[], anchored: TimelineItem[]): number | undefined {

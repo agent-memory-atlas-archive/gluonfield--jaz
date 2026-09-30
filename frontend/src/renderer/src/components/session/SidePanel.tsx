@@ -78,7 +78,7 @@ export function SidePanel({
               ) : tab.kind === 'diff' ? (
                 <CodeDiffPanel sessionId={session.id} visible={visible} />
               ) : tab.kind === 'app' ? (
-                <MCPAppFrame entry={tab.app} file={tab.file} active={visible} />
+                <MCPAppFrame app={tab.app} file={tab.file} active={visible} />
               ) : (
                 <SideChatPanel
                   sessionId={session.id}

@@ -402,6 +402,7 @@ export function buildTimeline(
       const taskSurface = taskSurfaceFromEvent(event)
       if (event.type === 'artifact') return Boolean(event.artifact)
       if (event.type === 'loop_created') return Boolean(event.loop_created)
+      if (event.type === 'mcp_app') return Boolean(event.mcp_app)
       if (!acp) {
         if (taskSurface) return true
         return Boolean(event.content || event.permission || event.voice)

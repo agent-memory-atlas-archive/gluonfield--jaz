@@ -158,6 +158,7 @@ func (c *serverConnection) loadCatalog(ctx context.Context, server mcpconfig.Ser
 			continue
 		}
 		items = append(items, remoteTool{
+			serverID:    server.ID,
 			serverName:  server.Name,
 			remoteName:  tool.Name,
 			connection:  c,

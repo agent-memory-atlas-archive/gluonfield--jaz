@@ -2,7 +2,9 @@ package sqlite
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -184,6 +186,34 @@ func TestLoopCreatedEventRoundTripsThroughContentColumn(t *testing.T) {
 	}
 	if loaded[0].Content != "" {
 		t.Fatalf("content should be collapsed into the typed payload, got %q", loaded[0].Content)
+	}
+}
+
+func TestMCPAppEventRoundTripsThroughContentColumn(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	session, err := store.CreateSession(storage.CreateSession{Slug: "app-card"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := sessionevents.MCPAppEvent{
+		ServerID:  "srv1",
+		Tool:      "create_issue",
+		Arguments: json.RawMessage(`{"title":"Ship"}`),
+		Result:    json.RawMessage(`{"content":[],"structuredContent":{"identifier":"AUG-12"},"_meta":{"jaz-tasks/stateColor":"#f2c94c"}}`),
+	}
+	if err := store.AppendSessionEvents(session.ID, sessionevents.Event{Type: sessionevents.TypeMCPApp, MCPApp: &app}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.LoadSessionEvents(session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded) != 1 || loaded[0].MCPApp == nil || loaded[0].Content != "" || !reflect.DeepEqual(*loaded[0].MCPApp, app) {
+		t.Fatalf("loaded = %#v", loaded)
 	}
 }
 

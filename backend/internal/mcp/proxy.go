@@ -82,7 +82,7 @@ func (m *Manager) updateProxyLocked() {
 				continue
 			}
 			changed = true
-			m.proxy.AddTool(&mcpsdk.Tool{Name: name, Description: tool.description, InputSchema: tool.inputSchema}, tool.callRaw)
+			m.proxy.AddTool(&mcpsdk.Tool{Name: name, Description: tool.description, InputSchema: tool.inputSchema}, m.proxyCall(tool))
 		}
 	}
 	for name := range m.proxyCatalog {

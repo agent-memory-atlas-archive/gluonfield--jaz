@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/wins/jaz/backend/internal/mcpsession"
+	"github.com/wins/jaz/backend/internal/sessionevents"
 )
 
 // AppMIMEType marks an MCP Apps UI resource (the io.modelcontextprotocol/ui
@@ -182,6 +185,57 @@ func (m *Manager) CallAppTool(ctx context.Context, serverID, name string, argume
 		return nil, fmt.Errorf("%w: %s", ErrAppToolDenied, name)
 	}
 	return session.callTool(ctx, &mcpsdk.CallToolParams{Name: name, Arguments: arguments, Meta: meta})
+}
+
+type sessionEventAppender interface {
+	AppendSessionEvents(id string, events ...sessionevents.Event) error
+}
+
+type sessionEventPublisher interface {
+	Publish(event sessionevents.Event)
+}
+
+// WithSessionEvents shows the MCP App a tool links to in the thread of the
+// agent that called it.
+func WithSessionEvents(store sessionEventAppender, bus sessionEventPublisher) Option {
+	return func(m *Manager) {
+		m.eventStore = store
+		m.eventBus = bus
+	}
+}
+
+// proxyCall runs an agent's call to a remote tool, then shows the tool's MCP
+// App, if it links one, in the agent's thread with the call's arguments and
+// result. A failed call shows only in the transcript.
+func (m *Manager) proxyCall(tool remoteTool) mcpsdk.ToolHandler {
+	return func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+		result, err := tool.callRaw(ctx, req)
+		if err == nil && !result.IsError {
+			m.showApp(mcpsession.SessionID(req), tool, req.Params.Arguments, result)
+		}
+		return result, err
+	}
+}
+
+func (m *Manager) showApp(sessionID string, tool remoteTool, arguments json.RawMessage, result *mcpsdk.CallToolResult) {
+	session := m.session(tool.serverID)
+	if m.eventStore == nil || sessionID == "" || session == nil || session.apps.uris[tool.remoteName] == "" {
+		return
+	}
+	data, err := json.Marshal(result)
+	if err != nil {
+		return
+	}
+	events := []sessionevents.Event{{
+		SessionID: sessionID,
+		Type:      sessionevents.TypeMCPApp,
+		MCPApp:    &sessionevents.MCPAppEvent{ServerID: tool.serverID, Tool: tool.remoteName, Arguments: arguments, Result: data},
+		At:        time.Now().UTC(),
+	}}
+	// AppendSessionEvents assigns Seq in place; publish the stored event.
+	if m.eventStore.AppendSessionEvents(sessionID, events...) == nil {
+		m.eventBus.Publish(events[0])
+	}
 }
 
 func (m *Manager) appSession(serverID, tool string) (*serverSession, string, error) {

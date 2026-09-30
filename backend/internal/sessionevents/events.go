@@ -17,6 +17,7 @@ const (
 	TypeArtifact         = "artifact"
 	TypeSession          = "session"
 	TypeLoopCreated      = "loop_created"
+	TypeMCPApp           = "mcp_app"
 	TypeSideChatMessage  = "side_chat_message"
 	TypeProviderSubagent = "provider_subagent"
 	TypeGoalUpdate       = "goal_update"
@@ -45,6 +46,7 @@ type Event struct {
 	Permission       *ACPPermission         `json:"permission,omitempty"`
 	Artifact         *ArtifactEvent         `json:"artifact,omitempty"`
 	LoopCreated      *LoopCreatedEvent      `json:"loop_created,omitempty"`
+	MCPApp           *MCPAppEvent           `json:"mcp_app,omitempty"`
 	SideChat         *SideChatEvent         `json:"side_chat,omitempty"`
 	AgentSession     *AgentSession          `json:"agent_session,omitempty"`
 	AgentTask        *AgentTask             `json:"agent_task,omitempty"`
@@ -88,6 +90,16 @@ type ArtifactEvent struct {
 	WidgetCode      string   `json:"widget_code"`
 	LoadingMessages []string `json:"loading_messages,omitempty"`
 	ArtifactType    string   `json:"artifact_type,omitempty"`
+}
+
+// MCPAppEvent shows an MCP App in the thread: an agent called a tool its
+// server links to a UI, which renders with the call's arguments and result.
+// Like ArtifactEvent it round-trips through the content column.
+type MCPAppEvent struct {
+	ServerID  string          `json:"server_id"`
+	Tool      string          `json:"tool"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+	Result    json.RawMessage `json:"result"`
 }
 
 // LoopCreatedEvent renders a card in the thread when a loop is created, linking
@@ -170,6 +182,16 @@ func (e *Event) NormalizePayload() {
 			e.LoopCreated = &loop
 			e.Content = ""
 		}
+	case TypeMCPApp:
+		if e.MCPApp != nil {
+			e.Content = ""
+			return
+		}
+		var app MCPAppEvent
+		if err := json.Unmarshal([]byte(e.Content), &app); err == nil && app.ServerID != "" && app.Tool != "" {
+			e.MCPApp = &app
+			e.Content = ""
+		}
 	case TypeProviderSubagent:
 		if e.ProviderSubagent != nil {
 			e.Content = ""
@@ -247,6 +269,13 @@ func (e Event) StorageContent() string {
 			return e.Content
 		}
 		if data, err := json.Marshal(e.LoopCreated); err == nil {
+			return string(data)
+		}
+	case TypeMCPApp:
+		if e.MCPApp == nil {
+			return e.Content
+		}
+		if data, err := json.Marshal(e.MCPApp); err == nil {
 			return string(data)
 		}
 	case TypeProviderSubagent:

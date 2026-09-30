@@ -4,17 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/log"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	mcpconfig "github.com/wins/jaz/backend/internal/mcpconfig"
+	"github.com/wins/jaz/backend/internal/mcpsession"
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/tools"
 )
 
@@ -112,5 +116,83 @@ func TestManagerServesMCPAppEntrypoints(t *testing.T) {
 
 	if _, err := manager.ReadApp(context.Background(), "missing", "library"); err != ErrAppNotFound {
 		t.Fatalf("ReadApp(missing) err = %v", err)
+	}
+}
+
+type recordedEvents struct {
+	mu                  sync.Mutex
+	appended, published []sessionevents.Event
+}
+
+func (r *recordedEvents) AppendSessionEvents(_ string, events ...sessionevents.Event) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.appended = append(r.appended, events...)
+	return nil
+}
+
+func (r *recordedEvents) Publish(event sessionevents.Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.published = append(r.published, event)
+}
+
+func TestProxyShowsMCPAppInCallersThread(t *testing.T) {
+	remote := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "tasks", Version: "1.0.0"}, nil)
+	card := mcpsdk.Meta{"ui": map[string]any{"resourceUri": "ui://tasks/issue"}}
+	create := func(_ context.Context, req *mcpsdk.CallToolRequest, input appQueryInput) (*mcpsdk.CallToolResult, map[string]string, error) {
+		return &mcpsdk.CallToolResult{Meta: mcpsdk.Meta{"color": "#f2c94c"}, IsError: input.Query == "fail"}, map[string]string{"identifier": "AUG-" + input.Query}, nil
+	}
+	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "create_issue", Meta: card}, create)
+	mcpsdk.AddTool(remote, &mcpsdk.Tool{Name: "list_issues"}, create)
+	httpServer := httptest.NewServer(mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
+		return remote
+	}, &mcpsdk.StreamableHTTPOptions{JSONResponse: true}))
+	defer httpServer.Close()
+	events := &recordedEvents{}
+	manager := NewManager(&testStore{servers: []mcpconfig.Server{{
+		ID: "srv1", Name: "Tasks", Transport: mcpconfig.TransportStreamableHTTP, URL: httpServer.URL, Enabled: true,
+	}}}, nil, tools.NewRegistry(), log.New(io.Discard), WithSessionEvents(events, events))
+	defer manager.Close()
+	manager.Refresh(context.Background())
+	proxy := httptest.NewServer(manager.Handler())
+	defer proxy.Close()
+
+	connect := func(headers ...mcpconfig.Header) *mcpsdk.ClientSession {
+		t.Helper()
+		session, err := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "agent", Version: "1.0.0"}, nil).Connect(context.Background(), &mcpsdk.StreamableClientTransport{
+			Endpoint: proxy.URL, HTTPClient: &http.Client{Transport: headerTransport{headers: headers}}, MaxRetries: -1, DisableStandaloneSSE: true,
+		}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = session.Close() })
+		return session
+	}
+	call := func(session *mcpsdk.ClientSession, tool, query string) {
+		t.Helper()
+		if _, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: "mcp_Tasks_" + tool, Arguments: map[string]any{"query": query}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	agent := connect(mcpconfig.Header{Name: mcpsession.HeaderName, Value: "thread-1"})
+	call(agent, "create_issue", "12")
+	call(agent, "list_issues", "13")
+	call(agent, "create_issue", "fail")
+	call(connect(), "create_issue", "14")
+
+	events.mu.Lock()
+	defer events.mu.Unlock()
+	if len(events.appended) != 1 || len(events.published) != 1 {
+		t.Fatalf("only the thread's successful create_issue shows its app: appended %d, published %d", len(events.appended), len(events.published))
+	}
+	event := events.appended[0]
+	var result mcpsdk.CallToolResult
+	if err := json.Unmarshal(event.MCPApp.Result, &result); err != nil {
+		t.Fatal(err)
+	}
+	if event.SessionID != "thread-1" || event.Type != sessionevents.TypeMCPApp || event.MCPApp.ServerID != "srv1" || event.MCPApp.Tool != "create_issue" ||
+		string(event.MCPApp.Arguments) != `{"query":"12"}` || result.Meta["color"] != "#f2c94c" || fmt.Sprint(result.StructuredContent) != "map[identifier:AUG-12]" {
+		t.Fatalf("event = %+v, result = %+v", event, result)
 	}
 }

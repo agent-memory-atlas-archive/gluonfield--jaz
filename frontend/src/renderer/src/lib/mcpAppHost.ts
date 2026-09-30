@@ -21,7 +21,7 @@ const STYLE_TOKENS: [McpUiStyleVariableKey, string][] = [
   ['--shadow-lg', '--shadow-raised'],
 ]
 
-export function mcpAppHostContext(): McpUiHostContext {
+export function mcpAppHostContext(displayMode: 'inline' | 'fullscreen'): McpUiHostContext {
   const root = document.documentElement
   const style = getComputedStyle(root)
   // McpUiStyles names every key; hosts send the subset they have.
@@ -31,8 +31,8 @@ export function mcpAppHostContext(): McpUiHostContext {
   return {
     theme: root.classList.contains('dark') ? 'dark' : 'light',
     styles: { variables },
-    displayMode: 'fullscreen',
-    availableDisplayModes: ['fullscreen'],
+    displayMode,
+    availableDisplayModes: [displayMode],
     platform: 'desktop',
     locale: navigator.language,
   }

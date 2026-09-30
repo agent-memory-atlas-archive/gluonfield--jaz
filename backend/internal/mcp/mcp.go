@@ -71,6 +71,11 @@ type Manager struct {
 
 	authMu     sync.Mutex
 	authStates map[string]*authorizationPending
+
+	// Optional: agents' calls to tools linked to an MCP App show it in their
+	// thread (WithSessionEvents).
+	eventStore sessionEventAppender
+	eventBus   sessionEventPublisher
 }
 
 type tokenStore interface {
@@ -120,6 +125,7 @@ type serverSession struct {
 }
 
 type remoteTool struct {
+	serverID    string
 	serverName  string
 	remoteName  string
 	description string

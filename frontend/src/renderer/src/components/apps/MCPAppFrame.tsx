@@ -1,43 +1,101 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { CallToolResult } from '@modelcontextprotocol/client'
-import { useEffect, useRef, useState } from 'react'
+import type { AppBridge } from '@modelcontextprotocol/ext-apps/app-bridge'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { callMCPAppTool, entrypointKey, mcpAppQuery, mcpEntrypointsQuery } from '@/lib/api/mcp'
-import type { MCPEntrypoint } from '@/lib/api/types'
+import { callMCPAppTool, deepLinkTarget, entrypointKey, mcpAppQuery, mcpEntrypointsQuery } from '@/lib/api/mcp'
+import type { MCPAppEvent, MCPEntrypoint } from '@/lib/api/types'
 import { serveFile, type OpenedFile } from '@/lib/mcpAppFiles'
 import { mcpAppHostContext } from '@/lib/mcpAppHost'
 
 // Every sidebar app stays mounted over the content card, so opening its
 // section is instant and finds the app as the user left it; only the active
-// one is visible.
+// one is visible, and a deep link's path reaches it.
 export function MCPApps({ activeKey }: { activeKey?: string }) {
   const entrypoints = useQuery(mcpEntrypointsQuery).data ?? []
+  const { path } = useSearch({ strict: false })
+  const navigate = useNavigate()
   return entrypoints
     .filter((entry) => entry.type === 'global')
     .map((entry) => {
       const key = entrypointKey(entry)
+      const active = key === activeKey
       return (
-        <div key={key} className={`absolute inset-0 bg-bg ${key === activeKey ? '' : 'invisible'}`}>
-          <MCPAppFrame entry={entry} active={key === activeKey} />
+        <div key={key} className={`absolute inset-0 bg-bg ${active ? '' : 'invisible'}`}>
+          <MCPAppFrame
+            app={entry}
+            active={active}
+            deepLink={active ? path : undefined}
+            onDeepLink={() => void navigate({ to: '/apps/$serverId/$tool', params: { serverId: entry.server_id, tool: entry.tool }, replace: true })}
+          />
         </div>
       )
     })
 }
 
-// Hosts one entrypoint through the official AppBridge. Opening it calls the
-// entrypoint's tool with {} or, for a file viewer, the opened file; the app
-// gets that input and result once it initializes. Tool calls reach the app's
-// own server through Jaz, which holds the authenticated MCP session, so the
-// sandboxed page never sees a token.
-export function MCPAppFrame({ entry, active, file }: { entry: MCPEntrypoint; active: boolean; file?: OpenedFile }) {
-  const { server_id: serverId, tool } = entry
-  const app = useQuery(mcpAppQuery(serverId, tool))
+// useAppLink follows an app's links: a deep link to one of its own server's
+// sidebar apps opens that section at the linked page, and anything else opens
+// in the browser.
+function useAppLink(serverId: string) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  return (url: string) => {
+    const target = deepLinkTarget(url)
+    const entry = target && queryClient.getQueryData(mcpEntrypointsQuery.queryKey)?.find(
+      (point) => point.type === 'global' && point.server_id === serverId && point.tool === target.tool,
+    )
+    if (target && entry) {
+      void navigate({ to: '/apps/$serverId/$tool', params: { serverId, tool: entry.tool }, search: { path: target.path } })
+      return
+    }
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+}
+
+// Hosts one MCP App through the official AppBridge. An entrypoint opens by
+// calling its tool with {} or, for a file viewer, the opened file; an agent's
+// call shows inline with its own arguments and result. The app gets that
+// input and result once it initializes. Tool calls reach the app's own server
+// through Jaz, which holds the authenticated MCP session, so the sandboxed
+// page never sees a token.
+export function MCPAppFrame({ app, active, file, call, deepLink, onDeepLink }: {
+  app: Pick<MCPEntrypoint, 'server_id' | 'tool'> & { title?: string }
+  active: boolean
+  file?: OpenedFile
+  call?: Pick<MCPAppEvent, 'arguments' | 'result'>
+  deepLink?: string
+  onDeepLink?: () => void
+}) {
+  const { server_id: serverId, tool } = app
+  const title = app.title ?? tool
+  const query = useQuery(mcpAppQuery(serverId, tool))
   const frame = useRef<HTMLIFrameElement>(null)
-  const html = app.data
+  const bridge = useRef<AppBridge>(null)
+  const html = query.data
+  const displayMode = call ? 'inline' : 'fullscreen'
   // The document paints before the app has the host theme, so it stays
   // transparent until the app reports ui/notifications/initialized.
   const [readyFor, setReadyFor] = useState<string>()
-  const { refetch } = app
+  // An inline app sizes its frame to its content.
+  const [height, setHeight] = useState<number>()
+  // An app that declares it can't render in this display mode stays hidden.
+  const [unsupported, setUnsupported] = useState(false)
+  const { refetch } = query
+  const openLink = useAppLink(serverId)
+  const followLink = useEffectEvent(openLink)
+  const delivered = useEffectEvent(() => onDeepLink?.())
+
+  // The opening input and result: the agent's call, or a call to the entrypoint.
+  const open = useEffectEvent(() => {
+    const input = call?.arguments ?? (file ? { file: { name: file.name, resourceUri: file.uri } } : {})
+    const result = call
+      ? Promise.resolve(call.result)
+      : callMCPAppTool(serverId, { name: tool, arguments: input }).catch(
+          (error: Error): CallToolResult => ({ content: [{ type: 'text', text: error.message }], isError: true }),
+        )
+    return { input, result }
+  })
 
   useEffect(() => {
     if (active) void refetch()
@@ -49,61 +107,81 @@ export function MCPAppFrame({ entry, active, file }: { entry: MCPEntrypoint; act
     if (!iframe || !target || html === undefined) return
     let closed = false
     let observer: MutationObserver | undefined
-    const input = file ? { file: { name: file.name, resourceUri: file.uri } } : {}
-    const opened = callMCPAppTool(serverId, { name: tool, arguments: input }).catch(
-      (error: Error): CallToolResult => ({ content: [{ type: 'text', text: error.message }], isError: true }),
-    )
+    const { input, result } = open()
     const connected = import('@modelcontextprotocol/ext-apps/app-bridge').then(async ({ AppBridge, PostMessageTransport }) => {
       if (closed) return undefined
-      const bridge = new AppBridge(
+      const created = new AppBridge(
         null,
         { name: 'Jaz', version: '1' },
         { openLinks: {}, serverTools: {}, logging: {}, ...(file && { experimental: { 'openai/resource': {} } }) },
-        { hostContext: mcpAppHostContext() },
+        { hostContext: mcpAppHostContext(displayMode) },
       )
       // The host alone attests the opened file's path, which only the app's
       // server may see; an app's own openai/resource claim never passes.
-      bridge.oncalltool = (params) =>
+      created.oncalltool = (params) =>
         callMCPAppTool(serverId, { ...params, _meta: { ...params._meta, 'openai/resource': file && { path: file.path } } })
-      bridge.onopenlink = async ({ url }) => {
-        window.open(url, '_blank', 'noopener,noreferrer')
+      created.onopenlink = async ({ url }) => {
+        followLink(url)
         return {}
       }
-      if (file) serveFile(bridge, file)
-      bridge.oninitialized = () => {
-        void bridge.sendToolInput({ arguments: input })
-        void opened.then((result) => bridge.sendToolResult(result))
+      created.onsizechange = ({ height }) => {
+        if (displayMode === 'inline' && height !== undefined) setHeight(height)
+      }
+      if (file) serveFile(created, file)
+      created.oninitialized = () => {
+        const modes = created.getAppCapabilities()?.availableDisplayModes
+        if (modes && !modes.includes(displayMode)) {
+          setUnsupported(true)
+          return
+        }
+        void created.sendToolInput({ arguments: input })
+        void result.then((value) => created.sendToolResult(value))
         // The app themes itself as it initializes; two frames let that paint land.
         requestAnimationFrame(() => requestAnimationFrame(() => setReadyFor(html)))
       }
       // Listen before the document loads so the app's first ui/initialize lands.
-      await bridge.connect(new PostMessageTransport(target, target))
+      await created.connect(new PostMessageTransport(target, target))
       iframe.srcdoc = html
-      observer = new MutationObserver(() => bridge.setHostContext(mcpAppHostContext()))
+      observer = new MutationObserver(() => created.setHostContext(mcpAppHostContext(displayMode)))
       observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
-      return bridge
+      bridge.current = created
+      return created
     })
     return () => {
       closed = true
+      bridge.current = null
       observer?.disconnect()
-      void connected.then((bridge) => bridge?.close())
+      void connected.then((created) => created?.close())
     }
-  }, [html, serverId, tool, file])
+  }, [html, serverId, tool, file, displayMode])
 
-  if (html === undefined && app.isError) {
-    return (
-      <EmptyState title={`Couldn't open ${entry.title}`}>
-        <p>{app.error.message}</p>
+  // A deep link reaches the running app as a host-context change, then clears,
+  // so following the same link again changes the context again.
+  useEffect(() => {
+    const current = bridge.current
+    if (!deepLink || !current || readyFor !== html) return
+    current.setHostContext({ ...mcpAppHostContext(displayMode), 'openai/deepLink': { url: deepLink } })
+    current.setHostContext({ ...mcpAppHostContext(displayMode), 'openai/deepLink': undefined })
+    delivered()
+  }, [deepLink, readyFor, html, displayMode])
+
+  if (unsupported) return null
+  if (html === undefined && query.isError) {
+    return call ? null : (
+      <EmptyState title={`Couldn't open ${title}`}>
+        <p>{query.error.message}</p>
       </EmptyState>
     )
   }
+  const ready = html !== undefined && readyFor === html
   return (
     <iframe
       ref={frame}
-      title={entry.title}
+      title={title}
       sandbox="allow-scripts allow-forms allow-popups"
       allow="clipboard-write"
-      className={`block size-full border-0 transition-opacity duration-150 ${html !== undefined && readyFor === html ? '' : 'pointer-events-none opacity-0'}`}
+      style={call ? { height: height ?? 0 } : undefined}
+      className={`block border-0 transition-opacity duration-150 ${call ? 'w-full' : 'size-full'} ${ready ? '' : 'pointer-events-none opacity-0'}`}
     />
   )
 }

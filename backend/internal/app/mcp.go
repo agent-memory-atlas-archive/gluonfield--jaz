@@ -9,6 +9,7 @@ import (
 	mcpruntime "github.com/wins/jaz/backend/internal/mcp"
 	mcpconfig "github.com/wins/jaz/backend/internal/mcpconfig"
 	"github.com/wins/jaz/backend/internal/serverconfig"
+	"github.com/wins/jaz/backend/internal/sessionevents"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
 	"github.com/wins/jaz/backend/internal/tools"
 	"github.com/wins/jaz/backend/pkg/integrations"
@@ -28,9 +29,11 @@ func NewACPMCPServerReader(jaz *jaztools.Service, urls serverconfig.URLs) mcpcon
 	return acpMCPServerReader{proxyURL: urls.MCPProxy, jaztoolsURL: jaz.URL()}
 }
 
-func NewMCPManager(store *sqlitestore.Store, catalog *connections.Catalog, registry *tools.Registry, jaz *jaztools.Service, logger *log.Logger) *mcpruntime.Manager {
+func NewMCPManager(store *sqlitestore.Store, catalog *connections.Catalog, registry *tools.Registry, jaz *jaztools.Service, events *sessionevents.Bus, logger *log.Logger) *mcpruntime.Manager {
 	reader := connectionMCPServerReader{store: store, catalog: catalog}
-	return mcpruntime.NewManager(reader, store, registry, logger, mcpruntime.WithBuiltinServerProvider(jaztools.ServerConfig(jaz.URL()), jaz.Server))
+	return mcpruntime.NewManager(reader, store, registry, logger,
+		mcpruntime.WithBuiltinServerProvider(jaztools.ServerConfig(jaz.URL()), jaz.Server),
+		mcpruntime.WithSessionEvents(store, events))
 }
 
 type connectionTokenStore interface {

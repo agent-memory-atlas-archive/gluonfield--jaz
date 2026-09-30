@@ -1,5 +1,6 @@
 // Mirrors of the Go backend's JSON shapes (backend/internal/storage,
 // sessionevents, server). Field names must match exactly.
+import type { CallToolResult } from '@modelcontextprotocol/client'
 import type { MessageContextInput } from '@/lib/messageContext'
 
 export interface RuntimeRef {
@@ -678,6 +679,15 @@ export interface LoopBoardRef {
   name: string
 }
 
+// MCPAppEvent is an agent's call to a tool its MCP server links to an MCP
+// App, which the thread shows with the call's arguments and result.
+export interface MCPAppEvent {
+  server_id: string
+  tool: string
+  arguments?: Record<string, unknown>
+  result: CallToolResult
+}
+
 export interface LoopCreatedEvent {
   loop_id: string
   loop_name: string
@@ -902,6 +912,7 @@ export interface SessionEvent {
   permission?: ACPPermission
   artifact?: ArtifactEvent
   loop_created?: LoopCreatedEvent
+  mcp_app?: MCPAppEvent
   side_chat?: SideChatEvent
   agent_session?: AgentSessionState
   agent_task?: AgentTask
