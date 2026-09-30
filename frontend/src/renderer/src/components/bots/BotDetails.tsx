@@ -1,74 +1,40 @@
-import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import { NativeModelOptions } from '@/components/session/NativeModelOptions'
-import { SectionHeader } from '@/components/session/OverviewRuns'
 import { SidePanelShell } from '@/components/session/SidePanelShell'
 import type { ThreadDetailsView } from '@/components/session/ThreadView'
 import { Popover } from '@/components/ui/Popover'
-import { Select } from '@/components/ui/Select'
-import { agentLabel } from '@/lib/agentLabel'
-import { enabledACPAgents } from '@/lib/agentRuntimes'
-import { agentSettingsQuery } from '@/lib/api/settings'
+import { Segmented } from '@/components/ui/Segmented'
 import type { Bot, BotColor } from '@/lib/api/types'
 import { BOT_COLORS, BOT_SHAPES } from '@/lib/bots'
 import { OVERVIEW_PANEL_WIDTH } from '@/lib/sidePanelTabs'
+import { BotAgentSettings } from './BotAgentSettings'
 import { BotAvatar } from './BotAvatar'
 import { BotNameInput } from './BotNameInput'
 import { BotRoutines } from './BotRoutines'
 import { useUpdateBot } from './useUpdateBot'
 
-// The agent's own model and effort controls, as it advertises them.
-const AGENT_CONTROLS = ['model', 'thought_level', 'model_config']
+type Tab = 'routines' | 'agent'
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'routines', label: 'Routines' },
+  { value: 'agent', label: 'Agent' },
+]
 
 export function BotDetails({ bot, focusName, agentSession, working }: { bot: Bot; focusName: boolean } & ThreadDetailsView) {
+  const [tab, setTab] = useState<Tab>('routines')
   return (
-    <SidePanelShell width={OVERVIEW_PANEL_WIDTH} variant="hug" className="gap-6 px-4 py-5">
-      <div className="flex flex-col items-center gap-1 text-center">
+    <SidePanelShell width={OVERVIEW_PANEL_WIDTH} variant="hug" className="gap-4 px-4 py-4">
+      <div className="flex items-center gap-2.5">
         <AvatarEditor bot={bot} />
         <BotNameInput
           key={bot.id}
           bot={bot}
           autoFocus={focusName}
-          className="mt-2 w-full rounded-md px-1 text-center text-[17px] font-semibold hover:bg-list-hover focus:bg-list-hover"
+          className="min-w-0 flex-1 rounded-md px-1 text-[15px] font-semibold hover:bg-list-hover focus:bg-list-hover"
         />
-        {bot.directory ? <p className="max-w-full truncate text-[12px] text-ink-3">{bot.directory}</p> : null}
       </div>
-      <section className="-mx-2.5 flex flex-col">
-        <div className="px-2.5 pb-1">
-          <SectionHeader>Settings</SectionHeader>
-        </div>
-        <AgentSelect bot={bot} working={working} />
-        <NativeModelOptions sessionId={bot.id} options={agentSession?.config_options} disabled={working} categories={AGENT_CONTROLS} />
-      </section>
-      <BotRoutines bot={bot} />
+      <Segmented value={tab} options={TABS} onChange={setTab} layoutId={`bot-details-${bot.id}`} />
+      {tab === 'routines' ? <BotRoutines bot={bot} /> : <BotAgentSettings bot={bot} agentSession={agentSession} working={working} />}
     </SidePanelShell>
-  )
-}
-
-// Another agent keeps the bot, its chat and routines, but starts with no
-// memory of the conversation, so the move asks first.
-function AgentSelect({ bot, working }: { bot: Bot; working: boolean }) {
-  const settings = useQuery(agentSettingsQuery)
-  const update = useUpdateBot(bot.id)
-  const current = bot.agent ?? ''
-  const agents = enabledACPAgents(settings.data)
-  const choices = !current || agents.includes(current) ? agents : [current, ...agents]
-  return (
-    <div className="flex min-h-10 items-center justify-between gap-3 px-2.5 py-1">
-      <span className="text-[13px] text-ink-2">Agent</span>
-      <Select
-        aria-label="Agent"
-        value={current}
-        options={choices.map((agent) => ({ value: agent, label: agentLabel(agent) }))}
-        disabled={working || update.isPending}
-        onChange={(agent) => {
-          if (agent === current) return
-          const label = agentLabel(agent)
-          if (!window.confirm(`Move ${bot.name} to ${label}? ${label} starts with a fresh memory; the chat and routines stay.`)) return
-          update.mutate({ agent })
-        }}
-      />
-    </div>
   )
 }
 
@@ -89,9 +55,9 @@ function AvatarEditor({ bot }: { bot: Bot }) {
           aria-label="Change face"
           title="Change face"
           onClick={() => setOpen((value) => !value)}
-          className="grid size-20 place-items-center rounded-full transition-transform duration-150 hover:scale-[1.04] active:scale-[0.97]"
+          className="grid size-10 shrink-0 place-items-center rounded-full transition-transform duration-150 hover:scale-[1.04] active:scale-[0.97]"
         >
-          <BotAvatar avatar={avatar} size={72} />
+          <BotAvatar avatar={avatar} size={34} />
         </button>
       }
     >

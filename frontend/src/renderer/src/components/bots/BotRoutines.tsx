@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link2, MoreHorizontal, Play, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { compactSchedule } from '@/components/loops/schedule'
-import { SectionHeader } from '@/components/session/OverviewRuns'
 import { IconButton } from '@/components/ui/IconButton'
 import { MenuRow, Popover } from '@/components/ui/Popover'
 import { Switch } from '@/components/ui/Switch'
@@ -31,8 +30,7 @@ function routineWhen({ trigger, schedule }: Loop): string {
 export function BotRoutines({ bot }: { bot: Bot }) {
   const routines = useQuery(botRoutinesQuery(bot.id))
   return (
-    <section className="flex flex-col gap-2">
-      <SectionHeader>Routines</SectionHeader>
+    <section className="flex flex-col gap-1">
       {routines.data?.length ? (
         routines.data.map((loop) => <RoutineRow key={loop.id} loop={loop} />)
       ) : routines.isPending ? null : (
