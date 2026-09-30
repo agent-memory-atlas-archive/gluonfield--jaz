@@ -1,11 +1,13 @@
 package mcpconfig
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -73,6 +75,39 @@ type ServerStatus struct {
 	Error     string       `json:"error,omitempty"`
 	AuthURL   string       `json:"auth_url,omitempty"`
 	CheckedAt time.Time    `json:"checked_at,omitempty"`
+}
+
+// Declare applies the servers a deployment declares as a JSON array of server
+// inputs: each is enabled and keyed by name, so a new name adds a server and
+// an existing one takes the declared settings.
+func Declare(store Store, raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var declared []ServerInput
+	if err := json.Unmarshal([]byte(raw), &declared); err != nil {
+		return fmt.Errorf("declared MCP servers: %w", err)
+	}
+	servers, err := store.ListMCPServers()
+	if err != nil {
+		return err
+	}
+	for _, input := range declared {
+		input.Enabled = true
+		if input, err = ValidateInput(input); err != nil {
+			return fmt.Errorf("declared MCP server %q: %w", input.Name, err)
+		}
+		index := slices.IndexFunc(servers, func(server Server) bool { return strings.EqualFold(server.Name, input.Name) })
+		if index < 0 {
+			_, err = store.CreateMCPServer(input)
+		} else {
+			_, err = store.UpdateMCPServer(servers[index].ID, input)
+		}
+		if err != nil {
+			return fmt.Errorf("declared MCP server %q: %w", input.Name, err)
+		}
+	}
+	return nil
 }
 
 type AuthorizeOptions struct {

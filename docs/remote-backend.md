@@ -204,6 +204,13 @@ OPENAI_API_KEY=...
 MISTRAL_API_KEY=...
 ```
 
+MCP servers can be declared so a deployment starts with them connected. `JAZ_MCP_SERVERS` is a JSON array in the shape the MCP server API accepts; each start adds new names, and existing ones get their declared settings back. Keep secrets in their own variables, such as the key a Jaz Tasks deployment provisions with `OWNER_API_KEY`:
+
+```sh
+JAZ_TASKS_API_KEY=...
+JAZ_MCP_SERVERS='[{"name":"Tasks","url":"http://tasks:7400/mcp","bearer_token_env_var":"JAZ_TASKS_API_KEY"}]'
+```
+
 ## Clients
 
 The Electron desktop app can connect to a remote backend with a client URL or a pinned development backend:

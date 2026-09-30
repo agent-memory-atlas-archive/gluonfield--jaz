@@ -144,6 +144,7 @@ func serveOptions(args []string) []fx.Option {
 			app.StartGmailSync,
 			app.StartModelCatalogWarmup,
 			startServer,
+			app.DeclareMCPServers,
 			app.StartMCPManager,
 			app.StartSessionRecovery,
 		),

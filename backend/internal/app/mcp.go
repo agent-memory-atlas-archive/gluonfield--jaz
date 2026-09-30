@@ -29,6 +29,12 @@ func NewACPMCPServerReader(jaz *jaztools.Service, urls serverconfig.URLs) mcpcon
 	return acpMCPServerReader{proxyURL: urls.MCPProxy, jaztoolsURL: jaz.URL()}
 }
 
+// DeclareMCPServers applies JAZ_MCP_SERVERS before the MCP manager first
+// connects, so a deployment starts with its servers wired.
+func DeclareMCPServers(cfg Config, store *sqlitestore.Store) error {
+	return mcpconfig.Declare(store, cfg.MCPServers)
+}
+
 func NewMCPManager(store *sqlitestore.Store, catalog *connections.Catalog, registry *tools.Registry, jaz *jaztools.Service, events *sessionevents.Bus, logger *log.Logger) *mcpruntime.Manager {
 	reader := connectionMCPServerReader{store: store, catalog: catalog}
 	return mcpruntime.NewManager(reader, store, registry, logger,
