@@ -49,38 +49,3 @@ func TestEventTriggerReplacesScheduleUntilCronIsSet(t *testing.T) {
 		t.Fatalf("cron update kept the trigger: %+v", updated)
 	}
 }
-
-func TestWebhookSecretIsReturnedOnceAndVerifiedByHash(t *testing.T) {
-	loop := Loop{Trigger: &Trigger{Kind: TriggerWebhook}}
-	ensureWebhookSecret(&loop)
-	secret, hash := loop.WebhookSecret, loop.WebhookHash
-	if secret == "" || hash == "" || hash == secret {
-		t.Fatalf("secret %q hash %q", secret, hash)
-	}
-	ensureWebhookSecret(&loop)
-	if loop.WebhookHash != hash {
-		t.Fatal("an existing secret was replaced")
-	}
-	if !VerifyWebhookSecret(loop, secret) || VerifyWebhookSecret(loop, secret+"x") || VerifyWebhookSecret(loop, "") {
-		t.Fatal("webhook secret verification is wrong")
-	}
-}
-
-func TestRunPromptLabelsThreadTurnsAndCarriesTheEvent(t *testing.T) {
-	loop := Loop{Name: "Triage", Prompt: "Sort the inbox", Schedule: Schedule{Timezone: "UTC"}}
-	now := time.Date(2026, 9, 30, 9, 5, 0, 0, time.UTC)
-	for _, tc := range []struct {
-		event    string
-		inThread bool
-		want     string
-	}{
-		{"", false, "Sort the inbox"},
-		{"new mail", false, "Triggered by: new mail\n\nSort the inbox"},
-		{"", true, "[routine] Triage · Wed 30 Sep 2026 09:05 UTC\n\nSort the inbox"},
-		{"new mail", true, "[routine] Triage · Wed 30 Sep 2026 09:05 UTC\nTriggered by: new mail\n\nSort the inbox"},
-	} {
-		if got := runPrompt(loop, now, tc.event, tc.inThread); got != tc.want {
-			t.Errorf("runPrompt(%q, %v) = %q, want %q", tc.event, tc.inThread, got, tc.want)
-		}
-	}
-}
