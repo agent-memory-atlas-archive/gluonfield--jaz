@@ -127,6 +127,9 @@ func (t Token) oauth2Token() *oauth2.Token {
 // rotated one is presented again, so each refresh must start from the stored token.
 var refreshLocks sync.Map
 
+// refreshTimeout bounds how long a refresh holds its connection's lock.
+const refreshTimeout = 30 * time.Second
+
 type persistingTokenSource struct {
 	ctx          context.Context
 	config       *oauth2.Config
@@ -149,7 +152,9 @@ func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 	if !ok {
 		return nil, ErrTokenNotFound
 	}
-	tok, err := p.config.TokenSource(p.ctx, stored.oauth2Token()).Token()
+	ctx, cancel := context.WithTimeout(p.ctx, refreshTimeout)
+	defer cancel()
+	tok, err := p.config.TokenSource(ctx, stored.oauth2Token()).Token()
 	if err != nil {
 		return nil, err
 	}
