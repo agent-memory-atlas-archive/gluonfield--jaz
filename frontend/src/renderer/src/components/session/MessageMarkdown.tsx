@@ -142,19 +142,6 @@ type MarkdownNode = {
   children?: MarkdownNode[]
 }
 
-const TEXT_REWRITE_SKIP_NODES = new Set([
-  'code',
-  'definition',
-  'html',
-  'image',
-  'imageReference',
-  'inlineCode',
-  'inlineMath',
-  'link',
-  'linkReference',
-  'math',
-])
-
 function remarkFileReferences() {
   return (tree: MarkdownNode) => {
     rewriteTextNodes(tree, fileReferenceTextNodes)
@@ -167,8 +154,12 @@ function remarkLineBreaks() {
   }
 }
 
+// Code, math, HTML and images carry no child nodes. Link labels are left as
+// written, so a file reference inside one never becomes a nested link.
 function rewriteTextNodes(node: MarkdownNode, rewrite: (value: string) => MarkdownNode[] | null): void {
-  if (!node.children || TEXT_REWRITE_SKIP_NODES.has(node.type)) return
+  if (!node.children || node.type === 'link' || node.type === 'linkReference') {
+    return
+  }
   for (let i = 0; i < node.children.length; i++) {
     const child = node.children[i]
     if (child.type === 'text' && typeof child.value === 'string') {
