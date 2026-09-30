@@ -19,7 +19,7 @@ const CATEGORY_META: Record<string, { label: string; color: string }> = {
 const CATEGORY_FALLBACK_COLOR = USAGE_SHARE_OTHER_COLOR
 
 function categoryMeta(category: string): { label: string; color: string } {
-  return CATEGORY_META[category] ?? { label: category, color: CATEGORY_FALLBACK_COLOR }
+  return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), color: CATEGORY_FALLBACK_COLOR }
 }
 
 // Each bot is its own activity, named and colored like its face.
