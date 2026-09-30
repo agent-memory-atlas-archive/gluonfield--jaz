@@ -21,7 +21,7 @@ type UserQuestion struct {
 }
 
 type AskUserOutput struct {
-	Answers   map[string]InteractiveAnswerValue `json:"answers,omitempty"`
+	Answers   map[string]InteractiveAnswerValue `json:"answers"`
 	Cancelled bool                              `json:"cancelled,omitempty"`
 }
 
@@ -62,15 +62,15 @@ func (m *Manager) AskUser(ctx context.Context, sessionID string, input AskUserIn
 		})
 	}
 	prepare := func(answers map[string]InteractiveAnswerValue) (map[string]InteractiveAnswerValue, error) {
-		if len(answers) != len(multiSelectByID) {
-			return nil, fmt.Errorf("answer every question before submitting")
-		}
-		normalized := make(map[string]InteractiveAnswerValue, len(multiSelectByID))
+		normalized := make(map[string]InteractiveAnswerValue, len(answers))
 		for id, answer := range answers {
 			values := trimmedAnswers(answer.Answers)
 			multiSelect, known := multiSelectByID[id]
-			if !known || len(values) == 0 {
-				return nil, fmt.Errorf("each question requires a nonempty answer")
+			if !known {
+				return nil, fmt.Errorf("unknown question: %s", id)
+			}
+			if len(values) == 0 {
+				continue
 			}
 			if !multiSelect && len(values) != 1 {
 				return nil, fmt.Errorf("question %s requires one answer", id)

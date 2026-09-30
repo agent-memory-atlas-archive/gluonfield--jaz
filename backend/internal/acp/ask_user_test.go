@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -52,12 +53,16 @@ func TestAskUserMCPRoundTripInOrdinaryMode(t *testing.T) {
 			name = "native steering"
 		}
 		t.Run(name, func(t *testing.T) {
-			testAskUserMCPRoundTrip(t, steered)
+			for _, mode := range []string{"complete", "partial", "empty", "blank"} {
+				t.Run(mode, func(t *testing.T) {
+					testAskUserMCPRoundTrip(t, steered, mode)
+				})
+			}
 		})
 	}
 }
 
-func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
+func testAskUserMCPRoundTrip(t *testing.T, steered bool, mode string) {
 	t.Helper()
 	manager, store, session, ctx := askUserFixture(t)
 	if steered {
@@ -82,6 +87,7 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	defer manager.cancelPendingPermissions(session.ID)
 	tools, err := client.ListTools(ctx, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -135,13 +141,12 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	default:
 	}
 	for _, answers := range []map[string]InteractiveAnswerValue{
-		{"z_strategy": {Answers: []string{"Phased"}}},
+		{"unknown": {Answers: []string{}}},
 		{"z_strategy": {Answers: []string{"Phased"}}, "a_constraints": {Answers: []string{"No downtime"}}, "unknown": {Answers: []string{"SQL"}}},
 		{"z_strategy": {Answers: []string{"Phased", "Single cutover"}}, "a_constraints": {Answers: []string{"No downtime"}}, "workloads": {Answers: []string{"SQL"}}},
-		{"z_strategy": {Answers: []string{"Phased"}}, "a_constraints": {Answers: []string{"No downtime"}}, "workloads": {Answers: []string{" "}}},
 	} {
 		if err := manager.AnswerInteractive(ctx, InteractiveAnswer{Session: session.ID, RequestID: permission.ID, Answers: answers}); err == nil {
-			t.Fatal("accepted incomplete or unrelated answers")
+			t.Fatal("accepted unrelated or invalid selections")
 		}
 	}
 	answers := map[string]InteractiveAnswerValue{
@@ -149,15 +154,32 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 		"a_constraints": {Answers: []string{"No downtime during business hours"}},
 		"workloads":     {Answers: []string{" SQL ", "Spark", "Custom scripts"}},
 	}
+	want := map[string]InteractiveAnswerValue{
+		"z_strategy":    {Answers: []string{"Phased"}},
+		"a_constraints": {Answers: []string{"No downtime during business hours"}},
+		"workloads":     {Answers: []string{"SQL", "Spark", "Custom scripts"}},
+	}
+	switch mode {
+	case "partial":
+		answers = map[string]InteractiveAnswerValue{
+			"z_strategy": {Answers: []string{" "}},
+			"workloads":  {Answers: []string{" SQL ", "Spark", "Custom scripts"}},
+		}
+		want = map[string]InteractiveAnswerValue{"workloads": {Answers: []string{"SQL", "Spark", "Custom scripts"}}}
+	case "empty":
+		answers = map[string]InteractiveAnswerValue{}
+		want = map[string]InteractiveAnswerValue{}
+	case "blank":
+		answers = map[string]InteractiveAnswerValue{"z_strategy": {Answers: []string{" "}}}
+		want = map[string]InteractiveAnswerValue{}
+	}
 	if err := manager.AnswerInteractive(ctx, InteractiveAnswer{Session: session.ID, RequestID: permission.ID, Answers: answers}); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case call := <-done:
 		out := structuredContent[AskUserOutput](t, call)
-		if out.Cancelled || out.Answers["z_strategy"].Answers[0] != "Phased" ||
-			out.Answers["a_constraints"].Answers[0] != "No downtime during business hours" ||
-			strings.Join(out.Answers["workloads"].Answers, ",") != "SQL,Spark,Custom scripts" {
+		if out.Cancelled || !reflect.DeepEqual(out.Answers, want) {
 			t.Fatalf("tool answers = %#v", out)
 		}
 	case err := <-errs:
@@ -169,8 +191,21 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(messages) != 1 || !strings.Contains(provider.MessageContent(messages[0]), "No downtime during business hours") {
-		t.Fatalf("answer was not persisted: %#v", messages)
+	wantMessages := 0
+	if len(want) > 0 {
+		wantMessages = 1
+	}
+	if len(messages) != wantMessages {
+		t.Fatalf("persisted messages = %d, want %d", len(messages), wantMessages)
+	}
+	for _, message := range messages {
+		for _, answer := range want {
+			for _, value := range answer.Answers {
+				if !strings.Contains(provider.MessageContent(message), value) {
+					t.Fatalf("answer was not persisted: %#v", message)
+				}
+			}
+		}
 	}
 	if len(manager.jobByID(session.ID).Permissions) != 0 || len(manager.pendingPermission) != 0 {
 		t.Fatal("answered questions remained pending")

@@ -81,7 +81,7 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 		job.ParentVisible = true
 		job.mu.Unlock()
 	}
-	if len(req.Answers) > 0 {
+	if req.Answers != nil {
 		if len(pending.request.Questions) == 0 {
 			m.permissionMu.Unlock()
 			return fmt.Errorf("permission request %s does not accept structured answers", req.RequestID)

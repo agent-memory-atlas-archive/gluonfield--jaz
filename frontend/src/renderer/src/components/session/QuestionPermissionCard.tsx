@@ -40,7 +40,6 @@ export function QuestionPermissionCard({
     const other = answer?.other.trim()
     return [...(answer?.choices ?? []), ...(other ? [other] : [])]
   }
-  const complete = questions.every((question) => valuesFor(question).length > 0)
 
   // Settled questions collapse to a single line, codex-style.
   const summary = settled ? (
@@ -86,7 +85,7 @@ export function QuestionPermissionCard({
   }
 
   const submit = async () => {
-    if (!complete || locked) return
+    if (locked) return
     setSubmitting(true)
     setError('')
     try {
@@ -196,7 +195,7 @@ export function QuestionPermissionCard({
           ) : settled ? null : (
             <button
               type="button"
-              disabled={!complete || submitting}
+              disabled={submitting}
               onClick={() => void submit()}
               className="relative inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3.5 text-[13px] font-medium text-on-primary transition duration-150 after:absolute after:inset-x-0 after:-inset-y-1 hover:bg-primary-strong active:scale-[0.96] disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-ink-3"
             >
