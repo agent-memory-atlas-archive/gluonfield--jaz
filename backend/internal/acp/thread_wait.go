@@ -16,9 +16,6 @@ func (m *Manager) WaitThreads(ctx context.Context, refs []string, timeout time.D
 	if len(refs) < 1 || len(refs) > 8 {
 		return ThreadResults{}, fmt.Errorf("targets must contain 1 to 8 threads")
 	}
-	if timeout < 0 || timeout > 2*time.Minute {
-		return ThreadResults{}, fmt.Errorf("timeout must be between 0 and 2 minutes")
-	}
 	if timeout > 0 {
 		waitCtx, cancel := context.WithTimeout(ctx, timeout)
 		ready := make(chan struct{}, len(refs))

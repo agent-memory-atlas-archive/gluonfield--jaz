@@ -147,7 +147,7 @@ func TestMCPThreadToolsUseCodexNamesAndCompactSnapshots(t *testing.T) {
 	}
 	for _, timeout := range []*int{nil, new(0), new(250)} {
 		args := map[string]any{"targets": []map[string]string{{"threadId": "child"}}}
-		want := 120 * time.Second
+		want := maxWaitMs * time.Millisecond
 		if timeout != nil {
 			args["timeoutMs"] = *timeout
 			want = time.Duration(*timeout) * time.Millisecond
@@ -166,7 +166,7 @@ func TestMCPThreadToolsUseCodexNamesAndCompactSnapshots(t *testing.T) {
 			t.Fatalf("snapshot = %#v", thread)
 		}
 	}
-	for _, timeout := range []int{-1, 120001} {
+	for _, timeout := range []int{-1, maxWaitMs + 1} {
 		call, err := client.CallTool(context.Background(), &mcp.CallToolParams{
 			Name: ToolWaitThreads, Arguments: map[string]any{"targets": []map[string]string{{"threadId": "child"}}, "timeoutMs": timeout},
 		})
