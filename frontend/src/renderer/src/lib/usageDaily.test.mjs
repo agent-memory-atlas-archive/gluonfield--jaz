@@ -48,6 +48,19 @@ test('daily, model, and activity breakdowns rank work consistently despite diffe
   expect(peakDay(days).date).toBe('2026-09-09')
 })
 
+test('each bot keeps its own activity row across days', () => {
+  const tokens = (n) => ({ input_tokens: n, input_output_tokens: n })
+  const day = (date, categories) => ({ date, usage: {}, categories })
+  const rows = sumCategoryUsage([
+    day('2026-09-29', [{ category: 'bot', bot_id: 'gimli', usage: tokens(70) }, { category: 'bot', bot_id: 'scout', usage: tokens(20) }]),
+    day('2026-09-30', [{ category: 'bot', bot_id: 'gimli', usage: tokens(30) }]),
+  ])
+  expect(rows.map((row) => [row.bot_id, row.usage.input_output_tokens])).toEqual([
+    ['gimli', 100],
+    ['scout', 20],
+  ])
+})
+
 test('cost splits input into the full-rate slice and the cache write it paid for', () => {
   expect(fullRateInputTokens(firstTurn)).toBe(6_090)
   expect(fullRateInputTokens(laterTurn)).toBe(10)

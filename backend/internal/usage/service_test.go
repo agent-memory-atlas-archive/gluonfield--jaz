@@ -169,6 +169,25 @@ func TestDailyCategorizesUsageBySourceType(t *testing.T) {
 	}
 }
 
+func TestDailyTracksEachBotSeparately(t *testing.T) {
+	now := time.Date(2026, 6, 16, 12, 0, 0, 0, time.UTC)
+	day := time.Date(2026, 6, 16, 9, 0, 0, 0, time.UTC)
+	turn := func(session string, tokens int64) storage.UsageEvent {
+		return storage.UsageEvent{SessionID: session, SourceType: storage.SourceBot, Usage: storage.Usage{InputTokens: tokens}, Source: storage.UsageEventSourceTurn, CreatedAt: day}
+	}
+	store := &fakeUsageEventStore{events: []storage.UsageEvent{turn("gimli", 70), turn("scout", 20), turn("gimli", 30)}}
+	daily, err := (Service{store: store, now: func() time.Time { return now }}).Daily(DailyQuery{Days: 1, Location: time.UTC})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := daily[len(daily)-1].Categories
+	if len(got) != 2 ||
+		got[0] != (CategoryUsage{Category: storage.SourceBot, Bot: "gimli", Usage: UsageTotals{InputTokens: 100}}) ||
+		got[1] != (CategoryUsage{Category: storage.SourceBot, Bot: "scout", Usage: UsageTotals{InputTokens: 20}}) {
+		t.Fatalf("bot usage = %#v", got)
+	}
+}
+
 func TestModelsAggregatesACPUsageByModel(t *testing.T) {
 	loc := time.FixedZone("plus2", 2*60*60)
 	now := time.Date(2026, 6, 16, 12, 0, 0, 0, loc)

@@ -2,6 +2,7 @@ import type { DailyUsage, UsageTotals } from '@/lib/api/types'
 
 export type UsageCategoryTotals = {
   category: string
+  bot_id?: string
   usage: UsageTotals
 }
 
@@ -87,9 +88,9 @@ export function sumModelUsage(days: DailyUsage[]): UsageModelTotals[] {
 export function sumCategoryUsage(days: DailyUsage[]): UsageCategoryTotals[] {
   return sumUsageGroups(
     days.flatMap((day) => day.categories ?? []),
-    (category) => category.category,
-    (category) => ({ category: category.category, usage: {} }),
-    (left, right) => left.category.localeCompare(right.category),
+    (category) => `${category.category}:${category.bot_id ?? ''}`,
+    (category) => ({ category: category.category, bot_id: category.bot_id, usage: {} }),
+    (left, right) => left.category.localeCompare(right.category) || (left.bot_id ?? '').localeCompare(right.bot_id ?? ''),
   )
 }
 

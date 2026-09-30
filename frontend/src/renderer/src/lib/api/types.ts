@@ -54,8 +54,10 @@ export interface ModelUsage {
 }
 
 export interface CategoryUsage {
-  // chat, loop_run, memory_dream, memory_search, memory_source, browser_task (legacy)
+  // chat, bot, loop_run, memory_dream, memory_search, memory_source, browser_task (legacy)
   category: string
+  // Bot usage is tracked per bot: the bot's thread id.
+  bot_id?: string
   usage: UsageTotals
 }
 

@@ -26,6 +26,7 @@ type dailyUsageDTO struct {
 
 type categoryUsageDTO struct {
 	Category string         `json:"category"`
+	BotID    string         `json:"bot_id,omitempty"`
 	Usage    usageTotalsDTO `json:"usage"`
 }
 
@@ -80,6 +81,7 @@ func categoryDTOs(categories []usagecore.CategoryUsage) []categoryUsageDTO {
 	for i, category := range categories {
 		out[i] = categoryUsageDTO{
 			Category: category.Category,
+			BotID:    category.Bot,
 			Usage:    usageDTO(category.Usage),
 		}
 	}
