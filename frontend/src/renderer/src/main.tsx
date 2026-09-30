@@ -15,6 +15,7 @@ import { VoiceOverlay } from '@/components/session/VoiceOverlay'
 import { devPreview } from './lib/devPreview'
 import { OnboardingGate } from './components/onboarding/OnboardingGate'
 import { installFileDropGuard } from './components/ui/FileDrop'
+import { installKeyboardFocus } from '@/lib/dom/keyboardFocus'
 import { useBackendChange, useConnection } from './lib/connection'
 import { clientRuntime } from './lib/clientRuntime'
 import { queryClient } from './lib/query/queryClient'
@@ -27,6 +28,7 @@ import './lib/appearance'
 // Without this, a file dropped outside a drop zone navigates the window to
 // its file:// URL, replacing the app shell.
 installFileDropGuard()
+installKeyboardFocus()
 
 // One open event per launch from the main window — board/widget popouts are
 // secondary surfaces and would inflate the count. PostHog derives new vs.

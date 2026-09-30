@@ -14,6 +14,7 @@ import { exerciseAnnotations } from './annotations'
 import { exerciseSidePanelTabs } from './side-panel'
 import { exerciseMermaid } from './mermaid'
 import { exerciseModelPicker } from './model-picker'
+import { exerciseKeyboardFocus } from './keyboard-focus'
 
 declare global {
   interface Window {
@@ -59,10 +60,12 @@ function Fixture() {
         window.smoke.result({ ok: true, checks: ['side panel and Overview shortcut visibility; compact tabs, browser retention, terminal, side chat, mobile layout and per-chat restoration'] })
         return
       }
+      stage = 'Tab-only focus rings'
+      await exerciseKeyboardFocus()
       stage = 'model picker efforts, animation, focus and persistence'
       await exerciseModelPicker()
       if (new URLSearchParams(location.search).get('suite') === 'model-picker') {
-        window.smoke.result({ ok: true, checks: ['Codex and Claude model selection, five efforts, animation, borderless focus, dragging, provider settings and persistence'] })
+        window.smoke.result({ ok: true, checks: ['Tab-only focus rings; Codex and Claude model selection, five efforts, animation, borderless focus, dragging, provider settings and persistence'] })
         return
       }
       stage = 'cancellation while opening the browser panel'
