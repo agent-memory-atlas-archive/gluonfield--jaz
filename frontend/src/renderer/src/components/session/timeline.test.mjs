@@ -1,6 +1,31 @@
 import { describe, expect, test } from 'bun:test'
 import { buildTimeline, classifyTurnItems, stableEventKey } from './timeline'
 
+test('questions stay inline and visible before and after resolution while approvals remain anchored', () => {
+  const at = (second) => new Date(second * 1000).toISOString()
+  const request = {
+    session_id: 'thread', type: 'permission_request', at: at(2),
+    permission: { id: 'question', status: 'pending', questions: [{ id: 'scope', question: 'Which workloads?' }] },
+  }
+  const commentary = { session_id: 'thread', type: 'acp_message', at: at(3), content: 'I can start with SQL.' }
+  const resolution = {
+    session_id: 'thread', type: 'permission_response', at: at(4),
+    permission: { ...request.permission, status: 'selected', answers: { scope: ['SQL'] } },
+  }
+  for (const events of [[request, commentary], [request, commentary, resolution]]) {
+    for (const grouped of [false, true]) {
+      const timeline = buildTimeline([], events, 'thread', grouped)
+      expect(timeline.anchored).toEqual([])
+      expect(timeline.chronological.map((item) => item.event)).toEqual([request, commentary])
+      const classified = classifyTurnItems(timeline.chronological, timeline.pendingPermissionIds, new Map())
+      expect(classified.resultItems.some((item) => item.event === request)).toBe(true)
+      expect(timeline.permissionResolutions.get('question')).toEqual(events.at(-1) === resolution ? resolution.permission : undefined)
+    }
+  }
+  const approval = { ...request, permission: { id: 'approval', status: 'pending', options: [{ id: 'allow', name: 'Allow' }] } }
+  expect(buildTimeline([], [approval], 'thread', true).anchored[0].event).toEqual(approval)
+})
+
 const acpEvent = (id, type, at, fields = {}) => ({
   session_id: 'thread',
   type,

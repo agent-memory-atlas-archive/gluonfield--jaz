@@ -502,6 +502,7 @@ type ACPPermission struct {
 	Options          []ACPPermissionOption   `json:"options,omitempty"`
 	Locations        []ACPPermissionLocation `json:"locations,omitempty"`
 	Questions        []ACPQuestion           `json:"questions,omitempty"`
+	Answers          map[string][]string     `json:"answers,omitempty"`
 	Status           string                  `json:"status,omitempty"`
 	SelectedOptionID string                  `json:"selected_option_id,omitempty"`
 }

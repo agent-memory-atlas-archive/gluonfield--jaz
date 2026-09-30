@@ -103,6 +103,10 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 		resolved := pending.request
 		resolved.Status = "selected"
 		resolved.SelectedOptionID = "answered"
+		resolved.Answers = make(map[string][]string, len(resolved.Questions))
+		for _, question := range resolved.Questions {
+			resolved.Answers[question.ID] = trimmedAnswers(answers[question.ID].Answers)
+		}
 		m.removeJobPermission(job, req.RequestID)
 		m.appendUserAnswerMessage(job, answerText, parentVisible)
 		m.publishPermission(job, resolved, "permission_response")

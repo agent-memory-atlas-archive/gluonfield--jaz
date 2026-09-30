@@ -887,6 +887,7 @@ export interface ACPPermission {
   options?: ACPPermissionOption[]
   locations?: ACPPermissionLocation[]
   questions?: ACPQuestion[]
+  answers?: Record<string, string[]>
   status?: string
   selected_option_id?: string
 }

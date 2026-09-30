@@ -1,6 +1,7 @@
 import { afterEach, expect, mock, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import codexAgentCalls from '@/components/session/fixtures/codexAgentCalls.json'
 
 let inlineDiffs = false
@@ -354,4 +355,45 @@ test('inline diff preference keeps file changes on the transcript axis', () => {
   inlineDiffs = true
   const inline = renderToStaticMarkup(createElement(ActivityBlock, { entries }))
   expect(inline).toContain('after_unique_line')
+})
+
+const { QuestionPermissionCard } = await import('./QuestionPermissionCard')
+
+const event = {
+  session_id: 'thread', type: 'permission_request',
+  permission: { id: 'questions', status: 'pending', questions: [
+    { id: 'scope', question: 'Which workloads?', multi_select: true, is_other: true, options: [{ label: 'SQL' }, { label: 'Spark' }, { label: 'ML' }] },
+    { id: 'goal', question: 'What is the goal?', is_other: true },
+    { id: 'secret', question: 'Private answer?', is_secret: true, is_other: true },
+  ] },
+}
+
+function render(resolution) {
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() },
+    createElement(QuestionPermissionCard, { event, resolution }),
+  ))
+}
+
+test('a fresh mount renders saved choices and custom answers as visible read-only history', () => {
+  const html = render({ ...event.permission, status: 'selected', answers: { scope: ['SQL', 'Spark', 'Custom scripts'], goal: [], secret: ['private-value'] } })
+  expect(html).toContain('Which workloads?')
+  expect(html).toContain('SQL')
+  expect(html).toContain('Spark')
+  expect(html).toContain('Custom scripts')
+  expect(html).not.toContain('ML')
+  expect(html).toContain('What is the goal?')
+  expect(html).toContain('Skipped')
+  expect(html).toContain('••••••••')
+  expect(html).not.toContain('private-value')
+  expect(html).not.toContain('<input')
+  expect(html).not.toContain('<button')
+  expect(html).not.toContain('Asked 3 questions')
+})
+
+test('cancelled and older answered events remain distinguishable from skipped answers', () => {
+  expect(render({ ...event.permission, status: 'cancelled' })).toContain('Cancelled')
+  const old = render({ ...event.permission, status: 'selected', selected_option_id: 'answered' })
+  expect(old).toContain('Answered')
+  expect(old).not.toContain('Skipped')
+  expect(old).not.toContain('<input')
 })

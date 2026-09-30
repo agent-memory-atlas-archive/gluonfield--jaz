@@ -231,7 +231,7 @@ export function isCollapsibleWork(
   if (event.type === 'artifact') return false
   if (event.type === 'acp_thought') return true
   if (event.type === 'permission_request') {
-    return !pendingPermissionIds.has(event.permission?.id ?? '')
+    return !event.permission?.questions?.length && !pendingPermissionIds.has(event.permission?.id ?? '')
   }
   const taskSurface = taskSurfaceFromEvent(event)
   if (taskSurface) {
@@ -446,11 +446,10 @@ export function buildTimeline(
       kind: 'event', event, eventIndex: index, at, showHeader: false,
     })
   }
-  // Live state isn't history: pending questions and working status anchor at
-  // the bottom; an answered question returns to its chronological spot.
   const isPendingCard = (item: TimelineItem) =>
     item.kind === 'event' &&
     item.event.type === 'permission_request' &&
+    !item.event.permission?.questions?.length &&
     pendingPermissionIds.has(item.event.permission?.id ?? '')
   const isWorkingStatusItem = (item: TimelineItem) =>
     item.kind === 'event' && isWorkingStatusOnly(item.event)
@@ -458,7 +457,7 @@ export function buildTimeline(
   const workingStatusItems = merged.filter(isWorkingStatusItem)
   const chronologicalItems = merged.filter((item) => !isPendingCard(item) && !isWorkingStatusItem(item))
   // A live "working" indicator next to a question awaiting the user is noise.
-  const anchored = [...(pendingCards.length ? [] : workingStatusItems), ...pendingCards]
+  const anchored = [...(pendingPermissionIds.size ? [] : workingStatusItems), ...pendingCards]
   markEventHeaders([...chronologicalItems, ...anchored], sessionId)
   const chronological = groupActivities(chronologicalItems)
   const turns = splitTurns(chronological)

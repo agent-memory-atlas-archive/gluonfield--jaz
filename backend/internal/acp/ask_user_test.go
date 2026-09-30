@@ -207,6 +207,18 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool, mode string) {
 			}
 		}
 	}
+	storedEvents, err := store.LoadSessionEvents(session.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantHistory := make(map[string][]string, len(permission.Questions))
+	for _, question := range permission.Questions {
+		wantHistory[question.ID] = trimmedAnswers(want[question.ID].Answers)
+	}
+	if len(storedEvents) != 2 || storedEvents[1].Type != "permission_response" ||
+		storedEvents[1].Permission == nil || !reflect.DeepEqual(storedEvents[1].Permission.Answers, wantHistory) {
+		t.Fatalf("reloaded question answers = %#v", storedEvents)
+	}
 	if len(manager.jobByID(session.ID).Permissions) != 0 || len(manager.pendingPermission) != 0 {
 		t.Fatal("answered questions remained pending")
 	}
