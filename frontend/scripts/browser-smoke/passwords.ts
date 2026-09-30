@@ -46,6 +46,21 @@ document.querySelector('form').requestSubmit()`)
     await until(async () => await evaluate('location.pathname') === '/welcome')
   }
 
+  document.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]')!.click()
+  await until(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].some((button) => button.textContent === 'Downloads' && !button.disabled))
+  const downloadsEntry = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find((button) => button.textContent === 'Downloads')!
+  downloadsEntry.click()
+  await until(() => Boolean(document.querySelector('[aria-label="Browser downloads"]')))
+  await navigate(location.origin + '/target')
+  await until(async () => (await state()).origin === '')
+  await new Promise(requestAnimationFrame)
+  await new Promise(requestAnimationFrame)
+  if (!document.querySelector('[aria-label="Browser downloads"]')) {
+    throw new Error('A password refresh closed the Downloads panel.')
+  }
+  document.querySelector<HTMLButtonElement>('[aria-label="Browser menu"]')!.click()
+  await navigate(origin + '/login')
+
   if (await evaluate('typeof window.jaz') !== 'undefined') {
     throw new Error('The browser page received the application bridge')
   }

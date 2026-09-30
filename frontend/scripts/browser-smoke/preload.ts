@@ -1,10 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { browserPasswords } from '@preload/browserPasswords'
+import { browserDownloads } from '@preload/browserDownloads'
 import { BROWSER_COMMAND_CHANNEL } from '@shared/browserControl'
 import { BROWSER_PROFILE_CHANNELS, type BrowserProfileAPI } from '@shared/browserProfile'
 
 contextBridge.exposeInMainWorld('jaz', {
   browserPasswords,
+  browserDownloads,
   browserProfiles: {
     list: () => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.list),
     import: (id, selection) => ipcRenderer.invoke(BROWSER_PROFILE_CHANNELS.import, id, selection),

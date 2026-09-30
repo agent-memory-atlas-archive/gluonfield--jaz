@@ -28,6 +28,7 @@ import { installBrowserControl } from '@main/browserControl'
 import { installBrowserProfileImport } from '@main/browserProfileImport'
 import { attachPreviewWebviews, configurePreviewSession } from '@main/previewSession'
 import { installBrowserPasswords } from '@main/browserPasswords'
+import { installBrowserDownloads } from '@main/browserDownloads'
 import { setupLauncher, teardownLauncher } from './spotlight'
 import { attachVoiceOverlay } from './voiceOverlay'
 import { createUpdateController } from './updater'
@@ -338,6 +339,7 @@ function openBoardWindow(boardId: string): void {
 
 app.whenReady().then(() => {
   configurePreviewSession()
+  installBrowserDownloads()
   installApplicationMenu()
   registerDictation()
 

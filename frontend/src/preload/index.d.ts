@@ -9,6 +9,7 @@ import type { DictationAPI } from '../shared/dictation'
 import type { BrowserCommandRequest } from '@shared/browserControl'
 import type { BrowserProfileAPI } from '@shared/browserProfile'
 import type { BrowserPasswordAPI } from '@shared/browserPasswords'
+import type { BrowserDownloadAPI } from '@shared/browserDownloads'
 import type { VoiceOverlayAPI } from '@shared/voice'
 
 declare global {
@@ -19,6 +20,7 @@ declare global {
       dictation: DictationAPI
       browserProfiles: BrowserProfileAPI
       browserPasswords: BrowserPasswordAPI
+      browserDownloads: BrowserDownloadAPI
       browserCommand: (request: BrowserCommandRequest) => Promise<unknown>
       apiBaseUrl: string
       windowKind: 'main' | 'board' | 'launcher' | 'voice'
