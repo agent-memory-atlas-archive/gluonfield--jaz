@@ -393,7 +393,7 @@ func TestOnboardingWaitsForManagedCodexDownload(t *testing.T) {
 	handler := (&Server{ModelCatalog: modelcatalog.NewService(nil),
 		Store:       store,
 		Root:        root,
-		ACPAdapters: fakeACPAdapterStatusReader{status: acpadapter.Status{Adapter: "codex", Version: "test-version", State: acpadapter.StateDownloading, Message: "Downloading Codex adapter"}},
+		ACPAdapters: fakeACPAdapterStatusReader{status: acpadapter.Status{Adapter: "codex", Version: "test-version", State: acpadapter.StateDownloading}},
 		AgentCatalog: acp.AgentCatalog{
 			"codex": {ManagedAdapter: "codex", Model: "gpt-5.5"},
 		},
@@ -409,7 +409,6 @@ func TestOnboardingWaitsForManagedCodexDownload(t *testing.T) {
 			Agent          string `json:"agent"`
 			Authenticated  bool   `json:"authenticated"`
 			Available      bool   `json:"available"`
-			Reason         string `json:"reason"`
 			ManagedAdapter struct {
 				State string `json:"state"`
 			} `json:"managed_adapter"`
@@ -421,8 +420,7 @@ func TestOnboardingWaitsForManagedCodexDownload(t *testing.T) {
 	if len(got.ACP) != 1 || got.ACP[0].Agent != "codex" ||
 		!got.ACP[0].Authenticated ||
 		got.ACP[0].Available ||
-		got.ACP[0].ManagedAdapter.State != acpadapter.StateDownloading ||
-		!strings.Contains(got.ACP[0].Reason, "Downloading Codex adapter") {
+		got.ACP[0].ManagedAdapter.State != acpadapter.StateDownloading {
 		t.Fatalf("unexpected codex probe: %#v", got.ACP)
 	}
 }
@@ -440,7 +438,7 @@ func TestOnboardingWaitsForManagedAntigravityCLI(t *testing.T) {
 		Store:        store,
 		Root:         root,
 		ACPAdapters:  fakeACPAdapterStatusReader{status: acpadapter.Status{Adapter: "antigravity", State: acpadapter.StateReady}},
-		ManagedTools: fakeManagedToolStatusReader{status: managedtool.Status{Tool: managedtool.AntigravityCLI, State: managedtool.StateMissing, Message: "Antigravity CLI is not downloaded yet"}},
+		ManagedTools: fakeManagedToolStatusReader{status: managedtool.Status{Tool: managedtool.AntigravityCLI, State: managedtool.StateMissing}},
 		AgentCatalog: acp.AgentCatalog{
 			acp.AgentAntigravity: {ManagedAdapter: "antigravity", ManagedTool: managedtool.AntigravityCLI},
 		},
@@ -456,7 +454,6 @@ func TestOnboardingWaitsForManagedAntigravityCLI(t *testing.T) {
 			Agent       string `json:"agent"`
 			Installed   bool   `json:"installed"`
 			Available   bool   `json:"available"`
-			Reason      string `json:"reason"`
 			ManagedTool struct {
 				State string `json:"state"`
 			} `json:"managed_tool"`
@@ -468,8 +465,7 @@ func TestOnboardingWaitsForManagedAntigravityCLI(t *testing.T) {
 	if len(got.ACP) != 1 || got.ACP[0].Agent != acp.AgentAntigravity ||
 		got.ACP[0].Installed ||
 		got.ACP[0].Available ||
-		got.ACP[0].ManagedTool.State != managedtool.StateMissing ||
-		!strings.Contains(got.ACP[0].Reason, "Antigravity CLI") {
+		got.ACP[0].ManagedTool.State != managedtool.StateMissing {
 		t.Fatalf("unexpected antigravity probe: %#v", got.ACP)
 	}
 }

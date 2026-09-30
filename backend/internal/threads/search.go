@@ -2,11 +2,13 @@ package threads
 
 import (
 	"context"
+	"encoding/json"
 	"sort"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/wins/jaz/backend/internal/codexcompat"
 	"github.com/wins/jaz/backend/internal/storage/sqlite/generated/search"
 )
 
@@ -78,8 +80,10 @@ func (s *Service) Search(ctx context.Context, query SearchQuery) ([]SearchResult
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	hiddenPrefixes, _ := json.Marshal(codexcompat.HiddenWarningPrefixes())
 	messageRows, err := s.store.SearchThreadMessages(ctx, search.SearchThreadMessagesParams{
 		Match:           match,
+		HiddenPrefixes:  string(hiddenPrefixes),
 		IncludeArchived: boolInt(query.IncludeArchived),
 		Limit:           int64(candidateLimit),
 	})
@@ -166,7 +170,7 @@ func addSearchHit(byThread map[string]*searchAccumulator, result SearchResult, s
 }
 
 func ftsMatchQuery(query string) string {
-	tokens := ftsTokens(query)
+	tokens := searchTokens(query)
 	terms := make([]string, 0, len(tokens))
 	for _, token := range tokens {
 		if len([]rune(token)) < 2 {
@@ -177,7 +181,7 @@ func ftsMatchQuery(query string) string {
 	return strings.Join(terms, " AND ")
 }
 
-func ftsTokens(query string) []string {
+func searchTokens(query string) []string {
 	var tokens []string
 	var current strings.Builder
 	flush := func() {

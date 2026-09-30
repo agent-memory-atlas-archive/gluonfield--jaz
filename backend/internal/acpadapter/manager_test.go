@@ -245,9 +245,11 @@ func TestFetchManifestRejectsStaleCacheWhenLocalManifestIsInvalid(t *testing.T) 
 	}
 	manager := NewForTest(root, "", nil)
 	manager.localManifestPath = manifestPath
-	manager.cacheManifest(manifest{Adapters: map[string]manifestAdapter{
+	if err := manager.writeManifestCache(manifest{Adapters: map[string]manifestAdapter{
 		"claude": {Version: "cached", Assets: map[string]manifestAsset{}},
-	}})
+	}}); err != nil {
+		t.Fatal(err)
+	}
 
 	if _, err := manager.fetchManifest(context.Background()); err == nil {
 		t.Fatal("expected invalid local manifest to reject cache fallback")
@@ -327,23 +329,82 @@ func TestStatusReportsMissingBeforeManifestDownload(t *testing.T) {
 	}
 }
 
-func TestManifestURLForVersion(t *testing.T) {
+func TestStatusReportsInstalledAdapterAfterRestart(t *testing.T) {
+	platform, err := platformKey(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Skip(err)
+	}
+	manager := NewForTest(t.TempDir(), "", nil)
+	path := cacheCodexManifest(t, manager, platform)
+	if status := manager.Status("codex"); status.State != StateMissing {
+		t.Fatalf("status before install = %#v", status)
+	}
+	if err := os.WriteFile(path, []byte("ok"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	status := manager.Status("codex")
+	if status.State != StateReady || status.Path != path || status.Version != "1.2.3" {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
+func TestResolveAdapterReadsPinnedManifestCacheWithoutNetwork(t *testing.T) {
+	platform, err := platformKey(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Skip(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request %s", r.URL.Path)
+		http.Error(w, "offline", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	manager := NewForTest(t.TempDir(), server.URL+"/manifest.json", server.Client())
+	manager.tag = "v9.9.9"
+	path := cacheCodexManifest(t, manager, platform)
+	if err := os.WriteFile(path, []byte("ok"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	launch, err := manager.ResolveAdapter(context.Background(), "codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if launch.Command != path {
+		t.Fatalf("command = %q, want %q", launch.Command, path)
+	}
+}
+
+// cacheCodexManifest caches a codex 1.2.3 manifest and returns where its
+// executable installs.
+func cacheCodexManifest(t *testing.T, manager *Manager, platform string) string {
+	t.Helper()
+	cached := manifest{Adapters: map[string]manifestAdapter{"codex": {Version: "1.2.3", Assets: map[string]manifestAsset{
+		platform: {URL: "https://example.invalid/codex.tgz", SHA256: strings.Repeat("0", 64), Binary: "tool"},
+	}}}}
+	if err := manager.writeManifestCache(cached); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(manager.root, "acp", "managed", "adapters", "codex", "1.2.3", platform, "tool")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestNewPinsManifestToReleaseVersion(t *testing.T) {
 	tests := []struct {
 		version string
 		want    string
 		cache   string
 	}{
-		{version: "", want: releasesURL + "/latest/download/acp-adapters.json", cache: "latest"},
-		{version: "dev", want: releasesURL + "/latest/download/acp-adapters.json", cache: "latest"},
-		{version: "0.0.51", want: releasesURL + "/download/v0.0.51/acp-adapters.json", cache: "v0.0.51"},
-		{version: "v0.0.51", want: releasesURL + "/download/v0.0.51/acp-adapters.json", cache: "v0.0.51"},
+		{version: "", want: releasesURL + "/latest/download/acp-adapters.json", cache: "manifest-latest.json"},
+		{version: "dev", want: releasesURL + "/latest/download/acp-adapters.json", cache: "manifest-latest.json"},
+		{version: "0.0.51", want: releasesURL + "/download/v0.0.51/acp-adapters.json", cache: "manifest-v0.0.51.json"},
+		{version: "v0.0.51", want: releasesURL + "/download/v0.0.51/acp-adapters.json", cache: "manifest-v0.0.51.json"},
 	}
 	for _, tt := range tests {
-		if got := manifestURLForVersion(tt.version); got != tt.want {
-			t.Fatalf("manifestURLForVersion(%q) = %q, want %q", tt.version, got, tt.want)
-		}
-		if got := manifestCacheNameForVersion(tt.version); got != tt.cache {
-			t.Fatalf("manifestCacheNameForVersion(%q) = %q, want %q", tt.version, got, tt.cache)
+		m := New(t.TempDir(), tt.version)
+		if m.manifestURL != tt.want || filepath.Base(m.manifestCachePath()) != tt.cache {
+			t.Fatalf("New(%q) manifest = %q cache %q, want %q cache %q", tt.version, m.manifestURL, filepath.Base(m.manifestCachePath()), tt.want, tt.cache)
 		}
 	}
 }

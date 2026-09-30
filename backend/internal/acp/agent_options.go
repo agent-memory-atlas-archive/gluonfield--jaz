@@ -83,7 +83,7 @@ func (m *Manager) agentOptions(agents []string, query string) ([]AgentSpawnOptio
 				option.ModelSearch = &AgentModelSearch{
 					Provider: provider.ProviderOpenRouter,
 					Limit:    agentOptionsProviderModelLimit,
-					Use:      `jazagent_options({"agent":"` + agent + `","name":"<model name or provider>"})`,
+					Use:      `list_agent_options({"agent":"` + agent + `","name":"<model name or provider>"})`,
 				}
 			}
 		}

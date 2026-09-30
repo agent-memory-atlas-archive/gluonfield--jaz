@@ -10,6 +10,24 @@ import (
 )
 
 const searchThreadMessages = `-- name: SearchThreadMessages :many
+WITH hits AS (
+  SELECT d.thread_id, d.seq,
+    snippet(message_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
+    bm25(message_search_fts) AS score
+  FROM message_search_fts(CAST(?3 AS TEXT))
+  JOIN message_search_docs d ON d.id = message_search_fts.rowid
+  UNION ALL
+  SELECT d.thread_id, 0 AS seq,
+    snippet(event_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
+    bm25(event_search_fts) AS score
+  FROM event_search_fts(CAST(?3 AS TEXT))
+  JOIN event_search_docs d ON d.id = event_search_fts.rowid
+  JOIN session_events e ON e.thread_id = d.thread_id AND e.seq = d.seq
+  WHERE NOT EXISTS (
+    SELECT 1 FROM json_each(CAST(?4 AS TEXT)) p
+    WHERE substr(e.content, 1, length(p.value)) = p.value
+  )
+)
 SELECT
   t.id,
   t.slug,
@@ -19,25 +37,24 @@ SELECT
   coalesce(t.acp_agent, '') AS agent,
   coalesce(t.parent_id, '') AS parent_id,
   t.archived,
-  d.seq,
-  snippet(message_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
-  bm25(message_search_fts) AS score,
+  hits.seq,
+  hits.snippet,
+  hits.score,
   t.updated_at_ms,
   t.last_attention_at_ms
-FROM message_search_fts(CAST(?1 AS TEXT))
-JOIN message_search_docs d ON d.id = message_search_fts.rowid
-JOIN threads t ON t.id = d.thread_id
-WHERE (CAST(?2 AS INTEGER) = 1 OR t.archived = 0)
-  -- Exclude loop-run / sourced threads, matching the default thread list.
+FROM hits
+JOIN threads t ON t.id = hits.thread_id
+WHERE (CAST(?1 AS INTEGER) = 1 OR t.archived = 0)
   AND coalesce(t.source_type, '') = ''
-ORDER BY bm25(message_search_fts)
-LIMIT ?3
+ORDER BY hits.score
+LIMIT ?2
 `
 
 type SearchThreadMessagesParams struct {
-	Match           string `json:"match"`
 	IncludeArchived int64  `json:"include_archived"`
 	Limit           int64  `json:"limit"`
+	Match           string `json:"match"`
+	HiddenPrefixes  string `json:"hidden_prefixes"`
 }
 
 type SearchThreadMessagesRow struct {
@@ -57,7 +74,12 @@ type SearchThreadMessagesRow struct {
 }
 
 func (q *Queries) SearchThreadMessages(ctx context.Context, arg SearchThreadMessagesParams) ([]SearchThreadMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchThreadMessages, arg.Match, arg.IncludeArchived, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, searchThreadMessages,
+		arg.IncludeArchived,
+		arg.Limit,
+		arg.Match,
+		arg.HiddenPrefixes,
+	)
 	if err != nil {
 		return nil, err
 	}

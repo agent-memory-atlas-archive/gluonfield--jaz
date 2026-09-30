@@ -44,7 +44,6 @@ type oauthHandler struct {
 	fetch       codeFetcher
 
 	mu    sync.Mutex
-	src   oauth2.TokenSource
 	mode  oauthMode
 	state authorizationState
 }
@@ -94,12 +93,9 @@ func newOAuthHandler(server mcpconfig.Server, store integrationoauth.Store, http
 	}
 }
 
+// TokenSource is rebuilt per call: the SDK passes the current connection's
+// context, and a source cached across a redial would refresh on a closed one.
 func (h *oauthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, error) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.src != nil {
-		return h.src, nil
-	}
 	src, err := (integrationoauth.Refresher{
 		Store:        h.store,
 		HTTPClient:   h.httpClient,
@@ -108,11 +104,7 @@ func (h *oauthHandler) TokenSource(ctx context.Context) (oauth2.TokenSource, err
 	if errors.Is(err, integrationoauth.ErrTokenNotFound) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	h.src = src
-	return h.src, nil
+	return src, err
 }
 
 func (h *oauthHandler) Authorize(ctx context.Context, req *http.Request, resp *http.Response) error {
@@ -148,7 +140,6 @@ func (h *oauthHandler) saveToken(ctx context.Context, tok integrationoauth.Token
 		return fmt.Errorf("persist token: %w", err)
 	}
 	h.mu.Lock()
-	h.src = nil
 	h.state = authorizationComplete
 	h.mu.Unlock()
 	return nil

@@ -14,6 +14,7 @@ window.__JAZ_DEFAULTS__ = {
   // showModelIcons: true,         // ACP agent/model marks in the left sidebar
   // homeWordmark: 'jaz',          // name or image URL above the new-thread composer
   // invertHomeLogoInLightMode: false, // darkens white image logos in light mode
+  // invertHomeLogoInDarkMode: false, // lightens black image logos in dark mode
   // inlineDiffs: false,           // expand agent file diffs in the transcript
   // inlineShellCommands: false,   // expand agent shell commands in the transcript
 

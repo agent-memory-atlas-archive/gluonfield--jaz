@@ -30,43 +30,38 @@ type Status struct {
 	BytesDownloaded int64
 	BytesTotal      int64
 	ProgressPercent int
-	StartedAt       time.Time
-	FinishedAt      time.Time
 }
 
 type Manager struct {
 	root              string
 	manifestURL       string
-	manifestCacheName string
+	tag               string
 	localManifestPath string
 	client            *http.Client
 	installMu         sync.Mutex
-	manifestMu        sync.Mutex
 	mu                sync.Mutex
-	manifest          manifest
-	hasManifest       bool
 	status            map[string]Status
 }
 
 func New(root, releaseVersion string) *Manager {
-	localManifestPath := ""
-	if usesLatestManifest(releaseVersion) {
-		localManifestPath = findLocalManifestPath()
+	m := &Manager{
+		root:   root,
+		tag:    releaseTag(releaseVersion),
+		client: &http.Client{Timeout: 10 * time.Minute},
+		status: map[string]Status{},
 	}
-	return &Manager{
-		root:              root,
-		manifestURL:       manifestURLForVersion(releaseVersion),
-		manifestCacheName: manifestCacheNameForVersion(releaseVersion),
-		localManifestPath: localManifestPath,
-		client:            &http.Client{Timeout: 10 * time.Minute},
-		status:            map[string]Status{},
+	if m.tag == "" {
+		m.manifestURL = releasesURL + "/latest/download/acp-adapters.json"
+		m.localManifestPath = findLocalManifestPath()
+	} else {
+		m.manifestURL = releasesURL + "/download/" + m.tag + "/acp-adapters.json"
 	}
+	return m
 }
 
 func NewForTest(root, manifestURL string, client *http.Client) *Manager {
 	m := New(root, "dev")
 	m.manifestURL = strings.TrimSpace(manifestURL)
-	m.manifestCacheName = "test"
 	m.localManifestPath = ""
 	if client != nil {
 		m.client = client
@@ -109,11 +104,15 @@ func (m *Manager) Status(name string) Status {
 	if status, ok := m.storedStatus(name); ok {
 		return status
 	}
+	if manifest, ok := m.offlineManifest(); ok {
+		if spec, err := m.specFromManifest(manifest, name, platform); err == nil && m.installed(spec) {
+			return readyStatus(spec)
+		}
+	}
 	return Status{
 		Adapter:  name,
 		Platform: platform,
 		State:    StateMissing,
-		Message:  displayName(name) + " adapter is not downloaded yet",
 	}
 }
 
@@ -165,60 +164,41 @@ func (m *Manager) setResolveErrorStatus(adapter string, err error) {
 		state = StateUnsupported
 	}
 	m.setStatus(adapter, Status{
-		Adapter:    adapter,
-		Platform:   platform,
-		State:      state,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
+		Adapter:  adapter,
+		Platform: platform,
+		State:    state,
+		Message:  err.Error(),
 	})
 }
 
 func downloadingStatus(spec adapterSpec) Status {
 	return Status{
-		Adapter:   spec.Adapter,
-		Version:   spec.Version,
-		Platform:  spec.Platform,
-		Path:      spec.Command,
-		State:     StateDownloading,
-		Message:   "Downloading " + displayName(spec.Adapter) + " adapter",
-		StartedAt: time.Now().UTC(),
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateDownloading,
 	}
 }
 
 func readyStatus(spec adapterSpec) Status {
 	return Status{
-		Adapter:    spec.Adapter,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateReady,
-		Message:    displayName(spec.Adapter) + " adapter is ready",
-		FinishedAt: time.Now().UTC(),
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateReady,
 	}
 }
 
 func failedStatus(spec adapterSpec, err error) Status {
 	return Status{
-		Adapter:    spec.Adapter,
-		Version:    spec.Version,
-		Platform:   spec.Platform,
-		Path:       spec.Command,
-		State:      StateFailed,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
-	}
-}
-
-func displayName(adapter string) string {
-	switch adapter {
-	case "codex":
-		return "Codex"
-	case "claude":
-		return "Claude"
-	case "kimi":
-		return "Kimi"
-	default:
-		return adapter
+		Adapter:  spec.Adapter,
+		Version:  spec.Version,
+		Platform: spec.Platform,
+		Path:     spec.Command,
+		State:    StateFailed,
+		Message:  err.Error(),
 	}
 }
 

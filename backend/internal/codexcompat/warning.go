@@ -16,6 +16,14 @@ var hiddenWarningPrefixes = []string{
 	"Falling back from WebSockets to HTTPS transport.",
 }
 
+func HiddenWarningPrefixes() []string {
+	var prefixes []string
+	for _, prefix := range hiddenWarningPrefixes {
+		prefixes = append(prefixes, prefix, warningPrefix+prefix)
+	}
+	return prefixes
+}
+
 func IsHiddenWarning(message string) bool {
 	message = strings.TrimPrefix(message, warningPrefix)
 	for _, prefix := range hiddenWarningPrefixes {

@@ -1,6 +1,7 @@
 package acpadapter
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -30,21 +31,11 @@ type manifestAsset struct {
 	Env    map[string]string `json:"env,omitempty"`
 }
 
-func manifestURLForVersion(version string) string {
+// releaseTag is the release a manifest is pinned to, or "" for latest.
+func releaseTag(version string) string {
 	version = strings.TrimSpace(version)
 	if version == "" || version == "dev" {
-		return releasesURL + "/latest/download/acp-adapters.json"
-	}
-	if !strings.HasPrefix(version, "v") {
-		version = "v" + version
-	}
-	return releasesURL + "/download/" + version + "/acp-adapters.json"
-}
-
-func manifestCacheNameForVersion(version string) string {
-	version = strings.TrimSpace(version)
-	if version == "" || version == "dev" {
-		return "latest"
+		return ""
 	}
 	if !strings.HasPrefix(version, "v") {
 		version = "v" + version
@@ -52,21 +43,20 @@ func manifestCacheNameForVersion(version string) string {
 	return version
 }
 
-func usesLatestManifest(version string) bool {
-	version = strings.TrimSpace(version)
-	return version == "" || version == "dev"
-}
-
 func (m *Manager) resolveSpec(ctx context.Context, name string) (adapterSpec, error) {
 	platform, err := platformKey(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return adapterSpec{}, err
 	}
-	manifest, err := m.fetchManifest(ctx)
+	source, err := m.fetchManifest(ctx)
 	if err != nil {
 		return adapterSpec{}, err
 	}
-	adapter, ok := manifest.Adapters[name]
+	return m.specFromManifest(source, name, platform)
+}
+
+func (m *Manager) specFromManifest(source manifest, name, platform string) (adapterSpec, error) {
+	adapter, ok := source.Adapters[name]
 	if !ok {
 		return adapterSpec{}, fmt.Errorf("managed acp adapter %q is not in the manifest", name)
 	}
@@ -98,41 +88,35 @@ func (m *Manager) resolveSpec(ctx context.Context, name string) (adapterSpec, er
 	return spec, nil
 }
 
+// fetchManifest reads the dev manifest or the release manifest. A tagged
+// release manifest never changes, so once cached it is final; the latest
+// manifest is refetched and falls back to its cache when the network fails.
 func (m *Manager) fetchManifest(ctx context.Context) (manifest, error) {
-	out, err := m.fetchManifestSource(ctx)
-	if err == nil {
-		m.cacheManifest(out)
-		_ = m.writeManifestCache(out)
-		return out, nil
-	}
-	if cached, ok := m.cachedManifest(); ok {
-		if !m.cacheAllowedForFetchFailure() {
-			return manifest{}, err
-		}
-		return cached, nil
-	}
-	if cached, ok := m.readManifestCache(); ok {
-		if !m.cacheAllowedForFetchFailure() {
-			return manifest{}, err
-		}
-		m.cacheManifest(cached)
-		return cached, nil
-	}
-	return manifest{}, err
-}
-
-func (m *Manager) cacheAllowedForFetchFailure() bool {
-	return m.localManifestPath == ""
-}
-
-func (m *Manager) fetchManifestSource(ctx context.Context) (manifest, error) {
 	if m.localManifestPath != "" {
 		return readLocalManifest(m.localManifestPath)
 	}
-	if m.manifestURL == "" {
-		return manifest{}, fmt.Errorf("managed acp adapter manifest URL is not configured")
+	cached, cachedOK := m.readManifestCache()
+	if cachedOK && m.tag != "" {
+		return cached, nil
 	}
-	return m.fetchRemoteManifest(ctx)
+	out, err := m.fetchRemoteManifest(ctx)
+	if err != nil {
+		if cachedOK {
+			return cached, nil
+		}
+		return manifest{}, err
+	}
+	_ = m.writeManifestCache(out)
+	return out, nil
+}
+
+// offlineManifest is fetchManifest without the network.
+func (m *Manager) offlineManifest() (manifest, bool) {
+	if m.localManifestPath != "" {
+		out, err := readLocalManifest(m.localManifestPath)
+		return out, err == nil
+	}
+	return m.readManifestCache()
 }
 
 func readLocalManifest(file string) (manifest, error) {
@@ -170,19 +154,6 @@ func (m *Manager) fetchRemoteManifest(ctx context.Context) (manifest, error) {
 	return out, nil
 }
 
-func (m *Manager) cacheManifest(out manifest) {
-	m.manifestMu.Lock()
-	defer m.manifestMu.Unlock()
-	m.manifest = out
-	m.hasManifest = true
-}
-
-func (m *Manager) cachedManifest() (manifest, bool) {
-	m.manifestMu.Lock()
-	defer m.manifestMu.Unlock()
-	return m.manifest, m.hasManifest
-}
-
 func (m *Manager) writeManifestCache(out manifest) error {
 	path := m.manifestCachePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -209,7 +180,7 @@ func (m *Manager) readManifestCache() (manifest, bool) {
 }
 
 func (m *Manager) manifestCachePath() string {
-	return filepath.Join(m.root, "acp", "managed", "adapters", "manifest-"+m.manifestCacheName+".json")
+	return filepath.Join(m.root, "acp", "managed", "adapters", "manifest-"+cmp.Or(m.tag, "latest")+".json")
 }
 
 func findLocalManifestPath() string {

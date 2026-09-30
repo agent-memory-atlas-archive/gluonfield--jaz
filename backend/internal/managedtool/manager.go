@@ -25,14 +25,12 @@ const (
 const antigravityBaseURL = "https://antigravity-cli-auto-updater-974169037036.us-central1.run.app"
 
 type Status struct {
-	Tool       string
-	Version    string
-	Platform   string
-	Path       string
-	State      string
-	Message    string
-	StartedAt  time.Time
-	FinishedAt time.Time
+	Tool     string
+	Version  string
+	Platform string
+	Path     string
+	State    string
+	Message  string
 }
 
 type Manager struct {
@@ -123,7 +121,6 @@ func (m *Manager) Status(name string) Status {
 		Platform: platform,
 		Path:     ExecutablePath(m.root, name),
 		State:    StateMissing,
-		Message:  DisplayName(name) + " is not downloaded yet",
 	}
 }
 
@@ -146,7 +143,6 @@ func (m *Manager) localReadyStatus(name string) (Status, bool) {
 		Platform: platform,
 		Path:     path,
 		State:    StateReady,
-		Message:  DisplayName(name) + " is ready",
 	}, true
 }
 
@@ -163,7 +159,6 @@ func existingReadyStatus(name, platform string) (Status, bool) {
 		Platform: platform,
 		Path:     path,
 		State:    StateReady,
-		Message:  DisplayName(name) + " is available on PATH",
 	}, true
 }
 
@@ -187,15 +182,14 @@ func (m *Manager) setResolveErrorStatus(name string, err error) {
 		state = StateUnsupported
 	}
 	m.setStatus(name, Status{
-		Tool:       name,
-		Platform:   platform,
-		State:      state,
-		Message:    err.Error(),
-		FinishedAt: time.Now().UTC(),
+		Tool:     name,
+		Platform: platform,
+		State:    state,
+		Message:  err.Error(),
 	})
 }
 
-func DisplayName(name string) string {
+func displayName(name string) string {
 	switch name {
 	case AntigravityCLI:
 		return "Antigravity CLI"

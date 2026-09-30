@@ -40,6 +40,7 @@ export interface JazDefaults {
   showModelIcons?: boolean
   homeWordmark?: string
   invertHomeLogoInLightMode?: boolean
+  invertHomeLogoInDarkMode?: boolean
   inlineDiffs?: boolean
   inlineShellCommands?: boolean
   composer?: ComposerConfig
