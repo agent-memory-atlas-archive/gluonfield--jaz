@@ -78,10 +78,13 @@ function itemKey(item: TimelineItem): string {
   }
 }
 
-// Result cards read as a turn's outcome, so they anchor to the end of the turn
-// rather than folding into its work.
+// Result cards and system rows never fold into a turn's work: they anchor to
+// the end of the turn, which also lands a row that precedes the next turn
+// directly above it.
+const RESULT_EVENTS = new Set(['loop_created', 'mcp_app', 'bot_activity'])
+
 function isResultCard(item: TimelineItem): boolean {
-  return item.kind === 'event' && (item.event.type === 'loop_created' || item.event.type === 'mcp_app')
+  return item.kind === 'event' && RESULT_EVENTS.has(item.event.type)
 }
 
 function trailingErrorEventIndex(chronological: TimelineItem[], anchored: TimelineItem[]): number | undefined {
@@ -264,8 +267,6 @@ export const Transcript = memo(function Transcript({
       {visibleTurns.map((turn, visibleTurnIndex) => {
         const turnIndex = historyStart + visibleTurnIndex
         const active = working && turnIndex === turns.length - 1
-        // A created-loop card reads as the turn's outcome, so pull it out of the
-        // flow and append it at the end rather than folding it into the work.
         const resultCards = turn.items.filter(isResultCard)
         const flow = turn.items.filter((item) => !isResultCard(item))
         const sections: ReactNode[] = []

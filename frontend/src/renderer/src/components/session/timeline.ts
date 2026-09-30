@@ -204,10 +204,19 @@ function markEventHeaders(items: TimelineItem[], sessionId?: string): void {
   }
 }
 
+// A turn opens with what started it: the user speaking, or a bot being woken
+// by a routine, another bot or a group.
+function opensTurn(item: TimelineItem): boolean {
+  if (item.kind === 'message') return item.message.role === 'user'
+  if (item.kind !== 'event') return false
+  const activity = item.event.bot_activity
+  return item.event.voice?.role === 'user' || (activity !== undefined && activity.kind !== 'message_sent')
+}
+
 function splitTurns(items: TimelineItem[]): Turn[] {
   const turns: Turn[] = []
   for (const item of items) {
-    if ((item.kind === 'message' && item.message.role === 'user') || (item.kind === 'event' && item.event.voice?.role === 'user')) {
+    if (opensTurn(item)) {
       turns.push({ opener: item, items: [] })
       continue
     }
@@ -402,6 +411,7 @@ export function buildTimeline(
       const taskSurface = taskSurfaceFromEvent(event)
       if (event.type === 'artifact') return Boolean(event.artifact)
       if (event.type === 'loop_created') return Boolean(event.loop_created)
+      if (event.type === 'bot_activity') return Boolean(event.bot_activity)
       if (event.type === 'mcp_app') return Boolean(event.mcp_app)
       if (!acp) {
         if (taskSurface) return true

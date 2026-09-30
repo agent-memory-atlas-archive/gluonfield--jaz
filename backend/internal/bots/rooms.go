@@ -92,7 +92,11 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 			if reply == "" || strings.EqualFold(reply, PassReply) {
 				continue
 			}
-			message := sessionevents.RoomMessageEvent{Speaker: "bot", BotID: member, Name: s.name(member), Text: reply}
+			name := s.name(member)
+			if rest, ok := strings.CutPrefix(reply, name+":"); ok {
+				reply = strings.TrimSpace(rest)
+			}
+			message := sessionevents.RoomMessageEvent{Speaker: "bot", BotID: member, Name: name, Text: reply}
 			s.appendEvent(sessionevents.Event{SessionID: groupID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
 			spoke = true
 			replies++

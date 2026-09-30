@@ -22,6 +22,7 @@ type fakeWorld struct {
 	prompts  map[string][]string
 	replies  map[string][]string
 	created  []acp.SpawnRequest
+	loops    []loops.Loop
 }
 
 func newFakeWorld() *fakeWorld {
@@ -127,10 +128,16 @@ func (w *fakeWorld) LoadLatestACPTurn(context.Context, string) ([]sessionevents.
 func (w *fakeWorld) Publish(sessionevents.Event) {}
 
 func (w *fakeWorld) List() ([]loops.Loop, error) {
-	return nil, nil
+	return w.loops, nil
 }
 
-func (w *fakeWorld) Update(string, loops.UpdateLoop) (loops.Loop, error) {
+func (w *fakeWorld) Update(id string, input loops.UpdateLoop) (loops.Loop, error) {
+	for i := range w.loops {
+		if w.loops[i].ID == id && input.BotID != nil {
+			w.loops[i].BotID = *input.BotID
+			return w.loops[i], nil
+		}
+	}
 	return loops.Loop{}, nil
 }
 
@@ -168,7 +175,7 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 }
 
 func newTestService(world *fakeWorld) *Service {
-	return NewService(world, world, fakeThreads{world: world}, world, world, log.New(nil))
+	return NewService(world, world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
 }
 
 func (w *fakeWorld) addBot(id, name string) {
@@ -237,7 +244,7 @@ func TestGroupRoundSkipsPassesAndStopsOnSilence(t *testing.T) {
 		t.Fatal(err)
 	}
 	world.replies["a"] = []string{"PASS", "pass"}
-	world.replies["b"] = []string{"Draft is in the doc.", "PASS"}
+	world.replies["b"] = []string{"Marketing: Draft is in the doc.", "PASS"}
 
 	if err := service.Post(group.ID, "Where is the launch draft?"); err != nil {
 		t.Fatal(err)
@@ -295,5 +302,28 @@ func TestMessageRelaysReplyToSender(t *testing.T) {
 	}
 	if relayed := world.prompts["gimli"][0]; !strings.HasPrefix(relayed, "[reply from dr eggbot]") || !strings.Contains(relayed, "temporal harness") {
 		t.Fatalf("relayed reply = %q", relayed)
+	}
+}
+
+func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBot(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("gimli", "Gimli")
+	world.loops = []loops.Loop{
+		{ID: "loop-1", Name: "Morning triage", ACPAgent: "codex", Directory: "triage"},
+		{ID: "loop-2", Name: "Digest", BotID: "gimli"},
+	}
+	if err := newTestService(world).AdoptLoops(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	adopted := world.loops[0].BotID
+	record, err := world.LoadBot(adopted)
+	if err != nil || record.Kind != KindBot || world.sessions[adopted].Title != "Morning triage" {
+		t.Fatalf("adopted by %q: %+v, %v", adopted, record, err)
+	}
+	if len(world.created) != 1 || world.created[0].ACPAgent != "codex" || world.created[0].Directory != "triage" {
+		t.Fatalf("created bots = %+v", world.created)
+	}
+	if world.loops[1].BotID != "gimli" {
+		t.Fatal("an owned loop changed owner")
 	}
 }

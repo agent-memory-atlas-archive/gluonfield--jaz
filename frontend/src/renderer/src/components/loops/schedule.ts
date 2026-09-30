@@ -63,13 +63,6 @@ export function cronFromDraft(draft: ScheduleDraft): string {
   }
 }
 
-// Rebuilds the editable draft from a stored loop. A paused loop is shown as
-// Manual; otherwise the preset is inferred from the cron shape.
-export function draftFromLoop(expr: string, paused: boolean): ScheduleDraft {
-  const parsed = parseExpr(expr)
-  return paused ? { ...parsed, preset: 'manual' } : parsed
-}
-
 function parseExpr(expr: string): ScheduleDraft {
   const fields = expr.trim().split(/\s+/)
   const fallback: ScheduleDraft = { preset: 'custom', time: DEFAULT_TIME, weekday: 1, expr }

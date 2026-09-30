@@ -111,7 +111,7 @@ function RootLayout() {
   const navigate = useNavigate()
   const router = useRouter()
 
-  // Deep links from board windows ("Open loop in Jaz") land here.
+  // Deep links from board windows ("Open bot in Jaz") land here.
   useEffect(() => {
     return clientRuntime.onOpenRoute?.((path) => router.history.push(path))
   }, [router])
@@ -164,12 +164,13 @@ function RootLayout() {
   // Phone: the sidebar is a full-screen drawer (CSS `max-sm:w-full`) that slides
   // over the thread rather than a resizable column, and auto-dismisses on
   // navigation to reveal the thread underneath. On desktop the thread panel
-  // belongs to Chat; the rail's other sections take the full card. Only the
-  // toggle animates the panel: switching tabs hides and restores it instantly.
+  // belongs to Chat and Bots; the rail's other sections take the full card.
+  // Only the toggle animates the panel: switching tabs hides and restores it
+  // instantly.
   const isMobile = useIsMobile()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const tab = railTab(pathname, settingsOpen)
-  const hasPanel = isMobile || tab === 'chat'
+  const hasPanel = isMobile || tab === 'chat' || tab === '/bots'
   const panelOpen = hasPanel && sidebarOpen
   const panelEdge = !isMobile && sidebarOpen ? RAIL_WIDTH + sidebarWidth : 0
   // A specific board paints itself on bg-surface so its tiles blend; match main
@@ -297,7 +298,7 @@ function RootLayout() {
             {/* Settings covers the page, so the page's own title and actions go too. */}
             {!settingsOpen && (
               <>
-                <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 items-center gap-1.5">
+                <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 flex-1 items-center gap-1.5">
                   <TitlebarSlotOutlet />
                 </div>
                 <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
@@ -332,6 +333,7 @@ function RootLayout() {
                     open={panelOpen}
                     width={sidebarWidth}
                     mobile={isMobile}
+                    bots={tab === '/bots'}
                     onDismiss={() => setSidebarOpen(false)}
                     resizing={resizing}
                     onResizeStart={startResize}

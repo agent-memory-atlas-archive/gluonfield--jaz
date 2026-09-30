@@ -36,7 +36,7 @@ function isCoarsePointer() {
 // Running, failed and unread are the same kind of fact, so they share the
 // trailing dot column rather than sitting on opposite sides of the row. Unread
 // follows the Feed: a finished turn nobody has opened yet.
-function stateDot(session: Session): { title: string; className: string } | null {
+export function stateDot(session: Pick<Session, 'status' | 'unread' | 'error'>): { title: string; className: string } | null {
   if (session.status === 'running') return { title: 'Running', className: 'animate-pulse bg-running' }
   if (session.status === 'error') {
     return { title: session.error ? `Failed: ${session.error}` : 'Failed', className: 'bg-danger' }

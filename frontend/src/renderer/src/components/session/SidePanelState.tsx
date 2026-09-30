@@ -27,7 +27,7 @@ export function SidePanelStateProvider({ children }: { children: ReactNode }) {
   return <PanelStates.Provider value={panels}>{children}</PanelStates.Provider>
 }
 
-export function useSidePanelState(sessionId: string, sideChatAvailable = false) {
+export function useSidePanelState(sessionId: string, sideChatAvailable = false, openOverview = false) {
   const panels = useContext(PanelStates)
   if (!panels) {
     throw new Error('Side panel state requires SidePanelStateProvider')
@@ -59,6 +59,9 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false) 
   const [open, setOpen] = useState(() => {
     if (saved) {
       return saved.open
+    }
+    if (openOverview) {
+      return true
     }
     const stored = localStorage.getItem(PANEL_OPEN_KEY)
     return stored === 'open' ? true : stored === 'closed' ? false : !isMobileViewport()

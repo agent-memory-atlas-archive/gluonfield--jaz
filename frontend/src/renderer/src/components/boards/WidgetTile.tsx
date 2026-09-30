@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { GripVertical, Pencil, Play, X } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
@@ -16,7 +17,7 @@ import {
   reportWidgetLayout,
   type WidgetLayoutReport,
 } from '@/lib/api/boards'
-import { activeRunStatus, runLoopNow, TONE_DOT } from '@/lib/api/loops'
+import { activeRunStatus, loopsQuery, runLoopNow, TONE_DOT } from '@/lib/api/loops'
 import type { BoardItem } from '@/lib/api/types'
 import { buildArtifactDocument, buildArtifactThemeCSS } from '@/lib/artifacts'
 import { clientRuntime } from '@/lib/clientRuntime'
@@ -65,8 +66,8 @@ function FirstRunPlaceholder({
   return (
     <button
       type="button"
-      aria-label="Open loop"
-      title="Open loop"
+      aria-label="Open bot"
+      title="Open bot"
       onClick={onClick}
       className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-hidden px-4 transition-colors duration-150 hover:bg-surface-2/60"
     >
@@ -128,6 +129,7 @@ export function WidgetTile({
   onOpenedInMain: (x: number, y: number) => void
 }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const reduce = useReducedMotion()
   // Keyed by version + theme: a new version or theme change builds a fresh
   // document and crossfades; zoom changes are applied live (postMessage) and
@@ -262,13 +264,19 @@ export function WidgetTile({
   }, [scale])
 
   const updated = hasTime(item.widget_updated_at) ? relativeTime(item.widget_updated_at) : ''
-  const openLoop = (e: ReactMouseEvent) => {
+  // A widget's loop is a bot's routine; open the bot that owns it.
+  const openBot = async (e: ReactMouseEvent) => {
+    const { clientX, clientY } = e
+    const loops = await queryClient.ensureQueryData(loopsQuery)
+    const botId = loops.find((loop) => loop.id === item.loop_id)?.bot_id
     if (clientRuntime.windowKind === 'board') {
-      clientRuntime.openInMain?.(`/loops/${item.loop_id}`)
-      onOpenedInMain(e.clientX, e.clientY)
-      return
+      clientRuntime.openInMain?.(botId ? `/bots/${botId}` : '/bots')
+      onOpenedInMain(clientX, clientY)
+    } else if (botId) {
+      void navigate({ to: '/bots/$botId', params: { botId } })
+    } else {
+      void navigate({ to: '/bots' })
     }
-    void navigate({ to: '/loops/$loopId', params: { loopId: item.loop_id } })
   }
 
   return (
@@ -306,9 +314,9 @@ export function WidgetTile({
           <IconButton
             variant="ghost"
             size="xs"
-            aria-label={clientRuntime.windowKind === 'board' ? 'Open loop in Jaz' : 'Open loop'}
-            title={clientRuntime.windowKind === 'board' ? 'Open loop in Jaz' : 'Open loop'}
-            onClick={openLoop}
+            aria-label={clientRuntime.windowKind === 'board' ? 'Open bot in Jaz' : 'Open bot'}
+            title={clientRuntime.windowKind === 'board' ? 'Open bot in Jaz' : 'Open bot'}
+            onClick={openBot}
           >
             <Pencil size={12} />
           </IconButton>
@@ -399,7 +407,7 @@ export function WidgetTile({
         </div>
       ) : (
         <FirstRunPlaceholder
-          onClick={openLoop}
+          onClick={openBot}
           running={
             item.loop_last_run_status === 'running' || item.loop_last_run_status === 'starting'
           }

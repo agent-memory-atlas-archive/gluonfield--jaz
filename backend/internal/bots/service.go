@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -24,13 +25,15 @@ type Service struct {
 	Routines Routines
 	Events   Publisher
 	Log      *log.Logger
+	// Workspace is the root bot directories are shown relative to.
+	Workspace string
 
 	mu     sync.Mutex
 	rounds map[string]*round
 }
 
-func NewService(repo Repository, store Store, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {
-	return &Service{Repo: repo, Store: store, Threads: threads, Routines: routines, Events: events, Log: logger.WithPrefix("bots")}
+func NewService(repo Repository, store Store, threads Threads, routines Routines, events Publisher, workspace string, logger *log.Logger) *Service {
+	return &Service{Repo: repo, Store: store, Threads: threads, Routines: routines, Events: events, Workspace: workspace, Log: logger.WithPrefix("bots")}
 }
 
 func (s *Service) List() ([]Bot, error) {
@@ -275,6 +278,9 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 	if ref := session.RuntimeRef; ref != nil {
 		bot.Agent = ref.Agent
 		bot.Directory = ref.ProjectPath
+		if rel, err := filepath.Rel(s.Workspace, ref.ProjectPath); err == nil && !strings.HasPrefix(rel, "..") {
+			bot.Directory = rel
+		}
 	}
 	bot.Preview = s.botPreview(session.ID)
 	return bot

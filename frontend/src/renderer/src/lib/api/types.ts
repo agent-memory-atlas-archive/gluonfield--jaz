@@ -420,11 +420,21 @@ export interface LoopSchedule {
   timezone: string
 }
 
+// Set when a routine fires on an incoming event instead of a schedule.
+export interface LoopTrigger {
+  kind: 'gmail' | 'whatsapp' | 'telegram' | 'slack' | 'webhook'
+  from?: string
+  subject?: string
+  contains?: string
+}
+
 export interface Loop {
   id: string
+  bot_id: string
   name: string
   prompt: string
   schedule: LoopSchedule
+  trigger?: LoopTrigger
   status: 'active' | 'paused' | 'deleted'
   runtime: 'acp'
   acp_agent?: string
@@ -674,11 +684,6 @@ export interface ArtifactEvent {
   artifact_type?: 'svg' | 'html'
 }
 
-export interface LoopBoardRef {
-  id: string
-  name: string
-}
-
 // MCPAppEvent is an agent's call to a tool its MCP server links to an MCP
 // App, which the thread shows with the call's arguments and result.
 export interface MCPAppEvent {
@@ -688,15 +693,48 @@ export interface MCPAppEvent {
   result: CallToolResult
 }
 
-export interface LoopCreatedEvent {
-  loop_id: string
-  loop_name: string
-  schedule?: string
-  timezone?: string
-  next_run_at?: string
+export type BotShape = 'circle' | 'blob' | 'squircle' | 'pill' | 'triangle' | 'hex' | 'cloud' | 'drop'
+export type BotColor = 'white' | 'brown' | 'red' | 'orange' | 'amber' | 'green' | 'teal' | 'blue' | 'purple' | 'pink' | 'gray'
+
+export interface BotAvatar {
+  shape: BotShape
+  color: BotColor
+}
+
+// A bot is a thread with a face; a group is a thread whose members are bots.
+// The id is the backing thread's session id.
+export interface Bot {
+  id: string
+  kind: 'bot' | 'group'
+  name: string
+  avatar: BotAvatar
+  pinned: boolean
+  unread: boolean
+  status: Session['status']
+  preview?: string
+  updated_at: string
   agent?: string
-  status?: string
-  boards?: LoopBoardRef[]
+  model?: string
+  directory?: string
+  members?: string[]
+  routines?: number
+}
+
+export interface BotActivityEvent {
+  kind: 'routine' | 'message_sent' | 'message_received' | 'group'
+  label: string
+  bot_id?: string
+}
+
+export interface RoomMessageEvent {
+  speaker: 'user' | 'bot'
+  bot_id?: string
+  name: string
+  text: string
+}
+
+export interface LoopCreatedEvent {
+  loop_name: string
 }
 
 export interface SideChatEvent {
@@ -913,6 +951,8 @@ export interface SessionEvent {
   permission?: ACPPermission
   artifact?: ArtifactEvent
   loop_created?: LoopCreatedEvent
+  bot_activity?: BotActivityEvent
+  room_message?: RoomMessageEvent
   mcp_app?: MCPAppEvent
   side_chat?: SideChatEvent
   agent_session?: AgentSessionState

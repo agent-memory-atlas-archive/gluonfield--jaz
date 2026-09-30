@@ -20,8 +20,8 @@ export async function readAPIResponse<T>(res: Response): Promise<T> {
     }
     throw new ApiError(res.status, message)
   }
-  if (res.status === 204) {
-    return undefined as T
-  }
-  return (await res.json()) as T
+  const body = await res.text()
+  // 202 and 204 acknowledge a write; an empty 200 is still a broken contract.
+  if (!body && (res.status === 202 || res.status === 204)) return undefined as T
+  return JSON.parse(body) as T
 }

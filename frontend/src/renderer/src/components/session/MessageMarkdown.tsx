@@ -22,6 +22,7 @@ import { findFileReferences, parseFileReference, resolveFileLink, type FileRefer
 import { CodeBlock } from './CodeBlock'
 import { encodeMention } from './mentionCodec'
 import { MentionPill } from './mentions'
+import { botIdFromTarget } from '@/lib/bots'
 
 const PreviewLinkContext = createContext<((url: string) => void) | null>(null)
 const FileReaderLinkContext = createContext<((file: FileReference) => void) | null>(null)
@@ -242,7 +243,7 @@ function BaseMarkdown({
         components={components}
         urlTransform={(url, key, node) => key === 'src' && node.tagName === 'img'
           ? markdownImageSource(url, files?.sessionId, files?.documentPath)
-          : parseFileReference(url) ? url : defaultUrlTransform(url)}
+          : parseFileReference(url) || botIdFromTarget(url) ? url : defaultUrlTransform(url)}
       >
         {prepared}
       </Markdown>

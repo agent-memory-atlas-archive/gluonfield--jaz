@@ -8,8 +8,8 @@ import { ACPEventHeader } from './ACPEventHeader'
 import { ArtifactBlock } from './ArtifactBlock'
 import { AssistantMarkdown } from './AssistantMarkdown'
 import { MCPAppFrame } from '@/components/apps/MCPAppFrame'
-import { LoopCreatedCard } from './LoopCreatedCard'
 import { SessionErrorNotice, type SessionErrorAction } from './SessionErrorNotice'
+import { SystemEventRow } from './SystemEventRow'
 import { TaskChecklist } from './TaskChecklist'
 import { ToolDisclosure } from './ToolDisclosure'
 import { PermissionCard } from './TranscriptPermissions'
@@ -37,6 +37,9 @@ export const LiveEvent = memo(function LiveEvent({
   onArtifactPrompt?: (text: string) => void
   errorAction?: SessionErrorAction
 }) {
+  if (event.type === 'bot_activity' || event.type === 'loop_created') {
+    return <SystemEventRow event={event} />
+  }
   if (event.voice) {
     return <Bubble message={{ seq: event.seq ?? 0, role: event.voice.role, content: event.voice.text, blocks: [], created_at: event.voice.at }} showAssistantCopy={showCopy} />
   }
@@ -45,7 +48,6 @@ export const LiveEvent = memo(function LiveEvent({
   const parentChild = isParentChildACPEvent(event)
   const toolCalls = parentChild ? undefined : event.acp?.tool_calls
   const artifact = event.type === 'artifact' ? event.artifact : undefined
-  const loopCreated = event.type === 'loop_created' ? event.loop_created : undefined
   const mcpApp = event.type === 'mcp_app' ? event.mcp_app : undefined
   return (
     <div className="flex min-w-0 max-w-[var(--prose-max)] flex-col gap-2">
@@ -56,7 +58,6 @@ export const LiveEvent = memo(function LiveEvent({
       {artifact ? (
         <ArtifactBlock artifact={artifact} onSendPrompt={onArtifactPrompt} />
       ) : null}
-      {loopCreated ? <LoopCreatedCard loop={loopCreated} /> : null}
       {mcpApp ? <MCPAppFrame app={mcpApp} call={mcpApp} active /> : null}
       {event.content && !artifact ? (
         <AssistantMarkdown text={event.content} createdAt={event.at} showCopy={showCopy} />

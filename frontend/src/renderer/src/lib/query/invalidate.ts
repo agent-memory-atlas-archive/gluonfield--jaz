@@ -6,6 +6,8 @@ export function invalidateSessionLists(
   opts: { archived?: boolean; session?: string } = {},
 ) {
   queryClient.invalidateQueries({ queryKey: keys.sidebarSessions })
+  // Bots are threads too: pins, names, and unread state ride the same writes.
+  queryClient.invalidateQueries({ queryKey: keys.bots })
   // Archiving, replying, and renaming all change which threads are unread.
   queryClient.invalidateQueries({ queryKey: keys.feed })
   if (opts.archived) queryClient.invalidateQueries({ queryKey: keys.archivedSessions })

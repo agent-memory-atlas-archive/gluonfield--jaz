@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { AgentAvatar } from '@/components/acp/AgentAvatar'
+import { BotIcon } from '@/components/bots/BotAvatar'
+import { botsQuery } from '@/lib/api/bots'
+import { botAvatars, botIdFromTarget } from '@/lib/bots'
 import { layoutRect, layoutViewport } from '@/lib/dom/zoom'
 import { sessionQuery } from '@/lib/api/sessions'
 import { skillsQuery } from '@/lib/api/skills'
@@ -17,6 +20,8 @@ const SESSION_ID_RE = /^\d{8}T\d{6}-[a-f0-9]{8}$/i
 
 export function MentionPill({ mention }: { mention: Mention }) {
   if (mention.sigil === '$') return <SkillMentionPill mention={mention} />
+  const botId = botIdFromTarget(mention.target)
+  if (botId) return <BotMentionPill botId={botId} name={mention.name} />
   if (mention.sigil === '@' && SESSION_ID_RE.test(mention.target)) {
     return <ThreadMentionPill mention={mention} />
   }
@@ -58,6 +63,17 @@ function SkillMentionPill({ mention }: { mention: Mention }) {
         </p>
       </MentionPopover>
     </>
+  )
+}
+
+function BotMentionPill({ botId, name }: { botId: string; name: string }) {
+  const bots = useQuery(botsQuery).data ?? []
+  const bot = bots.find((item) => item.id === botId)
+  return (
+    <Link to="/bots/$botId" params={{ botId }} title={bot?.name ?? name} className={THREAD_PILL_CLASS}>
+      {bot ? <BotIcon avatars={botAvatars(bot, bots)} size={14} /> : null}
+      <span className="min-w-0 truncate">{bot?.name ?? name}</span>
+    </Link>
   )
 }
 

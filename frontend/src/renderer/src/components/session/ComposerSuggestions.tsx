@@ -2,18 +2,21 @@ import { FileText, Folder, Sparkles, Terminal } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef } from 'react'
 import { AgentAvatar } from '@/components/acp/AgentAvatar'
+import { BotIcon } from '@/components/bots/BotAvatar'
+import type { BotAvatar } from '@/lib/api/types'
 import { fullTime, hasTime, relativeTime } from '@/lib/format/time'
 
 // One row in the composer's $/@ autocomplete. `insert` is the literal token
 // text placed in the textarea; `expansion` is what that text becomes in the
 // sent message (a skill reference, a thread id, an absolute path).
 export interface SuggestionItem {
-  kind: 'command' | 'skill' | 'project' | 'thread' | 'file' | 'dir'
+  kind: 'command' | 'skill' | 'project' | 'thread' | 'bot' | 'file' | 'dir'
   label: string
   detail?: string
   /** label indices matched by the fuzzy query, for highlighting */
   indices?: number[]
   agent?: string
+  avatars?: BotAvatar[]
   updatedAt?: string
   insert: string
   expansion: string
@@ -29,6 +32,7 @@ function ItemIcon({ item }: { item: SuggestionItem }) {
   if (item.kind === 'command') return <Terminal size={13} className="mt-0.5 shrink-0 text-ink-3" />
   if (item.kind === 'skill') return <Sparkles size={13} className="mt-0.5 shrink-0 text-primary" />
   if (item.kind === 'thread') return <AgentAvatar agent={item.agent} size={15} className="mt-0.5" />
+  if (item.avatars) return <span className="mt-0.5 shrink-0"><BotIcon avatars={item.avatars} size={15} /></span>
   if (item.kind === 'project' || item.kind === 'dir') return <Folder size={13} className="mt-0.5 shrink-0 text-primary" />
   return <FileText size={13} className="mt-0.5 shrink-0 text-ink-3" />
 }

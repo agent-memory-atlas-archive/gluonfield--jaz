@@ -13,10 +13,10 @@ import { Route as NewRouteImport } from './routes/new'
 import { Route as LauncherRouteImport } from './routes/launcher'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LoopsIndexRouteImport } from './routes/loops.index'
+import { Route as BotsIndexRouteImport } from './routes/bots.index'
 import { Route as BoardsIndexRouteImport } from './routes/boards.index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as LoopsLoopIdRouteImport } from './routes/loops.$loopId'
+import { Route as BotsBotIdRouteImport } from './routes/bots.$botId'
 import { Route as BoardsBoardIdRouteImport } from './routes/boards.$boardId'
 import { Route as AppsServerIdToolRouteImport } from './routes/apps.$serverId.$tool'
 
@@ -40,9 +40,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoopsIndexRoute = LoopsIndexRouteImport.update({
-  id: '/loops/',
-  path: '/loops/',
+const BotsIndexRoute = BotsIndexRouteImport.update({
+  id: '/bots/',
+  path: '/bots/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BoardsIndexRoute = BoardsIndexRouteImport.update({
@@ -55,9 +55,9 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   path: '/sessions/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoopsLoopIdRoute = LoopsLoopIdRouteImport.update({
-  id: '/loops/$loopId',
-  path: '/loops/$loopId',
+const BotsBotIdRoute = BotsBotIdRouteImport.update({
+  id: '/bots/$botId',
+  path: '/bots/$botId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BoardsBoardIdRoute = BoardsBoardIdRouteImport.update({
@@ -77,10 +77,10 @@ export interface FileRoutesByFullPath {
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
-  '/loops/$loopId': typeof LoopsLoopIdRoute
+  '/bots/$botId': typeof BotsBotIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards/': typeof BoardsIndexRoute
-  '/loops/': typeof LoopsIndexRoute
+  '/bots/': typeof BotsIndexRoute
   '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRoutesByTo {
@@ -89,10 +89,10 @@ export interface FileRoutesByTo {
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
-  '/loops/$loopId': typeof LoopsLoopIdRoute
+  '/bots/$botId': typeof BotsBotIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards': typeof BoardsIndexRoute
-  '/loops': typeof LoopsIndexRoute
+  '/bots': typeof BotsIndexRoute
   '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRoutesById {
@@ -102,10 +102,10 @@ export interface FileRoutesById {
   '/launcher': typeof LauncherRoute
   '/new': typeof NewRoute
   '/boards/$boardId': typeof BoardsBoardIdRoute
-  '/loops/$loopId': typeof LoopsLoopIdRoute
+  '/bots/$botId': typeof BotsBotIdRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/boards/': typeof BoardsIndexRoute
-  '/loops/': typeof LoopsIndexRoute
+  '/bots/': typeof BotsIndexRoute
   '/apps/$serverId/$tool': typeof AppsServerIdToolRoute
 }
 export interface FileRouteTypes {
@@ -116,10 +116,10 @@ export interface FileRouteTypes {
     | '/launcher'
     | '/new'
     | '/boards/$boardId'
-    | '/loops/$loopId'
+    | '/bots/$botId'
     | '/sessions/$sessionId'
     | '/boards/'
-    | '/loops/'
+    | '/bots/'
     | '/apps/$serverId/$tool'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -128,10 +128,10 @@ export interface FileRouteTypes {
     | '/launcher'
     | '/new'
     | '/boards/$boardId'
-    | '/loops/$loopId'
+    | '/bots/$botId'
     | '/sessions/$sessionId'
     | '/boards'
-    | '/loops'
+    | '/bots'
     | '/apps/$serverId/$tool'
   id:
     | '__root__'
@@ -140,10 +140,10 @@ export interface FileRouteTypes {
     | '/launcher'
     | '/new'
     | '/boards/$boardId'
-    | '/loops/$loopId'
+    | '/bots/$botId'
     | '/sessions/$sessionId'
     | '/boards/'
-    | '/loops/'
+    | '/bots/'
     | '/apps/$serverId/$tool'
   fileRoutesById: FileRoutesById
 }
@@ -153,10 +153,10 @@ export interface RootRouteChildren {
   LauncherRoute: typeof LauncherRoute
   NewRoute: typeof NewRoute
   BoardsBoardIdRoute: typeof BoardsBoardIdRoute
-  LoopsLoopIdRoute: typeof LoopsLoopIdRoute
+  BotsBotIdRoute: typeof BotsBotIdRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   BoardsIndexRoute: typeof BoardsIndexRoute
-  LoopsIndexRoute: typeof LoopsIndexRoute
+  BotsIndexRoute: typeof BotsIndexRoute
   AppsServerIdToolRoute: typeof AppsServerIdToolRoute
 }
 
@@ -190,11 +190,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/loops/': {
-      id: '/loops/'
-      path: '/loops'
-      fullPath: '/loops/'
-      preLoaderRoute: typeof LoopsIndexRouteImport
+    '/bots/': {
+      id: '/bots/'
+      path: '/bots'
+      fullPath: '/bots/'
+      preLoaderRoute: typeof BotsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/boards/': {
@@ -211,11 +211,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/loops/$loopId': {
-      id: '/loops/$loopId'
-      path: '/loops/$loopId'
-      fullPath: '/loops/$loopId'
-      preLoaderRoute: typeof LoopsLoopIdRouteImport
+    '/bots/$botId': {
+      id: '/bots/$botId'
+      path: '/bots/$botId'
+      fullPath: '/bots/$botId'
+      preLoaderRoute: typeof BotsBotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/boards/$boardId': {
@@ -241,10 +241,10 @@ const rootRouteChildren: RootRouteChildren = {
   LauncherRoute: LauncherRoute,
   NewRoute: NewRoute,
   BoardsBoardIdRoute: BoardsBoardIdRoute,
-  LoopsLoopIdRoute: LoopsLoopIdRoute,
+  BotsBotIdRoute: BotsBotIdRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   BoardsIndexRoute: BoardsIndexRoute,
-  LoopsIndexRoute: LoopsIndexRoute,
+  BotsIndexRoute: BotsIndexRoute,
   AppsServerIdToolRoute: AppsServerIdToolRoute,
 }
 export const routeTree = rootRouteImport
