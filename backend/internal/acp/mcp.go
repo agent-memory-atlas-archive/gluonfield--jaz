@@ -41,7 +41,7 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 	}, t.Send)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        ToolWaitThreads,
-		Description: "Get status or wait for up to eight Jaz threads. Set timeoutMs: 0 for an immediate snapshot; otherwise wait until any thread completes, fails, or needs user input. Default timeout is 120000 ms. Returns compact snapshots of all targets and per-thread errors. A timeout leaves work running.",
+		Description: "Get status or wait for up to eight Jaz threads. Set timeoutMs: 0 for an immediate snapshot; otherwise wait until any thread completes, fails, or needs user input. Default and maximum timeout is 50000 ms. Returns compact snapshots of all targets and per-thread errors. A timeout leaves work running.",
 	}, t.Wait)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        ToolStopThread,
@@ -141,8 +141,11 @@ type MCPThreadInput struct {
 
 type MCPWaitInput struct {
 	Targets   []MCPThreadInput `json:"targets" jsonschema:"One to eight threads to inspect or wait for."`
-	TimeoutMs *int             `json:"timeoutMs,omitempty" jsonschema:"0 for immediate status; 1-120000 to wait. Defaults to 120000 milliseconds."`
+	TimeoutMs *int             `json:"timeoutMs,omitempty" jsonschema:"0 for immediate status; 1-50000 to wait. Defaults to 50000 milliseconds."`
 }
+
+// Claude Code aborts an MCP request that receives no response byte within 60 s.
+const maxWaitMs = 50000
 
 type MCPWaitOutput struct {
 	Threads []ThreadSnapshot  `json:"threads"`
@@ -150,12 +153,12 @@ type MCPWaitOutput struct {
 }
 
 func (t *MCPTools) Wait(ctx context.Context, _ *mcp.CallToolRequest, input MCPWaitInput) (*mcp.CallToolResult, MCPWaitOutput, error) {
-	timeout := 120000
+	timeout := maxWaitMs
 	if input.TimeoutMs != nil {
 		timeout = *input.TimeoutMs
 	}
-	if timeout < 0 || timeout > 120000 {
-		return nil, MCPWaitOutput{}, fmt.Errorf("timeoutMs must be between 0 and 120000")
+	if timeout < 0 || timeout > maxWaitMs {
+		return nil, MCPWaitOutput{}, fmt.Errorf("timeoutMs must be between 0 and %d", maxWaitMs)
 	}
 	refs := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
