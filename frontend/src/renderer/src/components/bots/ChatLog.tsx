@@ -67,7 +67,7 @@ export function ChatLog({
       })}
       {working.map(({ bot, doing = 'working' }) => (
         <p key={bot.id} role="status" className="mt-4 flex items-center gap-2 text-sm text-ink-3 first:mt-0">
-          <BotAvatar avatar={bot.avatar} size={22} />
+          <BotAvatar avatar={bot.avatar} size={22} working />
           <span className="live-shimmer">
             {bot.name} is {doing}…
           </span>

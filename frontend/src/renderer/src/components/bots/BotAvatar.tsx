@@ -1,3 +1,4 @@
+import { motion, useReducedMotion } from 'motion/react'
 import type { ReactNode, SVGProps } from 'react'
 import type { BotAvatar as Avatar, BotShape } from '@/lib/api/types'
 import { BOT_COLORS } from '@/lib/bots'
@@ -35,31 +36,68 @@ const SHAPES: Record<BotShape, { eyes: number; body: (fill: string) => ReactNode
   drop: { eyes: 60, body: () => <path d="M50 4s36 38 36 59a36 36 0 0 1-72 0C14 42 50 4 50 4z" /> },
 }
 
-export function BotAvatar({ avatar, size, className = '' }: { avatar: Avatar; size: number; className?: string }) {
+// A working face bobs and glances around, unless motion is reduced.
+const LOOP = { repeat: Infinity, ease: 'easeInOut' } as const
+
+export function BotAvatar({
+  avatar,
+  size,
+  working = false,
+  className = '',
+}: {
+  avatar: Avatar
+  size: number
+  working?: boolean
+  className?: string
+}) {
   const fill = BOT_COLORS[avatar.color]
   const { eyes, body } = SHAPES[avatar.shape]
+  const reduced = useReducedMotion()
+  const animate = working && !reduced
   return (
-    <svg
+    <motion.svg
       aria-hidden
       viewBox="0 0 100 100"
       width={size}
       height={size}
+      animate={{ y: animate ? [0, -size * 0.06, 0] : 0 }}
+      transition={animate ? { duration: 1.2, ...LOOP } : undefined}
       className={`shrink-0 overflow-visible drop-shadow-[0_0_0.5px_rgb(0_0_0/0.35)] ${className}`}
     >
       <g fill={fill}>{body(fill)}</g>
-      <path d={`M45 ${eyes - 7}l4 14M65 ${eyes - 7}l4 14`} stroke="#1c1c1f" strokeWidth="7" strokeLinecap="round" />
-    </svg>
+      <motion.path
+        d={`M45 ${eyes - 7}l4 14M65 ${eyes - 7}l4 14`}
+        stroke="#1c1c1f"
+        strokeWidth="7"
+        strokeLinecap="round"
+        animate={{ x: animate ? [0, 5, 5, -5, -5, 0] : 0 }}
+        transition={animate ? { duration: 2.8, times: [0, 0.15, 0.4, 0.55, 0.8, 1], ...LOOP } : undefined}
+      />
+    </motion.svg>
   )
 }
 
-// One face for a bot; a group overlaps its first two members.
-export function BotIcon({ avatars, size }: { avatars: Avatar[]; size: number }) {
-  if (avatars.length < 2) return <BotAvatar avatar={avatars[0]} size={size} />
+// One face for a bot; a group overlaps its first two members. A working bot
+// wears a green dot, like someone online.
+export function BotIcon({ avatars, size, working = false }: { avatars: Avatar[]; size: number; working?: boolean }) {
   const member = Math.round(size * 0.72)
   return (
     <span className="relative shrink-0" style={{ width: size, height: size }}>
-      <BotAvatar avatar={avatars[0]} size={member} className="absolute left-0 top-0" />
-      <BotAvatar avatar={avatars[1]} size={member} className="absolute right-0 bottom-0" />
+      {avatars.length < 2 ? (
+        <BotAvatar avatar={avatars[0]} size={size} working={working} />
+      ) : (
+        <>
+          <BotAvatar avatar={avatars[0]} size={member} className="absolute left-0 top-0" />
+          <BotAvatar avatar={avatars[1]} size={member} className="absolute right-0 bottom-0" />
+        </>
+      )}
+      {working ? (
+        <span
+          title="Working"
+          className="absolute -top-px -right-px rounded-full bg-ok ring-2 ring-panel"
+          style={{ width: Math.max(7, Math.round(size * 0.24)), height: Math.max(7, Math.round(size * 0.24)) }}
+        />
+      ) : null}
     </span>
   )
 }

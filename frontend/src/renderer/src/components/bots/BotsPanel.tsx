@@ -67,7 +67,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
         ) : (
           <section className="flex shrink-0 flex-col gap-3">
             {pinned.length ? (
-              <div className="grid grid-cols-2 gap-px">
+              <div className="grid grid-cols-3 gap-px">
                 {pinned.map((bot) => (
                   <BotEntry key={bot.id} bot={bot} bots={list} tile />
                 ))}
@@ -91,7 +91,9 @@ function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: b
   const [renaming, setRenaming] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const menuTriggers = useContextMenuTrigger(setMenu)
-  const state = stateDot(bot)
+  // A working bot shows it on its face; the dot is for unread and failed.
+  const working = bot.status === 'running'
+  const state = working ? null : stateDot(bot)
   const dot = state ? <span title={state.title} className={`size-1.5 shrink-0 rounded-full ${state.className}`} /> : null
   const name = renaming ? (
     <BotNameInput
@@ -117,7 +119,7 @@ function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: b
             : 'flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] max-sm:py-2.5 max-sm:text-[15px]'
         }`}
       >
-        <BotIcon avatars={botAvatars(bot, bots)} size={tile ? 44 : 28} />
+        <BotIcon avatars={botAvatars(bot, bots)} size={tile ? 44 : 28} working={working} />
         {tile ? (
           <span className="flex max-w-full items-center gap-1">
             {name}
