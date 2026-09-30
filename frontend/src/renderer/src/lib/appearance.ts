@@ -29,6 +29,7 @@ export interface AppearanceSettings {
   /** custom name or image URL on the new-thread screen; '' keeps "jaz" */
   homeWordmark: string
   invertHomeLogoInLightMode: boolean
+  invertHomeLogoInDarkMode: boolean
 }
 
 export const DEFAULTS: AppearanceSettings = {
@@ -42,6 +43,7 @@ export const DEFAULTS: AppearanceSettings = {
   showModelIcons: true,
   homeWordmark: '',
   invertHomeLogoInLightMode: false,
+  invertHomeLogoInDarkMode: false,
 }
 
 // Whole-UI zoom steps. The chrome is built largely with px sizes, so scaling the
@@ -133,6 +135,10 @@ const FIELDS: { [K in keyof AppearanceSettings]: Field<AppearanceSettings[K]> } 
   invertHomeLogoInLightMode: boolField(
     'jaz.appearance.invertHomeLogoInLightMode',
     (c) => c.invertHomeLogoInLightMode,
+  ),
+  invertHomeLogoInDarkMode: boolField(
+    'jaz.appearance.invertHomeLogoInDarkMode',
+    (c) => c.invertHomeLogoInDarkMode,
   ),
 }
 

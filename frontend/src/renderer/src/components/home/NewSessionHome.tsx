@@ -9,7 +9,11 @@ import type { SendMessageHandler } from '@/lib/sendMessage'
 
 const HOME_WIDTH = 640
 
-function HomeLogo({ value, invertInLightMode }: { value: string; invertInLightMode: boolean }) {
+function HomeLogo({ value, invertInLightMode, invertInDarkMode }: {
+  value: string
+  invertInLightMode: boolean
+  invertInDarkMode: boolean
+}) {
   const url = isHomeLogoUrl(value) ? value : null
   const [failed, setFailed] = useState(false)
   return (
@@ -20,7 +24,7 @@ function HomeLogo({ value, invertInLightMode }: { value: string; invertInLightMo
           alt="Home logo"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
-          className={`block max-h-full max-w-full object-contain ${invertInLightMode ? 'invert dark:invert-0' : ''}`}
+          className={`block max-h-full max-w-full object-contain ${invertInLightMode ? 'invert' : ''} ${invertInDarkMode ? 'dark:invert' : 'dark:invert-0'}`}
         />
       ) : (
         <DitherWordmark text={url ? DEFAULT_HOME_WORDMARK : value} maxWidth={HOME_WIDTH} />
@@ -61,7 +65,12 @@ export function NewSessionHome({
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
       >
         <div className="flex w-full flex-col gap-8" style={{ maxWidth: HOME_WIDTH }}>
-          <HomeLogo key={wordmark} value={wordmark} invertInLightMode={settings.invertHomeLogoInLightMode} />
+          <HomeLogo
+            key={wordmark}
+            value={wordmark}
+            invertInLightMode={settings.invertHomeLogoInLightMode}
+            invertInDarkMode={settings.invertHomeLogoInDarkMode}
+          />
           <ComposerCard
             streaming={creating}
             autoFocus

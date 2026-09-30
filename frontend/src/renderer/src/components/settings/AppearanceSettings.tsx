@@ -348,13 +348,22 @@ export function AppearanceSettings() {
           />
         </Row>
         {isHomeLogoUrl(settings.homeWordmark) ? (
-          <Row title="Invert image in light mode" description="For white logos on transparent backgrounds.">
-            <Switch
-              checked={settings.invertHomeLogoInLightMode}
-              onChange={(value) => setAppearance({ invertHomeLogoInLightMode: value })}
-              aria-label="Invert image in light mode"
-            />
-          </Row>
+          <>
+            <Row title="Invert image in light mode" description="For white logos on transparent backgrounds.">
+              <Switch
+                checked={settings.invertHomeLogoInLightMode}
+                onChange={(value) => setAppearance({ invertHomeLogoInLightMode: value })}
+                aria-label="Invert image in light mode"
+              />
+            </Row>
+            <Row title="Invert image in dark mode" description="For black logos on transparent backgrounds.">
+              <Switch
+                checked={settings.invertHomeLogoInDarkMode}
+                onChange={(value) => setAppearance({ invertHomeLogoInDarkMode: value })}
+                aria-label="Invert image in dark mode"
+              />
+            </Row>
+          </>
         ) : null}
       </SettingsCard>
 
