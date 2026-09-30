@@ -37,10 +37,17 @@ type Server struct {
 	URL               string      `json:"url"`
 	Enabled           bool        `json:"enabled"`
 	BearerTokenEnvVar string      `json:"bearer_token_env_var,omitempty"`
+	BearerToken       string      `json:"bearer_token,omitempty"`
 	Headers           []Header    `json:"headers,omitempty"`
 	OAuth             OAuthConfig `json:"oauth,omitempty"`
 	CreatedAt         time.Time   `json:"created_at"`
 	UpdatedAt         time.Time   `json:"updated_at"`
+}
+
+// UsesBearer reports whether the server authenticates with a bearer token,
+// which takes the place of OAuth sign-in.
+func (s Server) UsesBearer() bool {
+	return s.BearerToken != "" || s.BearerTokenEnvVar != ""
 }
 
 type ServerInput struct {
@@ -48,6 +55,7 @@ type ServerInput struct {
 	URL               string      `json:"url"`
 	Enabled           bool        `json:"enabled"`
 	BearerTokenEnvVar string      `json:"bearer_token_env_var,omitempty"`
+	BearerToken       string      `json:"bearer_token,omitempty"`
 	Headers           []Header    `json:"headers,omitempty"`
 	OAuth             OAuthConfig `json:"oauth,omitempty"`
 }
@@ -90,6 +98,7 @@ func ValidateInput(input ServerInput) (ServerInput, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.URL = strings.TrimSpace(input.URL)
 	input.BearerTokenEnvVar = strings.TrimSpace(input.BearerTokenEnvVar)
+	input.BearerToken = strings.TrimSpace(input.BearerToken)
 	input.OAuth = normalizeOAuth(input.OAuth)
 	if input.Name == "" {
 		return input, errors.New("name is required")
@@ -214,7 +223,9 @@ func ResolvedHeaders(server Server, requireEnv bool) ([]Header, error) {
 		}
 		add(header.Name, header.Value)
 	}
-	if envVar := strings.TrimSpace(server.BearerTokenEnvVar); envVar != "" {
+	if server.BearerToken != "" {
+		add("Authorization", "Bearer "+server.BearerToken)
+	} else if envVar := strings.TrimSpace(server.BearerTokenEnvVar); envVar != "" {
 		value := os.Getenv(envVar)
 		if value == "" {
 			if requireEnv {

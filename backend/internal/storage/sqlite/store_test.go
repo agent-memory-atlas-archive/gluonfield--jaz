@@ -394,10 +394,11 @@ func TestMCPServersCRUDRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	updated, err := store.UpdateMCPServer(created.ID, mcpconfig.ServerInput{
-		Name:    "Docs",
-		URL:     "https://docs.example.com/mcp",
-		Enabled: true,
-		Headers: []mcpconfig.Header{{Name: "X-Docs", Value: "1"}},
+		Name:        "Docs",
+		URL:         "https://docs.example.com/mcp",
+		Enabled:     true,
+		BearerToken: "docs-key",
+		Headers:     []mcpconfig.Header{{Name: "X-Docs", Value: "1"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -406,6 +407,9 @@ func TestMCPServersCRUDRoundTrip(t *testing.T) {
 		updated.BearerTokenEnvVar != "" || len(updated.Headers) != 1 || updated.Headers[0].Name != "X-Docs" ||
 		updated.OAuth.ClientID != "" {
 		t.Fatalf("updated = %#v", updated)
+	}
+	if reloaded, err := store.LoadMCPServer(created.ID); err != nil || reloaded.BearerToken != "docs-key" || loaded.BearerToken != "" {
+		t.Fatalf("bearer token did not round-trip: %#v %v", reloaded, err)
 	}
 	if _, ok, err := store.LoadToken(context.Background(), tokenID); err != nil || ok {
 		t.Fatalf("updated server retained stale token ok=%v err=%v", ok, err)

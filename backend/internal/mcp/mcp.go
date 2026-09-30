@@ -171,9 +171,9 @@ func NewManager(store mcpconfig.ServerReader, tokens tokenStore, registry *tools
 
 // backgroundHandler builds a non-interactive OAuth handler that serves stored
 // tokens (refreshing them when possible) but never opens a browser. Returns nil
-// when no token store is configured.
+// when no token store is configured or the server uses a bearer token.
 func (m *Manager) backgroundHandler(server mcpconfig.Server) *oauthHandler {
-	if m.tokens == nil {
+	if m.tokens == nil || server.UsesBearer() {
 		return nil
 	}
 	return newOAuthHandler(server, m.tokens, http.DefaultClient)
@@ -478,7 +478,7 @@ func connectErrorStatus(handler *oauthHandler, err error) mcpconfig.ServerStatus
 }
 
 func oauthGateStatus(ctx context.Context, server mcpconfig.Server, handler *oauthHandler, items []remoteTool) (mcpconfig.ServerStatus, bool) {
-	if strings.TrimSpace(server.OAuth.ClientID) == "" && strings.TrimSpace(server.OAuth.Issuer) == "" {
+	if server.UsesBearer() || (strings.TrimSpace(server.OAuth.ClientID) == "" && strings.TrimSpace(server.OAuth.Issuer) == "") {
 		return mcpconfig.ServerStatus{}, false
 	}
 	if handler == nil {

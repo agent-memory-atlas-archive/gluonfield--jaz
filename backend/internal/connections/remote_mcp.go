@@ -48,6 +48,7 @@ func (c *RemoteMCPConnector) Connect(ctx context.Context, plugin integrations.Pl
 		if sameMCPServerURL(current.URL, input.URL) {
 			input.URL = current.URL
 			input.BearerTokenEnvVar = current.BearerTokenEnvVar
+			input.BearerToken = current.BearerToken
 			input.Headers = current.Headers
 			input.OAuth = current.OAuth
 			server, err = c.store.UpdateMCPServer(current.ID, input)

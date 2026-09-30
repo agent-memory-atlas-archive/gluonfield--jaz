@@ -83,3 +83,48 @@ func TestRefreshUsesCurrentOAuthCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestBearerTokenReplacesOAuth(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	remote := mcpsdk.NewServer(&mcpsdk.Implementation{Name: "identity"}, nil)
+	remote.AddTool(&mcpsdk.Tool{Name: "identity", InputSchema: map[string]any{"type": "object"}}, func(_ context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+		return &mcpsdk.CallToolResult{Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: req.Extra.Header.Get("Authorization")}}}, nil
+	})
+	handler := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server { return remote }, nil)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer good-key" {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			http.Error(w, "sign in required", http.StatusUnauthorized)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	}))
+	defer upstream.Close()
+	servers := []mcpconfig.Server{
+		{ID: "key", Name: "key", URL: upstream.URL, Enabled: true, BearerToken: "good-key"},
+		{ID: "bad", Name: "bad", URL: upstream.URL, Enabled: true, BearerToken: "bad-key"},
+		{ID: "oauth", Name: "oauth", URL: upstream.URL, Enabled: true},
+	}
+	tokens := newMemTokenStore()
+	if err := tokens.SaveToken(ctx, mcpconfig.OAuthConnectionID("key"), integrationoauth.Token{AccessToken: "oauth-account"}); err != nil {
+		t.Fatal(err)
+	}
+	manager := NewManager(&testStore{servers: servers}, tokens, tools.NewRegistry(), log.New(io.Discard))
+	defer manager.Close()
+	manager.Refresh(ctx)
+
+	if status := manager.Status("key"); status.Status != "connected" {
+		t.Fatalf("server with an API key = %+v", status)
+	}
+	result, err := manager.sessions["key"].callTool(ctx, &mcpsdk.CallToolParams{Name: "identity"})
+	if err != nil || result.Content[0].(*mcpsdk.TextContent).Text != "Bearer good-key" {
+		t.Fatalf("the API key, not the stored OAuth token, authenticates calls: %+v %v", result, err)
+	}
+	if status := manager.Status("bad"); status.Status != "error" {
+		t.Fatalf("a rejected API key reports an error rather than asking to sign in: %+v", status)
+	}
+	if status := manager.Status("oauth"); status.Status != "needs_auth" {
+		t.Fatalf("a server without a key still signs in with OAuth: %+v", status)
+	}
+}

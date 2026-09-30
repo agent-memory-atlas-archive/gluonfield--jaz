@@ -1029,6 +1029,7 @@ export interface MCPServer {
   url: string
   enabled: boolean
   bearer_token_env_var?: string
+  bearer_token?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
   status: 'connected' | 'disabled' | 'error' | 'needs_auth' | 'unknown'
@@ -1050,6 +1051,7 @@ export interface MCPServerInput {
   url: string
   enabled: boolean
   bearer_token_env_var?: string
+  bearer_token?: string
   headers?: MCPHeader[]
   oauth?: MCPOAuthConfig
 }

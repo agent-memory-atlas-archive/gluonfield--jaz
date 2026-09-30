@@ -39,6 +39,7 @@ type mcpServerInput struct {
 	URL               string                `json:"url"`
 	Enabled           *bool                 `json:"enabled,omitempty"`
 	BearerTokenEnvVar string                `json:"bearer_token_env_var,omitempty"`
+	BearerToken       string                `json:"bearer_token,omitempty"`
 	Headers           []mcpconfig.Header    `json:"headers,omitempty"`
 	OAuth             mcpconfig.OAuthConfig `json:"oauth,omitempty"`
 }
@@ -50,6 +51,7 @@ type mcpServerView struct {
 	URL               string                 `json:"url"`
 	Enabled           bool                   `json:"enabled"`
 	BearerTokenEnvVar string                 `json:"bearer_token_env_var,omitempty"`
+	BearerToken       string                 `json:"bearer_token,omitempty"`
 	Headers           []mcpconfig.Header     `json:"headers,omitempty"`
 	OAuth             mcpconfig.OAuthConfig  `json:"oauth,omitempty"`
 	Status            string                 `json:"status"`
@@ -178,6 +180,7 @@ func (s *Server) handleMCPServerPostAction(w http.ResponseWriter, r *http.Reques
 				server.URL = input.URL
 				server.Enabled = input.Enabled
 				server.BearerTokenEnvVar = input.BearerTokenEnvVar
+				server.BearerToken = input.BearerToken
 				server.Headers = input.Headers
 				server.OAuth = input.OAuth
 			}
@@ -274,6 +277,7 @@ func decodeMCPServerInput(r *http.Request, current *mcpconfig.Server) (mcpconfig
 		URL:               req.URL,
 		Enabled:           enabled,
 		BearerTokenEnvVar: req.BearerTokenEnvVar,
+		BearerToken:       req.BearerToken,
 		Headers:           req.Headers,
 		OAuth:             req.OAuth,
 	})
@@ -329,6 +333,7 @@ func (s *Server) mcpServerView(server mcpconfig.Server) mcpServerView {
 		URL:               server.URL,
 		Enabled:           server.Enabled,
 		BearerTokenEnvVar: server.BearerTokenEnvVar,
+		BearerToken:       server.BearerToken,
 		Headers:           server.Headers,
 		OAuth:             server.OAuth,
 		Status:            status.Status,

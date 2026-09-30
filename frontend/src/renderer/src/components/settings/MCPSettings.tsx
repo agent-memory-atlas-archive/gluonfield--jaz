@@ -52,6 +52,7 @@ function emptyDraft(): Draft {
     url: '',
     enabled: true,
     bearer_token_env_var: '',
+    bearer_token: '',
     headers: [],
     oauth: {},
   }
@@ -64,6 +65,7 @@ function draftFromServer(server: MCPServer): Draft {
     url: server.url,
     enabled: server.enabled,
     bearer_token_env_var: server.bearer_token_env_var ?? '',
+    bearer_token: server.bearer_token ?? '',
     headers: server.headers ?? [],
     oauth: server.oauth ?? {},
   }
@@ -460,7 +462,8 @@ function MCPServerForm({
   const oauthSet = Boolean(
     draft.oauth?.client_id || draft.oauth?.client_secret_env_var || draft.oauth?.issuer,
   )
-  const [advanced, setAdvanced] = useState(headerCount > 0 || oauthSet)
+  const advancedCount = headerCount + Number(oauthSet) + Number(Boolean(draft.bearer_token_env_var))
+  const [advanced, setAdvanced] = useState(advancedCount > 0)
 
   return (
     <div className="space-y-4">
@@ -480,11 +483,13 @@ function MCPServerForm({
         />
       </Field>
 
-      <Field label="Bearer token" hint="Optional — read from this environment variable.">
+      <Field label="Bearer token" hint="Optional — an API key, used instead of signing in.">
         <Input
-          placeholder="MCP_TOKEN"
-          value={draft.bearer_token_env_var ?? ''}
-          onChange={(event) => onChange({ ...draft, bearer_token_env_var: event.target.value })}
+          type="password"
+          autoComplete="off"
+          placeholder="Paste an API key"
+          value={draft.bearer_token ?? ''}
+          onChange={(event) => onChange({ ...draft, bearer_token: event.target.value })}
         />
       </Field>
 
@@ -499,13 +504,18 @@ function MCPServerForm({
             className={`transition-transform duration-200 ${advanced ? 'rotate-90' : ''}`}
           />
           Advanced
-          {(headerCount > 0 || oauthSet) && !advanced ? (
-            <span className="font-normal text-ink-3">
-              · {headerCount + (oauthSet ? 1 : 0)} set
-            </span>
+          {advancedCount > 0 && !advanced ? (
+            <span className="font-normal text-ink-3">· {advancedCount} set</span>
           ) : null}
         </button>
         <Collapse open={advanced} className="space-y-4 pb-1">
+          <Field label="Bearer token variable" hint="Or read the token from this environment variable on the Jaz server.">
+            <Input
+              placeholder="MCP_TOKEN"
+              value={draft.bearer_token_env_var ?? ''}
+              onChange={(event) => onChange({ ...draft, bearer_token_env_var: event.target.value })}
+            />
+          </Field>
           <OAuthEditor value={draft.oauth ?? {}} onChange={(oauth) => onChange({ ...draft, oauth })} />
           <HeaderEditor
             headers={draft.headers ?? []}

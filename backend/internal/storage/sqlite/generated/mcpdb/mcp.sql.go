@@ -18,6 +18,7 @@ INSERT INTO mcp_servers (
   url,
   enabled,
   bearer_token_env_var,
+  bearer_token,
   headers_json,
   env_headers_json,
   oauth_json,
@@ -34,7 +35,8 @@ INSERT INTO mcp_servers (
   ?8,
   ?9,
   ?10,
-  ?11
+  ?11,
+  ?12
 )
 `
 
@@ -45,6 +47,7 @@ type CreateMCPServerParams struct {
 	Url               string         `json:"url"`
 	Enabled           int64          `json:"enabled"`
 	BearerTokenEnvVar sql.NullString `json:"bearer_token_env_var"`
+	BearerToken       sql.NullString `json:"bearer_token"`
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
@@ -60,6 +63,7 @@ func (q *Queries) CreateMCPServer(ctx context.Context, arg CreateMCPServerParams
 		arg.Url,
 		arg.Enabled,
 		arg.BearerTokenEnvVar,
+		arg.BearerToken,
 		arg.HeadersJson,
 		arg.EnvHeadersJson,
 		arg.OauthJson,
@@ -90,6 +94,7 @@ SELECT
   url,
   enabled,
   bearer_token_env_var,
+  bearer_token,
   headers_json,
   env_headers_json,
   oauth_json,
@@ -107,6 +112,7 @@ type GetMCPServerRow struct {
 	Url               string         `json:"url"`
 	Enabled           int64          `json:"enabled"`
 	BearerTokenEnvVar sql.NullString `json:"bearer_token_env_var"`
+	BearerToken       sql.NullString `json:"bearer_token"`
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
@@ -124,6 +130,7 @@ func (q *Queries) GetMCPServer(ctx context.Context, id string) (GetMCPServerRow,
 		&i.Url,
 		&i.Enabled,
 		&i.BearerTokenEnvVar,
+		&i.BearerToken,
 		&i.HeadersJson,
 		&i.EnvHeadersJson,
 		&i.OauthJson,
@@ -141,6 +148,7 @@ SELECT
   url,
   enabled,
   bearer_token_env_var,
+  bearer_token,
   headers_json,
   env_headers_json,
   oauth_json,
@@ -157,6 +165,7 @@ type ListMCPServersRow struct {
 	Url               string         `json:"url"`
 	Enabled           int64          `json:"enabled"`
 	BearerTokenEnvVar sql.NullString `json:"bearer_token_env_var"`
+	BearerToken       sql.NullString `json:"bearer_token"`
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
@@ -180,6 +189,7 @@ func (q *Queries) ListMCPServers(ctx context.Context) ([]ListMCPServersRow, erro
 			&i.Url,
 			&i.Enabled,
 			&i.BearerTokenEnvVar,
+			&i.BearerToken,
 			&i.HeadersJson,
 			&i.EnvHeadersJson,
 			&i.OauthJson,
@@ -229,11 +239,12 @@ SET
   url = ?3,
   enabled = ?4,
   bearer_token_env_var = ?5,
-  headers_json = ?6,
-  env_headers_json = ?7,
-  oauth_json = ?8,
-  updated_at_ms = ?9
-WHERE id = ?10
+  bearer_token = ?6,
+  headers_json = ?7,
+  env_headers_json = ?8,
+  oauth_json = ?9,
+  updated_at_ms = ?10
+WHERE id = ?11
 `
 
 type UpdateMCPServerParams struct {
@@ -242,6 +253,7 @@ type UpdateMCPServerParams struct {
 	Url               string         `json:"url"`
 	Enabled           int64          `json:"enabled"`
 	BearerTokenEnvVar sql.NullString `json:"bearer_token_env_var"`
+	BearerToken       sql.NullString `json:"bearer_token"`
 	HeadersJson       string         `json:"headers_json"`
 	EnvHeadersJson    string         `json:"env_headers_json"`
 	OauthJson         string         `json:"oauth_json"`
@@ -256,6 +268,7 @@ func (q *Queries) UpdateMCPServer(ctx context.Context, arg UpdateMCPServerParams
 		arg.Url,
 		arg.Enabled,
 		arg.BearerTokenEnvVar,
+		arg.BearerToken,
 		arg.HeadersJson,
 		arg.EnvHeadersJson,
 		arg.OauthJson,
