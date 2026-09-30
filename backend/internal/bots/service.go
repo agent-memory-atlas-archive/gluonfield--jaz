@@ -26,6 +26,9 @@ type Service struct {
 	mu        sync.Mutex
 	voices    map[string]*voice
 	followUps map[string]int
+	// waking holds a member's group turns in flight, keyed by group and
+	// member, and whether another turn is owed after the current one.
+	waking map[string]bool
 }
 
 func NewService(store Store, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {

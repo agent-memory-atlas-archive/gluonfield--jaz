@@ -69,13 +69,47 @@ func (s *Service) post(group storage.BotRecord, name string, message sessioneven
 			}
 			s.followUps[group.ThreadID]++
 		}
-		go func() {
-			if err := s.memberTurn(group.ThreadID, name, member); err != nil {
-				s.Log.Warn("group turn failed", "group", group.ThreadID, "member", member, "error", err)
-			}
-		}()
+		s.wakeLocked(group.ThreadID, name, member)
 	}
 	return nil
+}
+
+// wakeLocked gives member a turn in the group soon. A member has at most one
+// turn in flight per group: a wake while it is busy there folds into one more
+// turn, whose prompt is built as that turn begins, so a burst of posts costs
+// one turn. Callers hold s.mu.
+func (s *Service) wakeLocked(groupID, name, member string) {
+	key := groupID + "\x00" + member
+	if _, busy := s.waking[key]; busy {
+		s.waking[key] = true
+		return
+	}
+	if s.waking == nil {
+		s.waking = make(map[string]bool)
+	}
+	s.waking[key] = false
+	go s.takeTurns(key, groupID, name, member)
+}
+
+// takeTurns runs member's turns in the group until no wake is owed.
+func (s *Service) takeTurns(key, groupID, name, member string) {
+	for {
+		s.mu.Lock()
+		s.waking[key] = false
+		s.mu.Unlock()
+		if err := s.memberTurn(groupID, name, member); err != nil {
+			s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
+		}
+		s.mu.Lock()
+		owed := s.waking[key]
+		if !owed {
+			delete(s.waking, key)
+		}
+		s.mu.Unlock()
+		if !owed {
+			return
+		}
+	}
 }
 
 // memberTurn gives member a turn in the group, in which it posts with

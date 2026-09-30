@@ -292,22 +292,53 @@ func TestMembersFollowUpOnlyWhenMentioned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	world.replies["a"] = []string{"", "Checked."}
 	world.replies["b"] = []string{"[@Research](bot:a) can you check the numbers?"}
+	world.replies["a"] = []string{"Checked."}
 
-	if err := service.Post(group.ID, "Where is the launch draft?"); err != nil {
+	if err := service.Post(group.ID, "[@Marketing](bot:b) where is the launch draft?"); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, func() bool { return len(world.roomMessages(group.ID)) == 3 })
+	waitUntil(t, func() bool { return slices.Contains(world.roomMessages(group.ID), "Research: Checked.") })
 	time.Sleep(20 * time.Millisecond)
-	if world.promptCount("a") != 2 || world.promptCount("b") != 1 {
+	if world.promptCount("a") != 1 || world.promptCount("b") != 1 {
 		t.Fatalf("turns: Research %d, Marketing %d", world.promptCount("a"), world.promptCount("b"))
 	}
 	world.mu.Lock()
-	followUp := world.prompts["a"][1]
+	prompt := world.prompts["a"][0]
 	world.mu.Unlock()
-	if !strings.Contains(followUp, "can you check the numbers?") {
-		t.Fatalf("follow-up prompt misses the mention:\n%s", followUp)
+	if !strings.Contains(prompt, "can you check the numbers?") {
+		t.Fatalf("follow-up prompt misses the mention:\n%s", prompt)
+	}
+}
+
+func TestPostsWhileAMemberIsBusyFoldIntoOneMoreTurn(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("a", "Research")
+	world.addBot("b", "Marketing")
+	service := newTestService(world)
+	group, err := service.CreateGroup("Launch", []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	world.held["a"] = release
+
+	post := func(text string) {
+		if err := service.Post(group.ID, "[@Research](bot:a) "+text); err != nil {
+			t.Fatal(err)
+		}
+	}
+	post("first")
+	waitUntil(t, func() bool { return world.promptCount("a") == 1 })
+	post("second")
+	post("third")
+	close(release)
+	waitUntil(t, func() bool { return world.promptCount("a") == 2 })
+	time.Sleep(20 * time.Millisecond)
+	world.mu.Lock()
+	defer world.mu.Unlock()
+	if len(world.prompts["a"]) != 2 || !strings.Contains(world.prompts["a"][1], "third") {
+		t.Fatalf("turns = %q", world.prompts["a"])
 	}
 }
 
@@ -329,10 +360,13 @@ func TestMentionPingPongStopsAtTheFollowUpCap(t *testing.T) {
 	if err := service.Post(group.ID, "who goes first?"); err != nil {
 		t.Fatal(err)
 	}
-	waitUntil(t, func() bool { return turns() == 2+maxFollowUps })
-	time.Sleep(30 * time.Millisecond)
-	if turns() != 2+maxFollowUps {
-		t.Fatalf("turns = %d, want %d", turns(), 2+maxFollowUps)
+	waitUntil(t, func() bool {
+		before := turns()
+		time.Sleep(30 * time.Millisecond)
+		return before > 2 && turns() == before
+	})
+	if turns() > 2+maxFollowUps {
+		t.Fatalf("turns = %d, cap is %d", turns(), 2+maxFollowUps)
 	}
 }
 
