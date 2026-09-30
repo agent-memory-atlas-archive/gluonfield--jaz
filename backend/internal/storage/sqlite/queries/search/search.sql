@@ -2,18 +2,20 @@
 WITH hits AS (
   SELECT d.thread_id, d.seq,
     snippet(message_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
-    bm25(message_search_fts) AS score,
-    '' AS event_prefix
+    bm25(message_search_fts) AS score
   FROM message_search_fts(CAST(sqlc.arg(match) AS TEXT))
   JOIN message_search_docs d ON d.id = message_search_fts.rowid
   UNION ALL
   SELECT d.thread_id, 0 AS seq,
     snippet(event_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
-    bm25(event_search_fts) AS score,
-    substr(e.content, 1, 100) AS event_prefix
+    bm25(event_search_fts) AS score
   FROM event_search_fts(CAST(sqlc.arg(match) AS TEXT))
   JOIN event_search_docs d ON d.id = event_search_fts.rowid
   JOIN session_events e ON e.thread_id = d.thread_id AND e.seq = d.seq
+  WHERE NOT EXISTS (
+    SELECT 1 FROM json_each(CAST(sqlc.arg(hidden_prefixes) AS TEXT)) p
+    WHERE substr(e.content, 1, length(p.value)) = p.value
+  )
 )
 SELECT
   t.id,
@@ -27,7 +29,6 @@ SELECT
   hits.seq,
   hits.snippet,
   hits.score,
-  hits.event_prefix,
   t.updated_at_ms,
   t.last_attention_at_ms
 FROM hits

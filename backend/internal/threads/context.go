@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
@@ -130,6 +129,16 @@ func (s *Service) Context(ctx context.Context, req ContextRequest) (ContextRespo
 	}
 	counts := ToolCounts(records)
 	visible = mergeContextEvents(session.ID, visible, events, opts, counts)
+	if opts.includeTools == IncludeToolsNone {
+		withoutTools := visible[:0]
+		for _, record := range visible {
+			record.message.Tools = nil
+			if record.message.Text != "" {
+				withoutTools = append(withoutTools, record)
+			}
+		}
+		visible = withoutTools
+	}
 	response := ContextResponse{
 		Session:    contextSession(session, len(visible)),
 		Mode:       "tail",
@@ -236,7 +245,7 @@ func visibleContextRecords(records []storage.Message, opts contextOptions) []con
 			CreatedAt: record.CreatedAt,
 		}
 		message.Text, message.Truncated = clampText(transcriptText(record), opts.maxTextChars)
-		message.Tools = contextTools(record.Blocks, opts)
+		message.Tools = contextTools(record.Blocks)
 		if message.Text == "" && len(message.Tools) == 0 {
 			continue
 		}
@@ -366,10 +375,7 @@ func firstIndexAfter(messages []contextRecord, seq int64) int {
 	return len(messages)
 }
 
-func contextTools(blocks []storage.Block, opts contextOptions) []ContextTool {
-	if opts.includeTools == IncludeToolsNone {
-		return nil
-	}
+func contextTools(blocks []storage.Block) []ContextTool {
 	var out []ContextTool
 	for _, block := range blocks {
 		if block.Type != storage.BlockTypeTool {
@@ -398,27 +404,6 @@ func matchesAllTokens(text string, tokens []string) bool {
 		}
 	}
 	return true
-}
-
-func searchTokens(query string) []string {
-	var tokens []string
-	var current strings.Builder
-	flush := func() {
-		if current.Len() == 0 {
-			return
-		}
-		tokens = append(tokens, strings.ToLower(current.String()))
-		current.Reset()
-	}
-	for _, r := range query {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			current.WriteRune(r)
-			continue
-		}
-		flush()
-	}
-	flush()
-	return tokens
 }
 
 func clampText(text string, maxChars int) (string, bool) {

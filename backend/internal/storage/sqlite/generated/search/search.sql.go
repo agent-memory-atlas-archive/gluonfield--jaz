@@ -13,18 +13,20 @@ const searchThreadMessages = `-- name: SearchThreadMessages :many
 WITH hits AS (
   SELECT d.thread_id, d.seq,
     snippet(message_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
-    bm25(message_search_fts) AS score,
-    '' AS event_prefix
+    bm25(message_search_fts) AS score
   FROM message_search_fts(CAST(?3 AS TEXT))
   JOIN message_search_docs d ON d.id = message_search_fts.rowid
   UNION ALL
   SELECT d.thread_id, 0 AS seq,
     snippet(event_search_fts, 0, char(31), char(30), '...', 18) AS snippet,
-    bm25(event_search_fts) AS score,
-    substr(e.content, 1, 100) AS event_prefix
+    bm25(event_search_fts) AS score
   FROM event_search_fts(CAST(?3 AS TEXT))
   JOIN event_search_docs d ON d.id = event_search_fts.rowid
   JOIN session_events e ON e.thread_id = d.thread_id AND e.seq = d.seq
+  WHERE NOT EXISTS (
+    SELECT 1 FROM json_each(CAST(?4 AS TEXT)) p
+    WHERE substr(e.content, 1, length(p.value)) = p.value
+  )
 )
 SELECT
   t.id,
@@ -38,7 +40,6 @@ SELECT
   hits.seq,
   hits.snippet,
   hits.score,
-  hits.event_prefix,
   t.updated_at_ms,
   t.last_attention_at_ms
 FROM hits
@@ -53,6 +54,7 @@ type SearchThreadMessagesParams struct {
 	IncludeArchived int64  `json:"include_archived"`
 	Limit           int64  `json:"limit"`
 	Match           string `json:"match"`
+	HiddenPrefixes  string `json:"hidden_prefixes"`
 }
 
 type SearchThreadMessagesRow struct {
@@ -67,13 +69,17 @@ type SearchThreadMessagesRow struct {
 	Seq               int64   `json:"seq"`
 	Snippet           string  `json:"snippet"`
 	Score             float64 `json:"score"`
-	EventPrefix       string  `json:"event_prefix"`
 	UpdatedAtMs       int64   `json:"updated_at_ms"`
 	LastAttentionAtMs int64   `json:"last_attention_at_ms"`
 }
 
 func (q *Queries) SearchThreadMessages(ctx context.Context, arg SearchThreadMessagesParams) ([]SearchThreadMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchThreadMessages, arg.IncludeArchived, arg.Limit, arg.Match)
+	rows, err := q.db.QueryContext(ctx, searchThreadMessages,
+		arg.IncludeArchived,
+		arg.Limit,
+		arg.Match,
+		arg.HiddenPrefixes,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +99,6 @@ func (q *Queries) SearchThreadMessages(ctx context.Context, arg SearchThreadMess
 			&i.Seq,
 			&i.Snippet,
 			&i.Score,
-			&i.EventPrefix,
 			&i.UpdatedAtMs,
 			&i.LastAttentionAtMs,
 		); err != nil {

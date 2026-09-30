@@ -24,9 +24,7 @@ func mergeContextEvents(id string, records []contextRecord, events []sessioneven
 				name := firstNonEmpty(call.ToolName, call.Title, "unknown")
 				counts[name]++
 				text += " " + name
-				if opts.includeTools != IncludeToolsNone {
-					message.Tools = append(message.Tools, ContextTool{Name: name})
-				}
+				message.Tools = append(message.Tools, ContextTool{Name: name})
 			}
 		}
 		if message.Text != "" || len(message.Tools) > 0 {

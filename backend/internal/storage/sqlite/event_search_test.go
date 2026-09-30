@@ -45,7 +45,7 @@ func TestEventSearchUpgradeAndMutationLifecycle(t *testing.T) {
 	queries := NewSearchQueries(store)
 	check := func(word string, count int) {
 		t.Helper()
-		rows, err := queries.SearchThreadMessages(t.Context(), search.SearchThreadMessagesParams{Match: word, Limit: 10})
+		rows, err := queries.SearchThreadMessages(t.Context(), search.SearchThreadMessagesParams{Match: word, Limit: 10, HiddenPrefixes: "[]"})
 		if err != nil || len(rows) != count {
 			t.Fatalf("search %q: %#v, %v", word, rows, err)
 		}
