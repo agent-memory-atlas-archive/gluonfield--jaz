@@ -2,9 +2,14 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,6 +18,7 @@ import (
 	"github.com/wins/jaz/backend/internal/mcpconfig"
 	"github.com/wins/jaz/backend/internal/tools"
 	integrationoauth "github.com/wins/jaz/backend/pkg/integrations/oauth"
+	"golang.org/x/oauth2"
 )
 
 func TestRefreshUsesCurrentOAuthCredentials(t *testing.T) {
@@ -81,5 +87,90 @@ func TestRefreshUsesCurrentOAuthCredentials(t *testing.T) {
 				t.Fatalf("tool used previous credentials: %+v", result)
 			}
 		})
+	}
+}
+
+// rotatingTokenServer rotates the refresh token on every use and revokes the
+// grant when a rotated one is presented again, as Jaz Tasks does.
+type rotatingTokenServer struct {
+	mu      sync.Mutex
+	issued  int
+	access  string
+	refresh string
+	revoked bool
+}
+
+func (s *rotatingTokenServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	if s.revoked || r.FormValue("refresh_token") != s.refresh {
+		s.revoked = true
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"error":"invalid_grant"}`)
+		return
+	}
+	s.issued++
+	s.access, s.refresh = fmt.Sprintf("access-%d", s.issued), fmt.Sprintf("refresh-%d", s.issued)
+	// Inside oauth2's expiry margin, so every MCP request refreshes.
+	_ = json.NewEncoder(w).Encode(map[string]any{"access_token": s.access, "refresh_token": s.refresh, "token_type": "Bearer", "expires_in": 1})
+}
+
+func (s *rotatingTokenServer) accepts(authorization string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return !s.revoked && authorization == "Bearer "+s.access
+}
+
+func TestOAuthRefreshSurvivesServerRestart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	grants := &rotatingTokenServer{refresh: "refresh-0"}
+	tokenServer := httptest.NewServer(grants)
+	defer tokenServer.Close()
+	var live atomic.Pointer[http.Handler]
+	first := newEchoHandler()
+	live.Store(&first)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !grants.accepts(r.Header.Get("Authorization")) {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+		(*live.Load()).ServeHTTP(w, r)
+	}))
+	defer upstream.Close()
+	server := mcpconfig.Server{ID: "tasks", Name: "Tasks", URL: upstream.URL, Enabled: true}
+	tokens := newMemTokenStore()
+	if err := tokens.SaveToken(ctx, mcpconfig.OAuthConnectionID(server.ID), integrationoauth.Token{
+		AccessToken:  "access-0",
+		RefreshToken: "refresh-0",
+		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(-time.Hour),
+		ClientID:     "jaz",
+		TokenURL:     tokenServer.URL,
+		AuthStyle:    int(oauth2.AuthStyleInParams),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	registry := tools.NewRegistry()
+	manager := NewManager(&testStore{servers: []mcpconfig.Server{server}}, tokens, registry, log.New(io.Discard))
+	defer manager.Close()
+	manager.Refresh(ctx)
+	if status := manager.Status(server.ID); status.Status != "connected" {
+		t.Fatalf("status = %+v", status)
+	}
+	tool, ok := registry.Get(tools.DefinitionName(registry.Definitions()[0]))
+	if !ok {
+		t.Fatal("echo tool not registered")
+	}
+
+	restarted := newEchoHandler()
+	live.Store(&restarted)
+	result, err := tool.Execute(ctx, map[string]any{"value": "after restart"})
+	if err != nil {
+		t.Fatalf("call after server restart: %v", err)
+	}
+	if !strings.Contains(result.Content, "got after restart") {
+		t.Fatalf("result = %s", result.Content)
 	}
 }

@@ -73,9 +73,8 @@ func (r Refresher) persistentTokenSource(ctx context.Context, connectionID strin
 	if err != nil {
 		return nil, err
 	}
-	ctx = r.context(ctx)
-	base := clientConfig.config().TokenSource(ctx, stored.oauth2Token())
-	return &persistingTokenSource{base: base, store: r.Store, connectionID: connectionID, stored: stored}, nil
+	lock, _ := refreshLocks.LoadOrStore(connectionID, &sync.Mutex{})
+	return &persistingTokenSource{ctx: r.context(ctx), config: clientConfig.config(), store: r.Store, connectionID: connectionID, mu: lock.(*sync.Mutex), stored: stored}, nil
 }
 
 func (r Refresher) Client(ctx context.Context, connectionID string) (*http.Client, error) {
@@ -139,28 +138,44 @@ func (t Token) oauth2Token() *oauth2.Token {
 	}
 }
 
+// refreshLocks holds one lock per connection for every token source in the
+// process. Providers may rotate refresh tokens and revoke the grant when a
+// rotated one is presented again, so each refresh must start from the stored token.
+var refreshLocks sync.Map
+
 type persistingTokenSource struct {
-	mu           sync.Mutex
-	base         oauth2.TokenSource
+	ctx          context.Context
+	config       *oauth2.Config
 	store        Store
 	connectionID string
+	mu           *sync.Mutex
 	stored       Token
 }
 
 func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	tok, err := p.base.Token()
+	if tok := p.stored.oauth2Token(); tok.Valid() {
+		return tok, nil
+	}
+	stored, ok, err := p.store.LoadToken(p.ctx, p.connectionID)
 	if err != nil {
 		return nil, err
 	}
-	if tok != nil && !sameToken(p.stored, tok) {
-		updated := mergeToken(p.stored, tok)
-		if err := p.store.SaveToken(context.Background(), p.connectionID, updated); err != nil {
+	if !ok {
+		return nil, ErrTokenNotFound
+	}
+	tok, err := p.config.TokenSource(p.ctx, stored.oauth2Token()).Token()
+	if err != nil {
+		return nil, err
+	}
+	if !sameToken(stored, tok) {
+		stored = mergeToken(stored, tok)
+		if err := p.store.SaveToken(context.Background(), p.connectionID, stored); err != nil {
 			return nil, err
 		}
-		p.stored = updated
 	}
+	p.stored = stored
 	return tok, nil
 }
 

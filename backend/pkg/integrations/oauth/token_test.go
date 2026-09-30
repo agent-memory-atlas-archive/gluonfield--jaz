@@ -3,8 +3,12 @@ package oauth
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -124,5 +128,61 @@ func TestRefresherUsesResolvedClientConfig(t *testing.T) {
 	}
 	if !tokenEndpointCalled {
 		t.Fatal("expected token endpoint call")
+	}
+}
+
+func TestTokenSourcesForOneConnectionRefreshOnce(t *testing.T) {
+	var refreshes atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if refreshes.Add(1) > 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "new-access",
+			"refresh_token": "new-refresh",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer server.Close()
+
+	store := &memoryStore{
+		ok: true,
+		token: Token{
+			AccessToken:  "old-access",
+			RefreshToken: "old-refresh",
+			Expiry:       time.Now().Add(-time.Hour),
+			TokenURL:     server.URL,
+			AuthStyle:    int(oauth2.AuthStyleInParams),
+		},
+	}
+	sources := make([]oauth2.TokenSource, 4)
+	for i := range sources {
+		src, err := (Refresher{Store: store}).TokenSource(context.Background(), "rotating")
+		if err != nil {
+			t.Fatal(err)
+		}
+		sources[i] = src
+	}
+	errs := make([]error, len(sources))
+	var wg sync.WaitGroup
+	for i, src := range sources {
+		wg.Go(func() {
+			tok, err := src.Token()
+			if err == nil && tok.AccessToken != "new-access" {
+				err = fmt.Errorf("access token = %q", tok.AccessToken)
+			}
+			errs[i] = err
+		})
+	}
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		t.Fatal(err)
+	}
+	if n := refreshes.Load(); n != 1 {
+		t.Fatalf("refreshes = %d, want 1", n)
 	}
 }
