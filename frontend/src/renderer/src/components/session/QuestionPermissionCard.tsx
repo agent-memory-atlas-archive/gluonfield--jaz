@@ -7,6 +7,11 @@ import type { ACPPermission, ACPQuestion, SessionEvent } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
 import { normalized } from '@/components/session/TranscriptUtils'
 
+type QuestionAnswer = {
+  choices: string[]
+  other: string
+}
+
 export function QuestionPermissionCard({
   event,
   resolution,
@@ -17,8 +22,7 @@ export function QuestionPermissionCard({
   const permission = event.permission
   const queryClient = useQueryClient()
   const reduce = useReducedMotion()
-  const [answers, setAnswers] = useState<Record<string, string[]>>({})
-  const [otherAnswers, setOtherAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, QuestionAnswer>>({})
   const [submitting, setSubmitting] = useState(false)
   const [localAnswered, setLocalAnswered] = useState(false)
   const [open, setOpen] = useState(false)
@@ -36,8 +40,9 @@ export function QuestionPermissionCard({
   const settled = answered || cancelled
   const locked = settled || submitting
   const valuesFor = (question: ACPQuestion) => {
-    const other = otherAnswers[question.id]?.trim()
-    return [...(answers[question.id] ?? []), ...(other ? [other] : [])]
+    const answer = answers[question.id]
+    const other = answer?.other.trim()
+    return [...(answer?.choices ?? []), ...(other ? [other] : [])]
   }
   const complete = questions.every((question) => valuesFor(question).length > 0)
 
@@ -63,9 +68,9 @@ export function QuestionPermissionCard({
   const isFirst = safeIndex === 0
   const isLast = safeIndex === total - 1
   const options = current.options ?? []
-  const selected = answers[current.id] ?? []
+  const selected = answers[current.id]?.choices ?? []
   const showOther = current.is_other || !options.length
-  const otherValue = otherAnswers[current.id] ?? ''
+  const otherValue = answers[current.id]?.other ?? ''
 
   const goTo = (next: number) => {
     if (next < 0 || next >= total || next === safeIndex) return
@@ -75,15 +80,21 @@ export function QuestionPermissionCard({
 
   const pickOption = (label: string) => {
     if (locked) return
-    setAnswers((prev) => ({
-      ...prev,
-      [current.id]: current.multi_select
-        ? selected.includes(label)
-          ? selected.filter((value) => value !== label)
-          : [...selected, label]
-        : [label],
-    }))
-    if (!current.multi_select) setOtherAnswers((prev) => ({ ...prev, [current.id]: '' }))
+    setAnswers((prev) => {
+      const answer = prev[current.id]
+      const choices = answer?.choices ?? []
+      return {
+        ...prev,
+        [current.id]: {
+          choices: current.multi_select
+            ? choices.includes(label)
+              ? choices.filter((value) => value !== label)
+              : [...choices, label]
+            : [label],
+          other: current.multi_select ? answer?.other ?? '' : '',
+        },
+      }
+    })
   }
 
   const submit = async () => {
@@ -199,8 +210,13 @@ export function QuestionPermissionCard({
                 className={`${options.length ? 'mt-1.5' : 'mt-3'} h-9 w-full rounded-control border border-border bg-bg px-3 text-[12px] text-ink transition-colors placeholder:text-ink-3 focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60`}
                 onChange={(e) => {
                   const value = e.target.value
-                  setOtherAnswers((prev) => ({ ...prev, [current.id]: value }))
-                  if (!current.multi_select) setAnswers((prev) => ({ ...prev, [current.id]: [] }))
+                  setAnswers((prev) => ({
+                    ...prev,
+                    [current.id]: {
+                      choices: current.multi_select ? prev[current.id]?.choices ?? [] : [],
+                      other: value,
+                    },
+                  }))
                 }}
                 onKeyDown={(e) => {
                   if (e.key !== 'Enter') return

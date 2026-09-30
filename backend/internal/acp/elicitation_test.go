@@ -276,6 +276,46 @@ func TestElicitationArraySupportsMultipleSelection(t *testing.T) {
 	}
 }
 
+func TestElicitationArraySeparatesCustomAnswer(t *testing.T) {
+	var schema acpschema.ElicitationSchema
+	if err := json.Unmarshal([]byte(`{"type":"object","properties":{
+		"workloads":{"type":"array","items":{"type":"string","enum":["SQL","Spark"]}},
+		"workloads_custom":{"type":"string","_meta":{"jetbrains":{"air":{"customAnswer":{"questionId":"workloads"}}}}}
+	}}`), &schema); err != nil {
+		t.Fatal(err)
+	}
+	questions, fields := elicitationQuestions("Which workloads?", &schema)
+	if len(questions) != 1 || !questions[0].MultiSelect || !questions[0].IsOther {
+		t.Fatalf("array question = %#v", questions)
+	}
+	for _, test := range []struct {
+		name    string
+		answers []string
+		choices string
+		custom  string
+	}{
+		{name: "choices", answers: []string{"SQL", "Spark"}, choices: `["SQL","Spark"]`},
+		{name: "mixed", answers: []string{"SQL", "Custom ingestion"}, choices: `["SQL"]`, custom: `"Custom ingestion"`},
+		{name: "custom", answers: []string{"Custom ingestion"}, custom: `"Custom ingestion"`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := encodeElicitationResponse(fields, map[string]InteractiveAnswerValue{
+				"workloads": {Answers: test.answers},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got acpschema.CreateElicitationResponse
+			if err := json.Unmarshal([]byte(raw), &got); err != nil {
+				t.Fatal(err)
+			}
+			if string(got.Content["workloads"]) != test.choices || string(got.Content["workloads_custom"]) != test.custom {
+				t.Fatalf("elicitation response = %s", raw)
+			}
+		})
+	}
+}
+
 func TestElicitationQuestionsReadCodexUserInputForm(t *testing.T) {
 	const message = "Codex needs your input to continue."
 	var schema acpschema.ElicitationSchema

@@ -216,22 +216,31 @@ func encodeElicitationResponse(fields map[string]elicitationAnswerField, answers
 		if len(values) == 0 {
 			continue
 		}
-		if field.Multi {
-			raw, err := elicitationContentValue(values)
-			if err != nil {
-				return "", err
+		if field.CustomField != "" {
+			choices := make([]string, 0, len(values))
+			var custom []string
+			for _, value := range values {
+				if field.Options[value] {
+					choices = append(choices, value)
+				} else {
+					custom = append(custom, value)
+				}
 			}
-			content[field.Field] = raw
-			continue
+			if len(custom) > 0 {
+				raw, err := elicitationContentValue(strings.Join(custom, "\n"))
+				if err != nil {
+					return "", err
+				}
+				content[field.CustomField] = raw
+			}
+			values = choices
+			if len(values) == 0 {
+				continue
+			}
 		}
-		value := values[0]
-		if field.CustomField != "" && !field.Options[value] {
-			raw, err := elicitationContentValue(value)
-			if err != nil {
-				return "", err
-			}
-			content[field.CustomField] = raw
-			continue
+		var value any = values[0]
+		if field.Multi {
+			value = values
 		}
 		raw, err := elicitationContentValue(value)
 		if err != nil {
