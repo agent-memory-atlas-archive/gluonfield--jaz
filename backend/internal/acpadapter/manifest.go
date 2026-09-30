@@ -66,6 +66,10 @@ func (m *Manager) resolveSpec(ctx context.Context, name string) (adapterSpec, er
 	if err != nil {
 		return adapterSpec{}, err
 	}
+	return m.specFromManifest(manifest, name, platform)
+}
+
+func (m *Manager) specFromManifest(manifest manifest, name, platform string) (adapterSpec, error) {
 	adapter, ok := manifest.Adapters[name]
 	if !ok {
 		return adapterSpec{}, fmt.Errorf("managed acp adapter %q is not in the manifest", name)
@@ -119,6 +123,15 @@ func (m *Manager) fetchManifest(ctx context.Context) (manifest, error) {
 		return cached, nil
 	}
 	return manifest{}, err
+}
+
+// offlineManifest is the manifest already on hand, without network.
+func (m *Manager) offlineManifest() (manifest, bool) {
+	if m.localManifestPath == "" {
+		return m.readManifestCache()
+	}
+	out, err := readLocalManifest(m.localManifestPath)
+	return out, err == nil
 }
 
 func (m *Manager) cacheAllowedForFetchFailure() bool {

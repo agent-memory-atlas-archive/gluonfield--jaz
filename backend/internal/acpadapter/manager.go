@@ -109,6 +109,11 @@ func (m *Manager) Status(name string) Status {
 	if status, ok := m.storedStatus(name); ok {
 		return status
 	}
+	if manifest, ok := m.offlineManifest(); ok {
+		if spec, err := m.specFromManifest(manifest, name, platform); err == nil && m.installed(spec) {
+			return readyStatus(spec)
+		}
+	}
 	return Status{
 		Adapter:  name,
 		Platform: platform,

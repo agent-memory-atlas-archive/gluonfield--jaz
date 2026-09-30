@@ -327,6 +327,35 @@ func TestStatusReportsMissingBeforeManifestDownload(t *testing.T) {
 	}
 }
 
+func TestStatusReportsInstalledAdapterAfterRestart(t *testing.T) {
+	platform, err := platformKey(runtime.GOOS, runtime.GOARCH)
+	if err != nil {
+		t.Skip(err)
+	}
+	root := t.TempDir()
+	manager := NewForTest(root, "", nil)
+	path := filepath.Join(root, "acp", "managed", "adapters", "codex", "1.2.3", platform, "tool")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cached := manifest{Adapters: map[string]manifestAdapter{"codex": {Version: "1.2.3", Assets: map[string]manifestAsset{
+		platform: {URL: "https://example.invalid/codex.tgz", SHA256: strings.Repeat("0", 64), Binary: "tool"},
+	}}}}
+	if err := manager.writeManifestCache(cached); err != nil {
+		t.Fatal(err)
+	}
+	if status := manager.Status("codex"); status.State != StateMissing {
+		t.Fatalf("status before install = %#v", status)
+	}
+	if err := os.WriteFile(path, []byte("ok"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	status := manager.Status("codex")
+	if status.State != StateReady || status.Path != path || status.Version != "1.2.3" {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
 func TestManifestURLForVersion(t *testing.T) {
 	tests := []struct {
 		version string
