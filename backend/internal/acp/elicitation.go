@@ -51,37 +51,15 @@ func (m *Manager) createElicitation(ctx context.Context, raw json.RawMessage) (j
 		Questions:  questions,
 		Status:     "pending",
 	}
-	rawAnswer := m.awaitQuestionAnswers(ctx, job, permission, elicitationAnswerEncoder(fields))
-	if rawAnswer == "" {
+	answer := m.awaitPermissionAnswer(ctx, job, permission, nil)
+	if answer.Answers == nil {
 		return jsonrpc.EncodeResult(acpschema.CreateElicitationResponse{Action: "cancel"})
 	}
+	rawAnswer, err := encodeElicitationResponse(fields, answer.Answers)
+	if err != nil {
+		return nil, jsonrpc.InternalError("encode elicitation answers", map[string]any{"error": err.Error()})
+	}
 	return jsonrpc.EncodeResult(json.RawMessage(rawAnswer))
-}
-
-func (m *Manager) awaitQuestionAnswers(ctx context.Context, job *jobState, permission sessionevents.ACPPermission, encoder answerEncoder) string {
-	pending := &pendingPermission{
-		sessionID:     job.ID,
-		request:       permission,
-		encodeAnswers: encoder,
-		answer:        make(chan string, 1),
-	}
-	if !m.registerPendingPermission(job, pending) {
-		return ""
-	}
-
-	m.setJobPermission(job, permission)
-	m.publishPermission(job, permission, "permission_request")
-
-	select {
-	case raw := <-pending.answer:
-		return raw
-	case <-ctx.Done():
-		m.removePendingPermission(permission.ID)
-		m.removeJobPermission(job, permission.ID)
-		permission.Status = "cancelled"
-		m.publishPermission(job, permission, "permission_response")
-		return ""
-	}
 }
 
 func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) ([]sessionevents.ACPQuestion, map[string]elicitationAnswerField) {
@@ -265,12 +243,6 @@ func encodeElicitationResponse(fields map[string]elicitationAnswerField, answers
 		return "", err
 	}
 	return string(raw), nil
-}
-
-func elicitationAnswerEncoder(fields map[string]elicitationAnswerField) answerEncoder {
-	return func(answers map[string]InteractiveAnswerValue) (string, error) {
-		return encodeElicitationResponse(fields, answers)
-	}
 }
 
 func elicitationContentValue(value any) (acpschema.ElicitationContentValue, error) {

@@ -12,7 +12,7 @@ import (
 )
 
 type MCPService interface {
-	AskUser(context.Context, string, MCPAskUserInput) (MCPAskUserOutput, error)
+	AskUser(context.Context, string, AskUserInput) (AskUserOutput, error)
 	Spawn(context.Context, SpawnRequest) (SpawnResult, error)
 	Send(context.Context, SendRequest) (Job, error)
 	WaitThreads(context.Context, []string, time.Duration) (ThreadResults, error)
@@ -65,6 +65,11 @@ type MCPCreateInput struct {
 	Model         string `json:"model,omitempty" jsonschema:"Model override. Omit unless the user requests a specific model."`
 	Thinking      string `json:"thinking,omitempty" jsonschema:"Reasoning effort supported by the selected model. Omit to use its configured default."`
 	Plan          bool   `json:"plan,omitempty" jsonschema:"Request the agent's plan mode for this prompt."`
+}
+
+func (t *MCPTools) AskUser(ctx context.Context, req *mcp.CallToolRequest, input AskUserInput) (*mcp.CallToolResult, AskUserOutput, error) {
+	out, err := t.Service.AskUser(ctx, mcpsession.SessionID(req), input)
+	return nil, out, err
 }
 
 func (t *MCPTools) CreateDefinition() *mcp.Tool {

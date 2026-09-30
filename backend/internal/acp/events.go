@@ -26,31 +26,11 @@ func (m *Manager) awaitPermission(ctx context.Context, job *jobState, req acpsch
 	permission.SessionID = string(req.SessionID)
 	permission.Status = "pending"
 
-	pending := &pendingPermission{
-		sessionID: job.ID,
-		request:   permission,
-		answer:    make(chan string, 1),
-	}
-	if !m.registerPendingPermission(job, pending) {
+	answer := m.awaitPermissionAnswer(ctx, job, permission, nil)
+	if answer.OptionID == "" {
 		return permissionCancelled()
 	}
-
-	m.setJobPermission(job, permission)
-	m.publishPermission(job, permission, "permission_request")
-
-	select {
-	case optionID := <-pending.answer:
-		if optionID == "" {
-			return permissionCancelled()
-		}
-		return jsonrpc.EncodeResult(acpschema.RequestPermissionResponseSelected(acpschema.PermissionOptionID(optionID)))
-	case <-ctx.Done():
-		m.removePendingPermission(permission.ID)
-		m.removeJobPermission(job, permission.ID)
-		permission.Status = "cancelled"
-		m.publishPermission(job, permission, "permission_response")
-		return permissionCancelled()
-	}
+	return jsonrpc.EncodeResult(acpschema.RequestPermissionResponseSelected(acpschema.PermissionOptionID(answer.OptionID)))
 }
 
 func permissionCancelled() (json.RawMessage, *jsonrpc.Error) {
@@ -106,14 +86,19 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 			m.permissionMu.Unlock()
 			return fmt.Errorf("permission request %s does not accept structured answers", req.RequestID)
 		}
-		payload, err := pending.encodeAnswers(req.Answers)
-		if err != nil {
-			m.permissionMu.Unlock()
-			return err
+		answers := req.Answers
+		if pending.prepareAnswers != nil {
+			var err error
+			answers, err = pending.prepareAnswers(answers)
+			if err != nil {
+				m.permissionMu.Unlock()
+				return err
+			}
 		}
-		answerText := formatPermissionAnswers(pending.request, req.Answers)
+		answerText := formatPermissionAnswers(pending.request, answers)
 		delete(m.pendingPermission, req.RequestID)
 		m.permissionMu.Unlock()
+		<-pending.published
 
 		resolved := pending.request
 		resolved.Status = "selected"
@@ -122,10 +107,7 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 		m.appendUserAnswerMessage(job, answerText, parentVisible)
 		m.publishPermission(job, resolved, "permission_response")
 
-		select {
-		case pending.answer <- payload:
-		default:
-		}
+		pending.answer <- permissionAnswer{Answers: answers}
 		return nil
 	}
 	if strings.TrimSpace(req.OptionID) == "" {
@@ -135,14 +117,12 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 		}
 		delete(m.pendingPermission, req.RequestID)
 		m.permissionMu.Unlock()
+		<-pending.published
 		cancelled := pending.request
 		cancelled.Status = "cancelled"
 		m.removeJobPermission(job, req.RequestID)
 		m.publishPermission(job, cancelled, "permission_response")
-		select {
-		case pending.answer <- "":
-		default:
-		}
+		pending.answer <- permissionAnswer{}
 		go m.sendTextAfterTurn(job.ID, text, parentVisible, req.PlanRequested)
 		return nil
 	}
@@ -152,6 +132,7 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 	}
 	delete(m.pendingPermission, req.RequestID)
 	m.permissionMu.Unlock()
+	<-pending.published
 
 	// The agent owns the mode transition out of plan: Claude's ExitPlanMode
 	// approval makes the adapter switch modes and emit current_mode_update, and
@@ -162,10 +143,7 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 	m.removeJobPermission(job, req.RequestID)
 	m.publishPermission(job, resolved, "permission_response")
 
-	select {
-	case pending.answer <- req.OptionID:
-	default:
-	}
+	pending.answer <- permissionAnswer{OptionID: req.OptionID}
 	if text != "" {
 		go m.sendTextAfterTurn(job.ID, text, parentVisible, req.PlanRequested)
 	}

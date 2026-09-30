@@ -24,8 +24,8 @@ type fakeMCPService struct {
 	sendErr error
 }
 
-func (s *fakeMCPService) AskUser(context.Context, string, MCPAskUserInput) (MCPAskUserOutput, error) {
-	return MCPAskUserOutput{}, nil
+func (s *fakeMCPService) AskUser(context.Context, string, AskUserInput) (AskUserOutput, error) {
+	return AskUserOutput{}, nil
 }
 
 func (s *fakeMCPService) Spawn(_ context.Context, req SpawnRequest) (SpawnResult, error) {

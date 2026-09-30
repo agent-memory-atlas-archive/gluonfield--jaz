@@ -24,8 +24,8 @@ type fakeACPService struct {
 	spawned chan acp.SpawnRequest
 }
 
-func (s fakeACPService) AskUser(context.Context, string, acp.MCPAskUserInput) (acp.MCPAskUserOutput, error) {
-	return acp.MCPAskUserOutput{}, nil
+func (s fakeACPService) AskUser(context.Context, string, acp.AskUserInput) (acp.AskUserOutput, error) {
+	return acp.AskUserOutput{}, nil
 }
 
 func (s fakeACPService) Spawn(_ context.Context, req acp.SpawnRequest) (acp.SpawnResult, error) {

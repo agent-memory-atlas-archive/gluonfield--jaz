@@ -1,24 +1,58 @@
 package acp
 
-import "github.com/wins/jaz/backend/internal/sessionevents"
+import (
+	"context"
 
-type pendingPermission struct {
-	sessionID     string
-	request       sessionevents.ACPPermission
-	encodeAnswers answerEncoder
-	answer        chan string
+	"github.com/wins/jaz/backend/internal/sessionevents"
+)
+
+type permissionAnswer struct {
+	OptionID string
+	Answers  map[string]InteractiveAnswerValue
 }
 
-type answerEncoder func(map[string]InteractiveAnswerValue) (string, error)
+type pendingPermission struct {
+	sessionID      string
+	request        sessionevents.ACPPermission
+	prepareAnswers answerPreparer
+	answer         chan permissionAnswer
+	published      chan struct{}
+}
 
-func (m *Manager) registerPendingPermission(job *jobState, pending *pendingPermission) bool {
-	m.permissionMu.Lock()
-	defer m.permissionMu.Unlock()
-	if job.hasQueuedPromptSuccessor() {
-		return false
+type answerPreparer func(map[string]InteractiveAnswerValue) (map[string]InteractiveAnswerValue, error)
+
+func (m *Manager) awaitPermissionAnswer(ctx context.Context, job *jobState, permission sessionevents.ACPPermission, prepare answerPreparer) permissionAnswer {
+	pending := &pendingPermission{
+		sessionID: job.ID, request: permission, prepareAnswers: prepare,
+		answer: make(chan permissionAnswer, 1), published: make(chan struct{}),
 	}
-	m.pendingPermission[pending.request.ID] = pending
-	return true
+	m.permissionMu.Lock()
+	if ctx.Err() != nil || job.hasQueuedPromptSuccessor() {
+		m.permissionMu.Unlock()
+		return permissionAnswer{}
+	}
+	m.pendingPermission[permission.ID] = pending
+	m.permissionMu.Unlock()
+	m.setJobPermission(job, permission)
+	m.publishPermission(job, permission, "permission_request")
+	close(pending.published)
+
+	select {
+	case answer := <-pending.answer:
+		return answer
+	case <-ctx.Done():
+		m.permissionMu.Lock()
+		if m.pendingPermission[permission.ID] == nil {
+			m.permissionMu.Unlock()
+			return <-pending.answer
+		}
+		delete(m.pendingPermission, permission.ID)
+		m.permissionMu.Unlock()
+		m.removeJobPermission(job, permission.ID)
+		permission.Status = "cancelled"
+		m.publishPermission(job, permission, "permission_response")
+		return permissionAnswer{}
+	}
 }
 
 func (m *Manager) cancelPendingPermissions(sessionID string) {
@@ -55,21 +89,13 @@ func (m *Manager) takePendingPermissionsLocked(sessionID string) []*pendingPermi
 
 func (m *Manager) cancelPendingPermissionList(pending []*pendingPermission) {
 	for _, candidate := range pending {
+		<-candidate.published
 		cancelled := candidate.request
 		cancelled.Status = "cancelled"
 		if job := m.jobByID(candidate.sessionID); job != nil {
 			m.removeJobPermission(job, candidate.request.ID)
 			m.publishPermission(job, cancelled, "permission_response")
 		}
-		select {
-		case candidate.answer <- "":
-		default:
-		}
+		candidate.answer <- permissionAnswer{}
 	}
-}
-
-func (m *Manager) removePendingPermission(requestID string) {
-	m.permissionMu.Lock()
-	delete(m.pendingPermission, requestID)
-	m.permissionMu.Unlock()
 }

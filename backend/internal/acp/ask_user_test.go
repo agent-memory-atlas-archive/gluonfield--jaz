@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,7 +79,7 @@ func TestAskUserMCPRoundTripInOrdinaryMode(t *testing.T) {
 	done := make(chan *mcp.CallToolResult, 1)
 	errs := make(chan error, 1)
 	go func() {
-		call, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "ask_user", Arguments: MCPAskUserInput{Questions: []UserQuestion{
+		call, err := client.CallTool(ctx, &mcp.CallToolParams{Name: "ask_user", Arguments: AskUserInput{Questions: []UserQuestion{
 			{ID: "z_strategy", Header: "Strategy", Question: "Which migration approach?", Options: []sessionevents.ACPQuestionOption{
 				{Label: "Phased", Description: "Validate each domain before cutover"},
 				{Label: "Single cutover", Description: "Move the whole estate together"},
@@ -130,7 +131,7 @@ func TestAskUserMCPRoundTripInOrdinaryMode(t *testing.T) {
 	}
 	select {
 	case call := <-done:
-		out := structuredContent[MCPAskUserOutput](t, call)
+		out := structuredContent[AskUserOutput](t, call)
 		if out.Cancelled || out.Answers["z_strategy"].Answers[0] != "Phased" ||
 			out.Answers["a_constraints"].Answers[0] != "No downtime during business hours" {
 			t.Fatalf("tool answers = %#v", out)
@@ -159,9 +160,9 @@ func TestAskUserCancellationClearsQuestion(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			events := manager.Events.Subscribe(ctx, session.ID)
-			done := make(chan MCPAskUserOutput, 1)
+			done := make(chan AskUserOutput, 1)
 			go func() {
-				out, _ := manager.AskUser(ctx, session.ID, MCPAskUserInput{Questions: []UserQuestion{{ID: "q", Question: "Which approach?"}}})
+				out, _ := manager.AskUser(ctx, session.ID, AskUserInput{Questions: []UserQuestion{{ID: "q", Question: "Which approach?"}}})
 				done <- out
 			}()
 			select {
@@ -204,11 +205,157 @@ func TestAskUserRejectsInvalidRequestsBeforePublishing(t *testing.T) {
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: " "}}}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: "A"}, {Label: " A "}}}}},
 	} {
-		if _, err := manager.AskUser(ctx, test.sessionID, MCPAskUserInput{Questions: test.questions}); err == nil {
+		if _, err := manager.AskUser(ctx, test.sessionID, AskUserInput{Questions: test.questions}); err == nil {
 			t.Fatalf("accepted invalid request: %#v", test)
 		}
 	}
 	if len(manager.pendingPermission) != 0 || len(manager.jobByID(session.ID).Permissions) != 0 {
 		t.Fatal("invalid requests opened questions")
+	}
+}
+
+type heldAnswerStore struct {
+	Store
+	claimed chan struct{}
+	release chan struct{}
+}
+
+func (s *heldAnswerStore) AppendMessages(id string, messages ...provider.Message) error {
+	close(s.claimed)
+	<-s.release
+	return s.Store.AppendMessages(id, messages...)
+}
+
+func TestAskUserAcceptedAnswerWinsConcurrentCancellation(t *testing.T) {
+	manager, _, session, ctx := askUserFixture(t)
+	held := &heldAnswerStore{Store: manager.store, claimed: make(chan struct{}), release: make(chan struct{})}
+	manager.store = held
+	release := sync.OnceFunc(func() {
+		close(held.release)
+	})
+	t.Cleanup(release)
+	events := manager.Events.Subscribe(ctx, session.ID)
+	callCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	done := make(chan AskUserOutput, 1)
+	go func() {
+		out, _ := manager.AskUser(callCtx, session.ID, AskUserInput{Questions: []UserQuestion{{ID: "q", Question: "Which approach?"}}})
+		done <- out
+	}()
+	var requestID string
+	select {
+	case event := <-events:
+		requestID = event.Permission.ID
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- manager.AnswerInteractive(ctx, InteractiveAnswer{
+			Session: session.ID, RequestID: requestID,
+			Answers: map[string]InteractiveAnswerValue{"q": {Answers: []string{"Phased"}}},
+		})
+	}()
+	select {
+	case <-held.claimed:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	cancel()
+	select {
+	case out := <-done:
+		t.Fatalf("accepted answer lost to cancellation: %#v", out)
+	case <-time.After(50 * time.Millisecond):
+	}
+	release()
+	if err := <-submitted; err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case out := <-done:
+		if out.Cancelled || out.Answers["q"].Answers[0] != "Phased" {
+			t.Fatalf("accepted answer = %#v", out)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	select {
+	case event := <-events:
+		if event.Type != "permission_response" || event.Permission.Status != "selected" {
+			t.Fatalf("terminal event = %#v", event)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("duplicate terminal event = %#v", event)
+	default:
+	}
+}
+
+type heldPermissionStore struct {
+	Store
+	started chan struct{}
+	release chan struct{}
+}
+
+func (s *heldPermissionStore) TouchSessionAttention(id string) error {
+	close(s.started)
+	<-s.release
+	return s.Store.TouchSessionAttention(id)
+}
+
+func TestAskUserPublishesRequestBeforeCancellation(t *testing.T) {
+	manager, _, session, ctx := askUserFixture(t)
+	held := &heldPermissionStore{Store: manager.store, started: make(chan struct{}), release: make(chan struct{})}
+	manager.store = held
+	release := sync.OnceFunc(func() {
+		close(held.release)
+	})
+	t.Cleanup(release)
+	events := manager.Events.Subscribe(ctx, session.ID)
+	done := make(chan AskUserOutput, 1)
+	go func() {
+		out, _ := manager.AskUser(ctx, session.ID, AskUserInput{Questions: []UserQuestion{{ID: "q", Question: "Which approach?"}}})
+		done <- out
+	}()
+	select {
+	case <-held.started:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	cancelled := make(chan struct{})
+	go func() {
+		manager.cancelPendingPermissions(session.ID)
+		close(cancelled)
+	}()
+	select {
+	case event := <-events:
+		t.Fatalf("resolution published before question: %#v", event)
+	case <-time.After(50 * time.Millisecond):
+	}
+	release()
+	for _, want := range []string{"permission_request", "permission_response"} {
+		select {
+		case event := <-events:
+			if event.Type != want {
+				t.Fatalf("event = %q, want %q", event.Type, want)
+			}
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+	select {
+	case out := <-done:
+		if !out.Cancelled {
+			t.Fatalf("cancellation = %#v", out)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	<-cancelled
+	if len(manager.jobByID(session.ID).Permissions) != 0 {
+		t.Fatal("cancelled question remained live")
 	}
 }
