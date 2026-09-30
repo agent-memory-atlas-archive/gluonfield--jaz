@@ -42,7 +42,7 @@ test('user bubbles render Markdown, LaTeX, and mentions', async () => {
   expect(html).toContain('<li>one</li>')
 })
 
-test('user bubbles preserve typed line breaks', async () => {
+test('user bubbles keep typed line breaks without preserving block whitespace', async () => {
   const { UserBubble } = await import('./Bubble')
   const html = renderToStaticMarkup(
     createElement(UserBubble, {
@@ -50,8 +50,9 @@ test('user bubbles preserve typed line breaks', async () => {
     }),
   )
 
-  expect(html).toContain('class="chat-prose whitespace-pre-wrap"')
-  expect(html).toContain('(int(d) for d in &quot;1234&quot;)\n[int(d) for d in &quot;1234&quot;]\n{int(d) for d in &quot;1234&quot;}')
+  expect(html).toContain('(int(d) for d in &quot;1234&quot;)<br/>\n[int(d) for d in &quot;1234&quot;]<br/>\n{int(d) for d in &quot;1234&quot;}')
+  // Markdown separates blocks with newline text nodes; preserved whitespace paints them as blank lines.
+  expect(html).not.toContain('pre-wrap')
 })
 
 test('inline links use website favicons and keep local file icons', async () => {
