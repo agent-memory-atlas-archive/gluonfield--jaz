@@ -12,6 +12,7 @@ import (
 )
 
 type MCPService interface {
+	AskUser(context.Context, string, MCPAskUserInput) (MCPAskUserOutput, error)
 	Spawn(context.Context, SpawnRequest) (SpawnResult, error)
 	Send(context.Context, SendRequest) (Job, error)
 	WaitThreads(context.Context, []string, time.Duration) (ThreadResults, error)
@@ -29,6 +30,10 @@ func NewMCPTools(service MCPService) *MCPTools {
 }
 
 func (t *MCPTools) AddTo(server *mcp.Server) {
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "ask_user",
+		Description: "Ask one or more questions in the current thread's UI and wait for the user's answers. Use for missing information, preferences, or decisions that change what you do next. Works outside plan mode. Questions may include suggested options; the user can always enter free text. Ask only what is needed and do not request confirmation already given. Returns answers keyed by question id, or cancelled when the question is interrupted.",
+	}, t.AskUser)
 	mcp.AddTool(server, t.CreateDefinition(), t.Create)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        ToolSendMessageToThread,

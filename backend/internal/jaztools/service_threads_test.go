@@ -24,6 +24,10 @@ type fakeACPService struct {
 	spawned chan acp.SpawnRequest
 }
 
+func (s fakeACPService) AskUser(context.Context, string, acp.MCPAskUserInput) (acp.MCPAskUserOutput, error) {
+	return acp.MCPAskUserOutput{}, nil
+}
+
 func (s fakeACPService) Spawn(_ context.Context, req acp.SpawnRequest) (acp.SpawnResult, error) {
 	s.spawned <- req
 	return acp.SpawnResult{Status: "ok", SessionID: "child", Slug: req.Slug, ACPAgent: req.ACPAgent, State: acp.StateIdle}, nil

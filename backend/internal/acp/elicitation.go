@@ -51,14 +51,22 @@ func (m *Manager) createElicitation(ctx context.Context, raw json.RawMessage) (j
 		Questions:  questions,
 		Status:     "pending",
 	}
+	rawAnswer := m.awaitQuestionAnswers(ctx, job, permission, elicitationAnswerEncoder(fields))
+	if rawAnswer == "" {
+		return jsonrpc.EncodeResult(acpschema.CreateElicitationResponse{Action: "cancel"})
+	}
+	return jsonrpc.EncodeResult(json.RawMessage(rawAnswer))
+}
+
+func (m *Manager) awaitQuestionAnswers(ctx context.Context, job *jobState, permission sessionevents.ACPPermission, encoder answerEncoder) string {
 	pending := &pendingPermission{
 		sessionID:     job.ID,
 		request:       permission,
-		encodeAnswers: elicitationAnswerEncoder(fields),
+		encodeAnswers: encoder,
 		answer:        make(chan string, 1),
 	}
 	if !m.registerPendingPermission(job, pending) {
-		return jsonrpc.EncodeResult(acpschema.CreateElicitationResponse{Action: "cancel"})
+		return ""
 	}
 
 	m.setJobPermission(job, permission)
@@ -66,16 +74,13 @@ func (m *Manager) createElicitation(ctx context.Context, raw json.RawMessage) (j
 
 	select {
 	case raw := <-pending.answer:
-		if raw == "" {
-			return jsonrpc.EncodeResult(acpschema.CreateElicitationResponse{Action: "cancel"})
-		}
-		return jsonrpc.EncodeResult(json.RawMessage(raw))
+		return raw
 	case <-ctx.Done():
 		m.removePendingPermission(permission.ID)
 		m.removeJobPermission(job, permission.ID)
 		permission.Status = "cancelled"
 		m.publishPermission(job, permission, "permission_response")
-		return jsonrpc.EncodeResult(acpschema.CreateElicitationResponse{Action: "cancel"})
+		return ""
 	}
 }
 
