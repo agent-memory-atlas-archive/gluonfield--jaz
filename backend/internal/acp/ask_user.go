@@ -3,6 +3,7 @@ package acp
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -13,11 +14,10 @@ type AskUserInput struct {
 }
 
 type UserQuestion struct {
-	ID          string                            `json:"id" jsonschema:"Unique identifier used to return this question's answer."`
-	Question    string                            `json:"question" jsonschema:"Complete self-contained question."`
-	Header      string                            `json:"header,omitempty" jsonschema:"Optional short label."`
-	MultiSelect bool                              `json:"multi_select,omitempty" jsonschema:"Allow multiple answers, shown as checkboxes. Requires options. Otherwise options are single-choice radio buttons."`
-	Options     []sessionevents.ACPQuestionOption `json:"options,omitempty" jsonschema:"Provide concrete answer options whenever useful, so the user can select rather than type. Free text is always available alongside choices."`
+	ID          string   `json:"id" jsonschema:"Unique identifier used to return this question's answer."`
+	Question    string   `json:"question" jsonschema:"Complete self-contained question."`
+	Options     []string `json:"options,omitempty" jsonschema:"Short plain-text answer choices. Provide them whenever useful so the user can select rather than type. The user can always type another answer."`
+	MultiSelect bool     `json:"multi_select,omitempty" jsonschema:"Allow several choices, shown as checkboxes. Requires options. Otherwise choices are single-select radio buttons."`
 }
 
 type AskUserOutput struct {
@@ -50,18 +50,15 @@ func (m *Manager) AskUser(ctx context.Context, sessionID string, input AskUserIn
 			return AskUserOutput{}, fmt.Errorf("question %s requires options for multiple selection", id)
 		}
 		options := make([]sessionevents.ACPQuestionOption, 0, len(question.Options))
-		labels := make(map[string]bool, len(question.Options))
-		for _, option := range question.Options {
-			option.Label = strings.TrimSpace(option.Label)
-			option.Description = strings.TrimSpace(option.Description)
-			if option.Label == "" || labels[option.Label] {
-				return AskUserOutput{}, fmt.Errorf("question %s requires unique nonempty option labels", id)
+		for _, label := range question.Options {
+			option := sessionevents.ACPQuestionOption{Label: strings.TrimSpace(label)}
+			if option.Label == "" || slices.Contains(options, option) {
+				return AskUserOutput{}, fmt.Errorf("question %s requires unique nonempty options", id)
 			}
-			labels[option.Label] = true
 			options = append(options, option)
 		}
 		questions = append(questions, sessionevents.ACPQuestion{
-			ID: id, Header: strings.TrimSpace(question.Header), Question: text, IsOther: true, Options: options, MultiSelect: question.MultiSelect,
+			ID: id, Question: text, IsOther: true, Options: options, MultiSelect: question.MultiSelect,
 		})
 	}
 	prepare := func(answers map[string]InteractiveAnswerValue) (map[string]InteractiveAnswerValue, error) {
