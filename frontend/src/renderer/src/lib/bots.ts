@@ -27,6 +27,12 @@ export function randomAvatar(): BotAvatar {
   return { shape: pick(BOT_SHAPES), color: pick(VIVID) }
 }
 
+const LAST_BOT_KEY = 'jaz.lastBot'
+
+// The Bots tab returns to the chat the user left, as Chat returns to its thread.
+export const lastBotId = () => localStorage.getItem(LAST_BOT_KEY) ?? undefined
+export const rememberBot = (id: string) => localStorage.setItem(LAST_BOT_KEY, id)
+
 const TARGET_PREFIX = 'bot:'
 
 export const botTarget = (id: string) => `${TARGET_PREFIX}${id}`
