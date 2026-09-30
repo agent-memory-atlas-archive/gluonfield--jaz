@@ -216,15 +216,15 @@ func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, er
 	return bot.ID, err
 }
 
-// AdoptLoops gives every loop without an owner a bot of its own, so all
-// routines live with a bot.
+// AdoptLoops gives every loop that has no owner and is not on a board a bot
+// of its own, so every routine lives with a bot or a board.
 func (s *Service) AdoptLoops(ctx context.Context) error {
 	routines, err := s.Routines.List()
 	if err != nil {
 		return err
 	}
 	for _, routine := range routines {
-		if routine.BotID != "" {
+		if routine.BotID != "" || s.Routines.OnBoard(routine) {
 			continue
 		}
 		bot, err := s.Create(ctx, CreateBot{Name: routine.Name, Agent: routine.ACPAgent, Model: routine.Model, Directory: routine.Directory})

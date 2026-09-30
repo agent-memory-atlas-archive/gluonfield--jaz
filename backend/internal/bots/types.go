@@ -87,6 +87,7 @@ type Routines interface {
 	List() ([]loops.Loop, error)
 	Update(string, loops.UpdateLoop) (loops.Loop, error)
 	Delete(string) error
+	OnBoard(loops.Loop) bool
 }
 
 type Publisher interface {

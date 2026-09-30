@@ -263,6 +263,11 @@ func (s *Service) StartDueAll(ctx context.Context) (int, error) {
 	}
 }
 
+// OnBoard reports whether loop publishes a widget to a board.
+func (s *Service) OnBoard(loop Loop) bool {
+	return s.ArtifactSurface != nil && s.ArtifactSurface(loop, Run{}) != ""
+}
+
 func (s *Service) RunNow(ctx context.Context, loopID string) (Run, error) {
 	return s.RunTriggered(ctx, loopID, "")
 }

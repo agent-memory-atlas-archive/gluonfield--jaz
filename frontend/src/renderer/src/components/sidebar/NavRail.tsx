@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, linkOptions, useRouterState } from '@tanstack/react-router'
-import { Bot, LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { AppIcon } from '@/components/apps/AppIcon'
+import { BotsGlyph } from '@/components/bots/BotAvatar'
 import { entrypointKey, mcpEntrypointsQuery } from '@/lib/api/mcp'
 
 export const RAIL_WIDTH = 48
@@ -10,7 +11,7 @@ export const RAIL_WIDTH = 48
 // The sections beside Chat. Bots keeps the thread panel for its own list;
 // the rest take the whole content card.
 export const SECTIONS = [
-  { to: '/bots', label: 'Bots', Icon: Bot },
+  { to: '/bots', label: 'Bots', Icon: BotsGlyph },
   { to: '/boards', label: 'Boards', Icon: LayoutDashboard },
 ] as const
 

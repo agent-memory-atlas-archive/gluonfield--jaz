@@ -145,6 +145,10 @@ func (w *fakeWorld) Delete(string) error {
 	return nil
 }
 
+func (w *fakeWorld) OnBoard(loop loops.Loop) bool {
+	return strings.HasPrefix(loop.ID, "widget-")
+}
+
 type fakeThreads struct {
 	world *fakeWorld
 }
@@ -315,12 +319,13 @@ func TestMessageRelaysReplyToSender(t *testing.T) {
 	}
 }
 
-func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBot(t *testing.T) {
+func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBotExceptBoardWidgets(t *testing.T) {
 	world := newFakeWorld()
 	world.addBot("gimli", "Gimli")
 	world.loops = []loops.Loop{
 		{ID: "loop-1", Name: "Morning triage", ACPAgent: "codex", Directory: "triage"},
 		{ID: "loop-2", Name: "Digest", BotID: "gimli"},
+		{ID: "widget-loop", Name: "world-clocks"},
 	}
 	if err := newTestService(world).AdoptLoops(context.Background()); err != nil {
 		t.Fatal(err)
@@ -335,5 +340,8 @@ func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBot(t *testing.T) {
 	}
 	if world.loops[1].BotID != "gimli" {
 		t.Fatal("an owned loop changed owner")
+	}
+	if world.loops[2].BotID != "" {
+		t.Fatal("a board widget was given a bot")
 	}
 }

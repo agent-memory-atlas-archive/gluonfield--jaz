@@ -60,3 +60,25 @@ func TestCoordinatorRejectsBadBoardsBeforeCreate(t *testing.T) {
 		t.Fatal("loop must not be created when board validation fails")
 	}
 }
+
+func TestCoordinatorGivesBotsOnlyToLoopsOffBoards(t *testing.T) {
+	svc := &fakeMCPService{}
+	boards := &fakeBoardService{boards: []BoardSummary{{ID: "board-1", Name: "News"}}}
+	owner := func(threadID string, _ CreateLoop) (string, error) {
+		return "bot-" + threadID, nil
+	}
+	c := Coordinator{Loops: svc, Boards: boards, Owner: owner}
+
+	if _, err := c.Create(CreateLoop{Name: "Clocks", BotID: "bot-x"}, []string{"board-1"}, "thread-1"); err != nil {
+		t.Fatal(err)
+	}
+	if svc.created.BotID != "" {
+		t.Fatalf("a board widget was given bot %q", svc.created.BotID)
+	}
+	if _, err := c.Create(CreateLoop{Name: "Triage"}, nil, "thread-1"); err != nil {
+		t.Fatal(err)
+	}
+	if svc.created.BotID != "bot-thread-1" {
+		t.Fatalf("owner = %q", svc.created.BotID)
+	}
+}

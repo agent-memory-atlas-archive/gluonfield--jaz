@@ -208,7 +208,7 @@ type MCPCreateInput struct {
 	ReasoningEffort string   `json:"reasoning_effort,omitempty" jsonschema:"none, minimal, low, medium, high, xhigh, max"`
 	Directory       string   `json:"directory,omitempty" jsonschema:"workspace-relative or absolute directory for loop runs"`
 	BoardIDs        []string `json:"board_ids,omitempty" jsonschema:"board ids to place this loop's widget on; assignment is what enables the widget. Use loop_boards to list ids."`
-	Bot             string   `json:"bot,omitempty" jsonschema:"id of the bot that owns the routine; defaults to the calling bot"`
+	Bot             string   `json:"bot,omitempty" jsonschema:"id of the bot that owns the routine; defaults to the calling bot. A routine on a board belongs to the board"`
 	Trigger         *Trigger `json:"trigger,omitempty" jsonschema:"fire on an event instead of the schedule: kind gmail, whatsapp, telegram, slack or webhook, with optional from, subject (email subject or Slack #channel) and contains filters"`
 }
 
