@@ -162,9 +162,17 @@ export function QuestionPermissionCard({
 
         <div className="mt-2 flex items-center justify-end gap-1">
           {total > 1 ? (
-            <span className="mr-auto text-[12px] tabular-nums text-ink-3">
-              {safeIndex + 1} / {total}
-            </span>
+            <div
+              role="progressbar"
+              aria-label="Question progress"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={safeIndex + 1}
+              aria-valuetext={`Question ${safeIndex + 1} of ${total}`}
+              className="mr-auto h-1 w-16 overflow-hidden rounded-full bg-ink/10"
+            >
+              <div className="h-full rounded-full bg-ink-3" style={{ width: `${((safeIndex + 1) / total) * 100}%` }} />
+            </div>
           ) : null}
           {isFirst ? null : (
             <button

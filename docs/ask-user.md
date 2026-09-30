@@ -21,6 +21,7 @@
 - [x] Review corrections: 40px hit areas for options and actions, a neutral `1 / 4` counter in place of the dots, and plain option text with no native descriptions drawn.
 - [x] Restore `header` in the TypeScript question contract.
 - [x] Remove the question slide so the outgoing question can no longer take clicks.
+- [x] Replace the numeric question counter with a small neutral progress bar, retaining the question position for screen readers.
 
 `ask_user` accepts ordered `questions`, each with `id`, `question`, optional plain-text `options`, and optional `multi_select`. Options use radio buttons by default; `multi_select: true` uses checkboxes and requires options. The agent should provide concrete options whenever useful. Free text remains available alongside choices, and multi-select answers can combine choices with custom text. It uses the caller's thread binding, waits for all answers, and returns `answers` keyed by question id. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle, without entering plan mode.
 
@@ -77,3 +78,5 @@ The outgoing-question bug has a direct probe. Clicking Next and immediately prob
 Limit: the side browser delivered no native key events. Enter-to-advance was checked with a dispatched DOM event, and Tab focus with `focus({ focusVisible: true })` plus the keyboard-focus attribute; without the attribute the band disappears. Screenshots: `/Users/wins/.jaz/artifacts/ask-user-redesign-20260930-v2/`.
 
 The review corrections changed only frontend files. After them, 281 frontend tests, typecheck and targeted lint pass. From the first redesign commit, backend `acp` and `jaztools` tests, focused `ask_user`/elicitation race runs and affected vet pass. The full backend run fails only in `internal/terminal` with a PTY `device not configured` error; that package depends on no changed package, and its behaviour on this machine is not otherwise verified.
+
+Follow-up: the footer counter is now a 64px-wide, 4px-high neutral bar showing the current question's position. Screen readers retain “Question N of total” through progressbar semantics. Integrated-browser checks confirmed dark/light rendering, Back/Next updates and accessibility values for all four questions; the fill measured 16px on question one, 32px on question two and 64px on question four. Submission remains independently gated by answered questions. Typecheck, targeted lint and a maintainability review pass. Screenshot: `/Users/wins/.jaz/artifacts/ask-user-progress-20260930/dark-progress.png`.
