@@ -24,7 +24,7 @@ type Service struct {
 	Log      *log.Logger
 
 	mu     sync.Mutex
-	rounds map[string]*round
+	rounds map[string]context.CancelFunc
 	voices map[string]*voice
 }
 

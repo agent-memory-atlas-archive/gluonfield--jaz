@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -19,11 +20,6 @@ const (
 )
 
 var mentionPattern = regexp.MustCompile(`\]\(bot:([A-Za-z0-9_-]+)\)`)
-
-type round struct {
-	cancel context.CancelFunc
-	posts  int
-}
 
 // Post adds the user's message to a group; its members then take turns.
 func (s *Service) Post(groupID, text string) error {
@@ -56,49 +52,40 @@ func (s *Service) post(group storage.BotRecord, name string, message sessioneven
 	ctx, cancel := context.WithCancel(context.Background())
 	s.mu.Lock()
 	if s.rounds == nil {
-		s.rounds = make(map[string]*round)
+		s.rounds = make(map[string]context.CancelFunc)
 	}
-	previous := s.rounds[group.ThreadID]
-	posts := 0
-	if previous != nil {
-		previous.cancel()
-		posts = previous.posts
+	if previous := s.rounds[group.ThreadID]; previous != nil {
+		previous()
 	}
-	s.rounds[group.ThreadID] = &round{cancel: cancel, posts: posts + 1}
+	s.rounds[group.ThreadID] = cancel
 	s.mu.Unlock()
-	go s.runRound(ctx, group.ThreadID, name, responders, posts)
+	go s.runRound(ctx, group.ThreadID, name, responders)
 	return nil
 }
 
-// runRound gives each responder a turn, rotating who goes first, until a
-// round passes in silence or the caps are reached.
-func (s *Service) runRound(ctx context.Context, groupID, name string, responders []string, offset int) {
-	if len(responders) == 0 {
-		return
-	}
+// runRound gives every responder a turn at once, so one slow member holds up
+// nobody, then a follow-up round to react to each other, stopping when a round
+// passes in silence or the reply cap is reached.
+func (s *Service) runRound(ctx context.Context, groupID, name string, responders []string) {
 	replies := 0
-	for turn := range maxRounds {
-		spoke := false
-		for i := range responders {
-			member := responders[(offset+turn+i)%len(responders)]
-			said, err := s.memberTurn(ctx, groupID, name, member)
-			if ctx.Err() != nil {
-				return
-			}
-			if err != nil {
-				s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
-				continue
-			}
-			if len(said) == 0 {
-				continue
-			}
-			spoke = true
-			replies += len(said)
-			if replies >= maxReplies {
-				return
-			}
+	for range maxRounds {
+		var mu sync.Mutex
+		spoke := 0
+		var wg sync.WaitGroup
+		for _, member := range responders {
+			wg.Go(func() {
+				said, err := s.memberTurn(ctx, groupID, name, member)
+				if err != nil && ctx.Err() == nil {
+					s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
+				}
+				mu.Lock()
+				spoke += len(said)
+				mu.Unlock()
+			})
 		}
-		if !spoke {
+		wg.Wait()
+		replies += spoke
+		if ctx.Err() != nil || spoke == 0 || replies >= maxReplies {
 			return
 		}
 	}

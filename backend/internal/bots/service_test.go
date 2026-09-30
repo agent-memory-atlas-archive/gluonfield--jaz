@@ -2,6 +2,7 @@ package bots
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -24,6 +25,7 @@ type fakeWorld struct {
 	created   []acp.SpawnRequest
 	loops     []loops.Loop
 	published []sessionevents.Event
+	held      map[string]chan struct{}
 	service   *Service
 }
 
@@ -34,6 +36,7 @@ func newFakeWorld() *fakeWorld {
 		events:   map[string][]sessionevents.Event{},
 		prompts:  map[string][]string{},
 		replies:  map[string][]string{},
+		held:     map[string]chan struct{}{},
 	}
 }
 
@@ -192,7 +195,11 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 		reply = queue[0]
 		t.world.replies[req.Session] = queue[1:]
 	}
+	held := t.world.held[req.Session]
 	t.world.mu.Unlock()
+	if held != nil {
+		<-held
+	}
 	if reply != "" {
 		if err := t.world.service.Say(req.Session, reply); err != nil {
 			return acp.Job{}, err
@@ -304,6 +311,28 @@ func TestGroupRoundPostsWhatMembersSendAndStopsOnSilence(t *testing.T) {
 	if !strings.Contains(secondPrompt, "Marketing: Draft is in the doc.") {
 		t.Fatalf("second round prompt misses what was said since:\n%s", secondPrompt)
 	}
+}
+
+func TestASlowMemberDoesNotHoldUpTheOthers(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("a", "Research")
+	world.addBot("b", "Marketing")
+	service := newTestService(world)
+	group, err := service.CreateGroup("Launch", []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	world.held["a"] = release
+	world.replies["a"] = []string{"Here is a meme."}
+	world.replies["b"] = []string{"Quick one."}
+
+	if err := service.Post(group.ID, "a good meme please"); err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, func() bool { return slices.Contains(world.roomMessages(group.ID), "Marketing: Quick one.") })
+	close(release)
+	waitUntil(t, func() bool { return slices.Contains(world.roomMessages(group.ID), "Research: Here is a meme.") })
 }
 
 func TestGroupMentionPicksResponders(t *testing.T) {
