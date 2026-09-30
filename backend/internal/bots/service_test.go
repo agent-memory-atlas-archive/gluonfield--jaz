@@ -175,7 +175,7 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 }
 
 func newTestService(world *fakeWorld) *Service {
-	return NewService(world, world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
+	return NewService(world, fakeThreads{world: world}, world, world, "/workspace", log.New(nil))
 }
 
 func (w *fakeWorld) addBot(id, name string) {
@@ -212,7 +212,7 @@ func waitUntil(t *testing.T, check func() bool) {
 	}
 }
 
-func TestRoutineOwnerKeepsBotThreadAndGivesOtherThreadsANewBot(t *testing.T) {
+func TestRoutineOwnerChecksNamedBotsKeepsBotThreadAndGivesOtherThreadsANewBot(t *testing.T) {
 	world := newFakeWorld()
 	world.addBot("gimli", "Gimli")
 	service := newTestService(world)
@@ -231,6 +231,16 @@ func TestRoutineOwnerKeepsBotThreadAndGivesOtherThreadsANewBot(t *testing.T) {
 	}
 	if len(world.created) != 1 || world.created[0].SourceType != storage.SourceBot || world.created[0].ACPAgent != "claude" || world.created[0].Title != "Morning triage" {
 		t.Fatalf("created threads = %+v", world.created)
+	}
+	if owner, err := service.RoutineOwner("chat-thread", loops.CreateLoop{BotID: "gimli"}); err != nil || owner != "gimli" {
+		t.Fatalf("named owner = %q, %v", owner, err)
+	}
+	world.sessions["crew"] = storage.Session{ID: "crew", Title: "Crew"}
+	world.records["crew"] = storage.BotRecord{ThreadID: "crew", Kind: KindGroup}
+	for _, named := range []string{"crew", "missing"} {
+		if _, err := service.RoutineOwner("gimli", loops.CreateLoop{BotID: named}); err == nil {
+			t.Fatalf("routine was given to %q, which is not a bot", named)
+		}
 	}
 }
 

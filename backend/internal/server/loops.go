@@ -48,6 +48,8 @@ func (s *Server) handleCreateLoop(w http.ResponseWriter, r *http.Request) {
 		Model:           req.Model,
 		ReasoningEffort: req.ReasoningEffort,
 		Directory:       req.Directory,
+		BotID:           req.BotID,
+		Trigger:         req.Trigger,
 	}, req.BoardIDs, "")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -184,6 +186,8 @@ type loopRequest struct {
 	Model           string         `json:"model,omitempty"`
 	ReasoningEffort string         `json:"reasoning_effort,omitempty"`
 	Directory       string         `json:"directory,omitempty"`
+	BotID           string         `json:"bot_id,omitempty"`
+	Trigger         *loops.Trigger `json:"trigger,omitempty"`
 	// BoardIDs assigns the loop's widget to boards; assignment is what enables
 	// widget publishing (there is no separate toggle).
 	BoardIDs []string `json:"board_ids,omitempty"`

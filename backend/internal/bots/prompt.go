@@ -9,12 +9,12 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
-// PassReply is how a group member declines to speak.
-const PassReply = "PASS"
+// passReply is how a group member declines to speak.
+const passReply = "PASS"
 
 // Prompt is the identity module a bot's thread starts with.
-func Prompt(repo Repository, session storage.Session) (promptmodule.Modules, error) {
-	record, err := repo.LoadBot(session.ID)
+func Prompt(bots BotLoader, session storage.Session) (promptmodule.Modules, error) {
+	record, err := bots.LoadBot(session.ID)
 	if err != nil || record.Kind != KindBot {
 		return nil, err
 	}
@@ -45,6 +45,6 @@ func groupTurnPrompt(group, self string, peers []string, messages []sessionevent
 	for _, message := range messages {
 		fmt.Fprintf(&b, "%s: %s\n", message.Name, message.Text)
 	}
-	fmt.Fprintf(&b, "\nYour final reply is posted to the group as you. Keep it short and only add something new; reply exactly %s if you have nothing to add.", PassReply)
+	fmt.Fprintf(&b, "\nYour final reply is posted to the group as you. Keep it short and only add something new; reply exactly %s if you have nothing to add.", passReply)
 	return b.String()
 }

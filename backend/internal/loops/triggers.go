@@ -2,37 +2,26 @@ package loops
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/wins/jaz/backend/pkg/integrations"
+	"github.com/wins/jaz/backend/internal/integrationingest"
 )
 
 // triggerWindow bounds how old an observed message may be and still fire a
 // trigger, so history backfills and resyncs stay quiet.
 const triggerWindow = 15 * time.Minute
 
-// observed is one incoming message, reduced to what triggers match on.
-type observed struct {
-	Kind    string
-	ID      string
-	From    string
-	Subject string
-	Text    string
-	At      time.Time
-}
-
-// HandleRecords fires every active routine whose trigger matches a newly
-// observed message. The user's own messages never fire a trigger.
-func (s *Service) HandleRecords(ctx context.Context, records []integrations.Record) {
+// HandleIncoming fires every active routine whose trigger matches a message
+// observed within the trigger window.
+func (s *Service) HandleIncoming(ctx context.Context, messages []integrationingest.Incoming) {
 	now := s.now()
-	var recent []observed
-	for _, record := range records {
-		if incoming, ok := incomingFrom(record); ok && now.Sub(incoming.At) <= triggerWindow {
-			recent = append(recent, incoming)
+	var recent []integrationingest.Incoming
+	for _, message := range messages {
+		if now.Sub(message.At) <= triggerWindow {
+			recent = append(recent, message)
 		}
 	}
 	if len(recent) == 0 {
@@ -43,12 +32,12 @@ func (s *Service) HandleRecords(ctx context.Context, records []integrations.Reco
 		s.Log.Warn("list routines for trigger failed", "error", err)
 		return
 	}
-	for _, incoming := range recent {
+	for _, message := range recent {
 		for _, routine := range routines {
-			if routine.Status != StatusActive || !routine.Trigger.matches(incoming) || incoming.At.Before(routine.CreatedAt) || !s.firstSighting(routine.ID, incoming.ID) {
+			if routine.Status != StatusActive || !routine.Trigger.matches(message) || message.At.Before(routine.CreatedAt) || !s.firstSighting(routine.ID, message.ID) {
 				continue
 			}
-			if _, err := s.RunTriggered(ctx, routine.ID, incoming.describe()); err != nil {
+			if _, err := s.RunTriggered(ctx, routine.ID, describe(message)); err != nil {
 				s.Log.Info("trigger did not start a run", "routine", routine.ID, "error", err)
 			}
 		}
@@ -70,16 +59,16 @@ func (s *Service) firstSighting(routineID, id string) bool {
 	return true
 }
 
-func (t *Trigger) matches(in observed) bool {
+func (t *Trigger) matches(in integrationingest.Incoming) bool {
 	return t != nil &&
-		t.Kind == in.Kind &&
+		t.Kind == in.Provider &&
 		containsFold(in.From, t.From) &&
 		containsFold(in.Subject, t.Subject) &&
 		containsFold(in.Subject+"\n"+in.Text, t.Contains)
 }
 
-func (in observed) describe() string {
-	parts := []string{fmt.Sprintf("new %s message from %s", in.Kind, in.From)}
+func describe(in integrationingest.Incoming) string {
+	parts := []string{fmt.Sprintf("new %s message from %s", in.Provider, in.From)}
 	if in.Subject != "" {
 		parts = append(parts, "subject: "+in.Subject)
 	}
@@ -96,80 +85,6 @@ func containsFold(value, filter string) bool {
 	return filter == "" || strings.Contains(strings.ToLower(value), strings.ToLower(filter))
 }
 
-func incomingFrom(record integrations.Record) (observed, bool) {
-	in := observed{ID: record.Provider + ":" + record.ExternalID, At: record.OccurredAt}
-	switch record.Kind {
-	case "gmail.message":
-		var content struct {
-			Message  gmailMessage `json:"message"`
-			BodyText string       `json:"body_text"`
-		}
-		if json.Unmarshal(record.Raw, &content) != nil {
-			return observed{}, false
-		}
-		message := content.Message
-		if message.ID == "" && json.Unmarshal(record.Raw, &message) != nil {
-			return observed{}, false
-		}
-		for _, label := range message.LabelIDs {
-			if label == "SENT" {
-				return observed{}, false
-			}
-		}
-		in.Kind = TriggerGmail
-		if len(message.From) > 0 {
-			in.From = strings.TrimSpace(message.From[0].Name + " <" + message.From[0].Email + ">")
-		}
-		in.Subject = message.Subject
-		in.Text = firstNonEmpty(content.BodyText, message.Snippet)
-	case "whatsapp.message":
-		var message struct {
-			Sender   string `json:"sender"`
-			PushName string `json:"push_name"`
-			FromMe   bool   `json:"from_me"`
-			Text     string `json:"text"`
-		}
-		if json.Unmarshal(record.Raw, &message) != nil || message.FromMe {
-			return observed{}, false
-		}
-		in.Kind = TriggerWhatsApp
-		in.From = strings.TrimSpace(message.PushName + " " + message.Sender)
-		in.Text = message.Text
-	case "telegram.message":
-		var message struct {
-			Out     bool   `json:"out"`
-			Message string `json:"message"`
-			FromID  any    `json:"from_id"`
-		}
-		if json.Unmarshal(record.Raw, &message) != nil || message.Out {
-			return observed{}, false
-		}
-		in.Kind = TriggerTelegram
-		in.From = fmt.Sprint(message.FromID)
-		in.Text = message.Message
-	case "slack.message":
-		var message struct {
-			Channel struct {
-				Name string `json:"name"`
-			} `json:"channel"`
-			Username string `json:"username"`
-			User     string `json:"user"`
-			Text     string `json:"text"`
-			FromMe   bool   `json:"from_me"`
-		}
-		if json.Unmarshal(record.Raw, &message) != nil || message.FromMe {
-			return observed{}, false
-		}
-		in.Kind = TriggerSlack
-		in.From = firstNonEmpty(message.Username, message.User)
-		in.Subject = "#" + message.Channel.Name
-		in.Text = message.Text
-	default:
-		return observed{}, false
-	}
-	return in, true
-}
-
 // Watching reports whether an active routine listens for kind.
 func (s *Service) Watching(kind string) bool {
 	routines, err := s.Repo.ListLoops()
@@ -179,24 +94,4 @@ func (s *Service) Watching(kind string) bool {
 	return slices.ContainsFunc(routines, func(routine Loop) bool {
 		return routine.Status == StatusActive && routine.Trigger != nil && routine.Trigger.Kind == kind
 	})
-}
-
-type gmailMessage struct {
-	ID       string   `json:"id"`
-	Subject  string   `json:"subject"`
-	Snippet  string   `json:"snippet"`
-	LabelIDs []string `json:"label_ids"`
-	From     []struct {
-		Name  string `json:"name"`
-		Email string `json:"email"`
-	} `json:"from"`
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

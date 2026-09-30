@@ -5,40 +5,29 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wins/jaz/backend/pkg/integrations"
+	"github.com/wins/jaz/backend/internal/integrationingest"
 )
 
-func gmailRecord(raw string) integrations.Record {
-	return integrations.Record{Provider: "gmail", Kind: "gmail.message", ExternalID: "m1", OccurredAt: time.Now(), Raw: []byte(raw)}
-}
-
-func TestGmailTriggerMatchesFiltersAndIgnoresSentMail(t *testing.T) {
+func TestTriggerFiltersMatchSenderSubjectAndText(t *testing.T) {
+	mail := integrationingest.Incoming{Provider: "gmail", From: "Ujjwal <u@cas.com>", Subject: "New quote", Text: "Numbers attached"}
 	trigger := &Trigger{Kind: TriggerGmail, From: "ujjwal", Contains: "quote"}
-	incoming, ok := incomingFrom(gmailRecord(`{"message":{"id":"m1","subject":"New quote","from":[{"name":"Ujjwal","email":"u@cas.com"}]},"body_text":"Numbers attached"}`))
-	if !ok || !trigger.matches(incoming) {
-		t.Fatalf("matching mail did not fire: %+v", incoming)
+	if !trigger.matches(mail) {
+		t.Fatalf("matching mail did not fire: %+v", mail)
 	}
-	if !strings.Contains(incoming.describe(), "subject: New quote") {
-		t.Fatalf("event description = %q", incoming.describe())
+	if !strings.Contains(describe(mail), "subject: New quote") {
+		t.Fatalf("event description = %q", describe(mail))
 	}
-	other, _ := incomingFrom(gmailRecord(`{"message":{"id":"m2","subject":"New quote","from":[{"email":"someone@else.com"}]}}`))
-	if trigger.matches(other) {
-		t.Fatal("mail from another sender fired a from-filtered trigger")
+	for _, other := range []integrationingest.Incoming{
+		{Provider: "gmail", From: "someone@else.com", Subject: "New quote"},
+		{Provider: "whatsapp", From: "Ujjwal", Text: "quote"},
+	} {
+		if trigger.matches(other) {
+			t.Fatalf("%+v fired a trigger it does not match", other)
+		}
 	}
-	if _, ok := incomingFrom(gmailRecord(`{"message":{"id":"m3","label_ids":["SENT"],"from":[{"email":"me@x.com"}]}}`)); ok {
-		t.Fatal("the user's own sent mail must not fire triggers")
-	}
-}
-
-func TestChatTriggersIgnoreTheUsersOwnMessages(t *testing.T) {
-	own := integrations.Record{Kind: "whatsapp.message", OccurredAt: time.Now(), Raw: []byte(`{"from_me":true,"text":"hi"}`)}
-	if _, ok := incomingFrom(own); ok {
-		t.Fatal("own WhatsApp message fired")
-	}
-	theirs := integrations.Record{Kind: "whatsapp.message", OccurredAt: time.Now(), Raw: []byte(`{"push_name":"Dennis","text":"visit on Friday?"}`)}
-	incoming, ok := incomingFrom(theirs)
-	if !ok || !(&Trigger{Kind: TriggerWhatsApp, Contains: "friday"}).matches(incoming) {
-		t.Fatalf("incoming WhatsApp message did not match: %+v", incoming)
+	channel := integrationingest.Incoming{Provider: "slack", From: "dana", Subject: "#eng", Text: "deploy is red"}
+	if !(&Trigger{Kind: TriggerSlack, Subject: "#eng", Contains: "deploy"}).matches(channel) || (&Trigger{Kind: TriggerSlack, Subject: "#sales"}).matches(channel) {
+		t.Fatal("slack channel filter is wrong")
 	}
 }
 
@@ -63,11 +52,13 @@ func TestEventTriggerReplacesScheduleUntilCronIsSet(t *testing.T) {
 
 func TestWebhookSecretIsReturnedOnceAndVerifiedByHash(t *testing.T) {
 	loop := Loop{Trigger: &Trigger{Kind: TriggerWebhook}}
-	secret := ensureWebhookSecret(&loop)
-	if secret == "" || loop.WebhookHash == "" || loop.WebhookHash == secret {
-		t.Fatalf("secret %q hash %q", secret, loop.WebhookHash)
+	ensureWebhookSecret(&loop)
+	secret, hash := loop.WebhookSecret, loop.WebhookHash
+	if secret == "" || hash == "" || hash == secret {
+		t.Fatalf("secret %q hash %q", secret, hash)
 	}
-	if ensureWebhookSecret(&loop) != "" {
+	ensureWebhookSecret(&loop)
+	if loop.WebhookHash != hash {
 		t.Fatal("an existing secret was replaced")
 	}
 	if !VerifyWebhookSecret(loop, secret) || VerifyWebhookSecret(loop, secret+"x") || VerifyWebhookSecret(loop, "") {
@@ -75,18 +66,21 @@ func TestWebhookSecretIsReturnedOnceAndVerifiedByHash(t *testing.T) {
 	}
 }
 
-func TestSlackTriggerMatchesChannelAndSkipsOwnMessages(t *testing.T) {
-	record := func(raw string) integrations.Record {
-		return integrations.Record{Kind: "slack.message", OccurredAt: time.Now(), Raw: []byte(raw)}
-	}
-	incoming, ok := incomingFrom(record(`{"channel":{"name":"eng"},"username":"dana","text":"deploy is red"}`))
-	if !ok || !(&Trigger{Kind: TriggerSlack, Subject: "#eng", Contains: "deploy"}).matches(incoming) {
-		t.Fatalf("channel message did not match: %+v", incoming)
-	}
-	if (&Trigger{Kind: TriggerSlack, Subject: "#sales"}).matches(incoming) {
-		t.Fatal("a message in another channel matched")
-	}
-	if _, ok := incomingFrom(record(`{"channel":{"name":"eng"},"text":"on it","from_me":true}`)); ok {
-		t.Fatal("the user's own Slack message fired")
+func TestRunPromptLabelsThreadTurnsAndCarriesTheEvent(t *testing.T) {
+	loop := Loop{Name: "Triage", Prompt: "Sort the inbox", Schedule: Schedule{Timezone: "UTC"}}
+	now := time.Date(2026, 9, 30, 9, 5, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		event    string
+		inThread bool
+		want     string
+	}{
+		{"", false, "Sort the inbox"},
+		{"new mail", false, "Triggered by: new mail\n\nSort the inbox"},
+		{"", true, "[routine] Triage · Wed 30 Sep 2026 09:05 UTC\n\nSort the inbox"},
+		{"new mail", true, "[routine] Triage · Wed 30 Sep 2026 09:05 UTC\nTriggered by: new mail\n\nSort the inbox"},
+	} {
+		if got := runPrompt(loop, now, tc.event, tc.inThread); got != tc.want {
+			t.Errorf("runPrompt(%q, %v) = %q, want %q", tc.event, tc.inThread, got, tc.want)
+		}
 	}
 }

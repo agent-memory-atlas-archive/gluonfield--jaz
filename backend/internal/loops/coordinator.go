@@ -39,7 +39,7 @@ type Coordinator struct {
 	Loops  LoopWriter
 	Boards BoardService
 	Card   CardSink
-	// Owner picks the bot that owns a new loop when the input names none.
+	// Owner picks, or checks, the bot that owns a new loop.
 	Owner OwnerFunc
 }
 
@@ -54,7 +54,7 @@ func (c Coordinator) Create(in CreateLoop, boardIDs []string, threadID string) (
 	if err := c.validateBoards(boardIDs); err != nil {
 		return Loop{}, err
 	}
-	if in.BotID == "" && c.Owner != nil {
+	if c.Owner != nil {
 		owner, err := c.Owner(threadID, in)
 		if err != nil {
 			return Loop{}, err

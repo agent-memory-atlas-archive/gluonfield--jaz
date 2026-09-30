@@ -89,7 +89,7 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 				s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
 				continue
 			}
-			if reply == "" || strings.EqualFold(reply, PassReply) {
+			if reply == "" || strings.EqualFold(reply, passReply) {
 				continue
 			}
 			name := s.name(member)
@@ -111,7 +111,7 @@ func (s *Service) runRound(ctx context.Context, groupID, name string, responders
 }
 
 func (s *Service) memberTurn(ctx context.Context, groupID, name, member string) (string, error) {
-	record, err := s.Repo.LoadBot(groupID)
+	record, err := s.Store.LoadBot(groupID)
 	if err != nil {
 		return "", err
 	}

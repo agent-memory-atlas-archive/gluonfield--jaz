@@ -306,7 +306,7 @@ func startServer(
 		loops.WithPromptExtra(widgetService.LoopPromptExtra),
 		loops.WithArtifactSurface(widgetService.LoopArtifactSurface),
 	)
-	botService := bots.NewService(store, store, manager, loopService, events, string(workspace), logger)
+	botService := bots.NewService(store, manager, loopService, events, string(workspace), logger)
 	jazTools.SetLoops(loopService,
 		loops.WithBoards(widgetService.LoopBoards()),
 		loops.WithAgentNames(manager.Agents),
@@ -318,7 +318,7 @@ func startServer(
 	handler.Routes = append(handler.Routes, app.BotRoutes(botsAPI)...)
 	handler.PublicRoutes = append(handler.PublicRoutes, app.BotWebhookRoute(botsAPI))
 	handler.RoutineOwner = botService.RoutineOwner
-	recordObservers.Add(loopService.HandleRecords)
+	recordObservers.Add(loopService.HandleIncoming)
 	jazTools.SetThreads(threadService)
 	jazTools.SetAgents(manager)
 	handler.Loops = loopService

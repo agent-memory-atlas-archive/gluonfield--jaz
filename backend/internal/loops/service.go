@@ -156,12 +156,12 @@ func (s *Service) Update(id string, input UpdateLoop) (Loop, error) {
 		return Loop{}, err
 	}
 	next.UpdatedAt = now
-	secret := ensureWebhookSecret(&next)
+	ensureWebhookSecret(&next)
 	if err := s.Repo.SaveLoop(next); err != nil {
 		return Loop{}, err
 	}
 	saved, err := s.Repo.LoadLoop(id)
-	saved.WebhookSecret = secret
+	saved.WebhookSecret = next.WebhookSecret
 	return saved, err
 }
 
@@ -372,7 +372,7 @@ func (s *Service) start(ctx context.Context, loop Loop, run Run, now time.Time, 
 	go s.Executor.StartLoopRun(context.WithoutCancel(ctx), Execution{
 		Loop:                   loop,
 		Run:                    run,
-		Prompt:                 runPrompt(loop, now, event, thread),
+		Prompt:                 runPrompt(loop, now, event, thread != ""),
 		Thread:                 thread,
 		SystemPromptExtensions: systemPromptExtensions,
 		ArtifactSurface:        artifactSurface,

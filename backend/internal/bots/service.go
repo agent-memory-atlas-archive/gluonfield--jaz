@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -19,7 +18,6 @@ import (
 )
 
 type Service struct {
-	Repo     Repository
 	Store    Store
 	Threads  Threads
 	Routines Routines
@@ -32,12 +30,12 @@ type Service struct {
 	rounds map[string]*round
 }
 
-func NewService(repo Repository, store Store, threads Threads, routines Routines, events Publisher, workspace string, logger *log.Logger) *Service {
-	return &Service{Repo: repo, Store: store, Threads: threads, Routines: routines, Events: events, Workspace: workspace, Log: logger.WithPrefix("bots")}
+func NewService(store Store, threads Threads, routines Routines, events Publisher, workspace string, logger *log.Logger) *Service {
+	return &Service{Store: store, Threads: threads, Routines: routines, Events: events, Workspace: workspace, Log: logger.WithPrefix("bots")}
 }
 
 func (s *Service) List() ([]Bot, error) {
-	records, err := s.Repo.ListBots()
+	records, err := s.Store.ListBots()
 	if err != nil {
 		return nil, err
 	}
@@ -83,16 +81,11 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 	if err != nil {
 		return Bot{}, err
 	}
-	slug := slugify(name)
-	directory := strings.TrimSpace(input.Directory)
-	if directory == "" {
-		directory = path.Join("bots", slug)
-	}
 	session, err := s.Threads.CreateSession(ctx, acp.SpawnRequest{
 		ACPAgent:   strings.TrimSpace(input.Agent),
-		Slug:       "bot-" + slug,
+		Slug:       "bot " + name,
 		Title:      name,
-		Directory:  directory,
+		Directory:  strings.TrimSpace(input.Directory),
 		Model:      strings.TrimSpace(input.Model),
 		SourceType: storage.SourceBot,
 	})
@@ -102,7 +95,7 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 	if err := s.Store.UpdateSessionTitle(session.ID, name); err != nil {
 		return Bot{}, err
 	}
-	if err := s.Repo.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Shape: avatar.Shape, Color: avatar.Color}); err != nil {
+	if err := s.Store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Shape: avatar.Shape, Color: avatar.Color}); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(session.ID)
@@ -118,7 +111,7 @@ func (s *Service) CreateGroup(name string, members []string) (Bot, error) {
 		return Bot{}, err
 	}
 	session, err := s.Store.CreateSession(storage.CreateSession{
-		Slug:       "group-" + slugify(name),
+		Slug:       "group " + name,
 		Title:      name,
 		Runtime:    storage.RuntimeACP,
 		SourceType: storage.SourceBot,
@@ -126,11 +119,8 @@ func (s *Service) CreateGroup(name string, members []string) (Bot, error) {
 	if err != nil {
 		return Bot{}, err
 	}
-	if err := s.Store.UpdateSessionTitle(session.ID, name); err != nil {
-		return Bot{}, err
-	}
 	avatar, _ := normalizeAvatar(nil)
-	if err := s.Repo.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindGroup, Shape: avatar.Shape, Color: avatar.Color, Members: members}); err != nil {
+	if err := s.Store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindGroup, Shape: avatar.Shape, Color: avatar.Color, Members: members}); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(session.ID)
@@ -166,7 +156,7 @@ func (s *Service) Update(id string, input UpdateBot) (Bot, error) {
 			return Bot{}, err
 		}
 	}
-	if err := s.Repo.SaveBot(record); err != nil {
+	if err := s.Store.SaveBot(record); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(id)
@@ -178,7 +168,7 @@ func (s *Service) Delete(id string) error {
 	if _, _, err := s.load(id); err != nil {
 		return err
 	}
-	records, err := s.Repo.ListBots()
+	records, err := s.Store.ListBots()
 	if err != nil {
 		return err
 	}
@@ -187,7 +177,7 @@ func (s *Service) Delete(id string) error {
 			continue
 		}
 		group.Members = slices.DeleteFunc(group.Members, func(member string) bool { return member == id })
-		if err := s.Repo.SaveBot(group); err != nil {
+		if err := s.Store.SaveBot(group); err != nil {
 			return err
 		}
 	}
@@ -206,10 +196,16 @@ func (s *Service) Delete(id string) error {
 	return s.Store.SetArchived(id, true)
 }
 
-// RoutineOwner keeps a routine created from a bot's thread with that bot and
-// gives a routine created anywhere else a bot of its own.
+// RoutineOwner returns the bot a new routine belongs to: the bot it names, the
+// bot whose thread created it, or else a new bot of its own.
 func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, error) {
-	if record, err := s.Repo.LoadBot(threadID); err == nil && record.Kind == KindBot {
+	if in.BotID != "" {
+		if !s.isBot(in.BotID) {
+			return "", fmt.Errorf("%s is not a bot", in.BotID)
+		}
+		return in.BotID, nil
+	}
+	if s.isBot(threadID) {
 		return threadID, nil
 	}
 	name := strings.TrimSpace(in.Name)
@@ -243,7 +239,7 @@ func (s *Service) AdoptLoops(ctx context.Context) error {
 }
 
 func (s *Service) load(id string) (storage.BotRecord, storage.Session, error) {
-	record, err := s.Repo.LoadBot(id)
+	record, err := s.Store.LoadBot(id)
 	if err != nil {
 		return storage.BotRecord{}, storage.Session{}, err
 	}
@@ -255,6 +251,11 @@ func (s *Service) load(id string) (storage.BotRecord, storage.Session, error) {
 		return storage.BotRecord{}, storage.Session{}, storage.ErrBotNotFound
 	}
 	return record, session, nil
+}
+
+func (s *Service) isBot(id string) bool {
+	record, _, err := s.load(id)
+	return err == nil && record.Kind == KindBot
 }
 
 func (s *Service) view(record storage.BotRecord, session storage.Session, routines int) Bot {
@@ -277,8 +278,8 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 	bot.Model = session.Model
 	if ref := session.RuntimeRef; ref != nil {
 		bot.Agent = ref.Agent
-		bot.Directory = ref.ProjectPath
-		if rel, err := filepath.Rel(s.Workspace, ref.ProjectPath); err == nil && !strings.HasPrefix(rel, "..") {
+		bot.Directory = ref.Cwd
+		if rel, err := filepath.Rel(s.Workspace, ref.Cwd); err == nil && !strings.HasPrefix(rel, "..") {
 			bot.Directory = rel
 		}
 	}
@@ -328,8 +329,7 @@ func (s *Service) routineCounts() (map[string]int, error) {
 func (s *Service) memberBots(ids []string) ([]string, error) {
 	members := make([]string, 0, len(ids))
 	for _, id := range ids {
-		record, err := s.Repo.LoadBot(id)
-		if err != nil || record.Kind != KindBot {
+		if !s.isBot(id) {
 			return nil, fmt.Errorf("member %s is not a bot", id)
 		}
 		if !slices.Contains(members, id) {
@@ -344,9 +344,9 @@ func (s *Service) memberBots(ids []string) ([]string, error) {
 
 func normalizeAvatar(avatar *Avatar) (Avatar, error) {
 	if avatar == nil {
-		return Avatar{Shape: Shapes[rand.IntN(len(Shapes))], Color: Colors[1+rand.IntN(len(Colors)-2)]}, nil
+		return Avatar{Shape: shapes[rand.IntN(len(shapes))], Color: colors[rand.IntN(len(colors))]}, nil
 	}
-	if !slices.Contains(Shapes, avatar.Shape) || !slices.Contains(Colors, avatar.Color) {
+	if !slices.Contains(shapes, avatar.Shape) || !slices.Contains(colors, avatar.Color) {
 		return Avatar{}, fmt.Errorf("unsupported avatar %s/%s", avatar.Shape, avatar.Color)
 	}
 	return *avatar, nil
@@ -358,25 +358,4 @@ func preview(text string) string {
 		return string(runes[:140]) + "…"
 	}
 	return text
-}
-
-func slugify(name string) string {
-	var b strings.Builder
-	dash := false
-	for _, r := range strings.ToLower(name) {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
-			b.WriteRune(r)
-			dash = false
-			continue
-		}
-		if !dash && b.Len() > 0 {
-			b.WriteByte('-')
-			dash = true
-		}
-	}
-	slug := strings.TrimSuffix(b.String(), "-")
-	if slug == "" {
-		return "bot"
-	}
-	return slug
 }

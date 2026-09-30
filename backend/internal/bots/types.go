@@ -16,8 +16,8 @@ const (
 )
 
 var (
-	Shapes = []string{"circle", "blob", "squircle", "pill", "triangle", "hex", "cloud", "drop"}
-	Colors = []string{"white", "brown", "red", "orange", "amber", "green", "teal", "blue", "purple", "pink", "gray"}
+	shapes = []string{"circle", "blob", "squircle", "pill", "triangle", "hex", "cloud", "drop"}
+	colors = []string{"white", "brown", "red", "orange", "amber", "green", "teal", "blue", "purple", "pink", "gray"}
 )
 
 type Avatar struct {
@@ -56,12 +56,6 @@ type UpdateBot struct {
 	Members *[]string `json:"members,omitempty"`
 }
 
-type Repository interface {
-	SaveBot(storage.BotRecord) error
-	LoadBot(threadID string) (storage.BotRecord, error)
-	ListBots() ([]storage.BotRecord, error)
-}
-
 // Threads is the agent runtime bot threads run on.
 type Threads interface {
 	CreateSession(context.Context, acp.SpawnRequest) (storage.Session, error)
@@ -69,8 +63,11 @@ type Threads interface {
 	Wait(context.Context, acp.WaitRequest) (acp.Job, error)
 }
 
-// Store is the thread storage bots read and write.
+// Store keeps bot records and the threads they live in.
 type Store interface {
+	BotLoader
+	SaveBot(storage.BotRecord) error
+	ListBots() ([]storage.BotRecord, error)
 	CreateSession(storage.CreateSession) (storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	ListSessions(storage.SessionFilter) ([]storage.Session, error)
@@ -79,6 +76,10 @@ type Store interface {
 	LoadSessionEvents(id string) ([]sessionevents.Event, error)
 	AppendSessionEvents(id string, events ...sessionevents.Event) error
 	LoadLatestACPTurn(ctx context.Context, id string) ([]sessionevents.Event, error)
+}
+
+type BotLoader interface {
+	LoadBot(threadID string) (storage.BotRecord, error)
 }
 
 // Routines is the loop service seen as a bot's routines.

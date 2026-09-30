@@ -17,27 +17,32 @@ type MaterializingWriter struct {
 	Log             *log.Logger
 }
 
-// Observers hear every batch of records once it is stored.
+// Observers hear the incoming messages in every batch of records once it is
+// stored.
 type Observers struct {
 	mu        sync.RWMutex
-	listeners []func(context.Context, []integrations.Record)
+	listeners []func(context.Context, []Incoming)
 }
 
 func NewObservers() *Observers {
 	return &Observers{}
 }
 
-func (o *Observers) Add(listener func(context.Context, []integrations.Record)) {
+func (o *Observers) Add(listener func(context.Context, []Incoming)) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.listeners = append(o.listeners, listener)
 }
 
 func (o *Observers) notify(ctx context.Context, records []integrations.Record) {
+	messages := incoming(records)
+	if len(messages) == 0 {
+		return
+	}
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 	for _, listener := range o.listeners {
-		listener(ctx, records)
+		listener(ctx, messages)
 	}
 }
 
