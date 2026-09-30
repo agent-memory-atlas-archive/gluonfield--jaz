@@ -13,10 +13,11 @@ type AskUserInput struct {
 }
 
 type UserQuestion struct {
-	ID       string                            `json:"id" jsonschema:"Unique identifier used to return this question's answer."`
-	Question string                            `json:"question" jsonschema:"Complete self-contained question."`
-	Header   string                            `json:"header,omitempty" jsonschema:"Optional short label."`
-	Options  []sessionevents.ACPQuestionOption `json:"options,omitempty" jsonschema:"Optional suggested answers. Free text is always available."`
+	ID          string                            `json:"id" jsonschema:"Unique identifier used to return this question's answer."`
+	Question    string                            `json:"question" jsonschema:"Complete self-contained question."`
+	Header      string                            `json:"header,omitempty" jsonschema:"Optional short label."`
+	MultiSelect bool                              `json:"multi_select,omitempty" jsonschema:"Allow multiple answers, shown as checkboxes. Requires options. Otherwise options are single-choice radio buttons."`
+	Options     []sessionevents.ACPQuestionOption `json:"options,omitempty" jsonschema:"Provide concrete answer options whenever useful, so the user can select rather than type. Free text is always available alongside choices."`
 }
 
 type AskUserOutput struct {
@@ -36,14 +37,18 @@ func (m *Manager) AskUser(ctx context.Context, sessionID string, input AskUserIn
 		return AskUserOutput{}, fmt.Errorf("at least one question is required")
 	}
 	questions := make([]sessionevents.ACPQuestion, 0, len(input.Questions))
-	ids := make(map[string]bool, len(input.Questions))
+	multiSelectByID := make(map[string]bool, len(input.Questions))
 	for _, question := range input.Questions {
 		id := strings.TrimSpace(question.ID)
 		text := strings.TrimSpace(question.Question)
-		if id == "" || text == "" || ids[id] {
+		_, duplicate := multiSelectByID[id]
+		if id == "" || text == "" || duplicate {
 			return AskUserOutput{}, fmt.Errorf("questions require unique nonempty ids and nonempty text")
 		}
-		ids[id] = true
+		multiSelectByID[id] = question.MultiSelect
+		if question.MultiSelect && len(question.Options) == 0 {
+			return AskUserOutput{}, fmt.Errorf("question %s requires options for multiple selection", id)
+		}
 		options := make([]sessionevents.ACPQuestionOption, 0, len(question.Options))
 		labels := make(map[string]bool, len(question.Options))
 		for _, option := range question.Options {
@@ -56,18 +61,22 @@ func (m *Manager) AskUser(ctx context.Context, sessionID string, input AskUserIn
 			options = append(options, option)
 		}
 		questions = append(questions, sessionevents.ACPQuestion{
-			ID: id, Header: strings.TrimSpace(question.Header), Question: text, IsOther: true, Options: options,
+			ID: id, Header: strings.TrimSpace(question.Header), Question: text, IsOther: true, Options: options, MultiSelect: question.MultiSelect,
 		})
 	}
 	prepare := func(answers map[string]InteractiveAnswerValue) (map[string]InteractiveAnswerValue, error) {
-		if len(answers) != len(ids) {
+		if len(answers) != len(multiSelectByID) {
 			return nil, fmt.Errorf("answer every question before submitting")
 		}
-		normalized := make(map[string]InteractiveAnswerValue, len(ids))
+		normalized := make(map[string]InteractiveAnswerValue, len(multiSelectByID))
 		for id, answer := range answers {
 			values := trimmedAnswers(answer.Answers)
-			if !ids[id] || len(values) != 1 {
-				return nil, fmt.Errorf("each question requires one nonempty answer")
+			multiSelect, known := multiSelectByID[id]
+			if !known || len(values) == 0 {
+				return nil, fmt.Errorf("each question requires a nonempty answer")
+			}
+			if !multiSelect && len(values) != 1 {
+				return nil, fmt.Errorf("question %s requires one answer", id)
 			}
 			normalized[id] = InteractiveAnswerValue{Answers: values}
 		}

@@ -101,12 +101,13 @@ func elicitationQuestions(message string, schema *acpschema.ElicitationSchema) (
 		}
 		customField := customFields[key]
 		questions = append(questions, sessionevents.ACPQuestion{
-			ID:       key,
-			Header:   field.header,
-			Question: questionText,
-			IsOther:  customField != "" || len(options) == 0,
-			IsSecret: field.secret,
-			Options:  options,
+			ID:          key,
+			Header:      field.header,
+			Question:    questionText,
+			IsOther:     customField != "" || len(options) == 0,
+			IsSecret:    field.secret,
+			MultiSelect: property.Type == "array",
+			Options:     options,
 		})
 		fields[key] = elicitationAnswerField{
 			Field:       key,

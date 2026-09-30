@@ -104,6 +104,9 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 				{Label: "Single cutover", Description: "Move the whole estate together"},
 			}},
 			{ID: "a_constraints", Question: "What downtime is acceptable?"},
+			{ID: "workloads", Question: "Which workloads should move?", MultiSelect: true, Options: []sessionevents.ACPQuestionOption{
+				{Label: "SQL"}, {Label: "Spark"},
+			}},
 		}}})
 		if err != nil {
 			errs <- err
@@ -125,8 +128,9 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
 	}
-	if len(permission.Questions) != 2 || permission.Questions[0].ID != "z_strategy" ||
+	if len(permission.Questions) != 3 || permission.Questions[0].ID != "z_strategy" ||
 		permission.Questions[1].ID != "a_constraints" || !permission.Questions[0].IsOther ||
+		permission.Questions[0].MultiSelect || !permission.Questions[2].MultiSelect || !permission.Questions[2].IsOther ||
 		permission.Questions[0].Options[0].Description != "Validate each domain before cutover" {
 		t.Fatalf("questions lost ordering or choices: %#v", permission)
 	}
@@ -137,7 +141,9 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	}
 	for _, answers := range []map[string]InteractiveAnswerValue{
 		{"z_strategy": {Answers: []string{"Phased"}}},
-		{"z_strategy": {Answers: []string{"Phased"}}, "unknown": {Answers: []string{"No downtime"}}},
+		{"z_strategy": {Answers: []string{"Phased"}}, "a_constraints": {Answers: []string{"No downtime"}}, "unknown": {Answers: []string{"SQL"}}},
+		{"z_strategy": {Answers: []string{"Phased", "Single cutover"}}, "a_constraints": {Answers: []string{"No downtime"}}, "workloads": {Answers: []string{"SQL"}}},
+		{"z_strategy": {Answers: []string{"Phased"}}, "a_constraints": {Answers: []string{"No downtime"}}, "workloads": {Answers: []string{" "}}},
 	} {
 		if err := manager.AnswerInteractive(ctx, InteractiveAnswer{Session: session.ID, RequestID: permission.ID, Answers: answers}); err == nil {
 			t.Fatal("accepted incomplete or unrelated answers")
@@ -146,6 +152,7 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	answers := map[string]InteractiveAnswerValue{
 		"z_strategy":    {Answers: []string{"Phased"}},
 		"a_constraints": {Answers: []string{"No downtime during business hours"}},
+		"workloads":     {Answers: []string{" SQL ", "Spark", "Custom scripts"}},
 	}
 	if err := manager.AnswerInteractive(ctx, InteractiveAnswer{Session: session.ID, RequestID: permission.ID, Answers: answers}); err != nil {
 		t.Fatal(err)
@@ -154,7 +161,8 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool) {
 	case call := <-done:
 		out := structuredContent[AskUserOutput](t, call)
 		if out.Cancelled || out.Answers["z_strategy"].Answers[0] != "Phased" ||
-			out.Answers["a_constraints"].Answers[0] != "No downtime during business hours" {
+			out.Answers["a_constraints"].Answers[0] != "No downtime during business hours" ||
+			strings.Join(out.Answers["workloads"].Answers, ",") != "SQL,Spark,Custom scripts" {
 			t.Fatalf("tool answers = %#v", out)
 		}
 	case err := <-errs:
@@ -222,6 +230,7 @@ func TestAskUserRejectsInvalidRequestsBeforePublishing(t *testing.T) {
 		{sessionID: session.ID},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: " ", Question: "Which?"}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: " "}}},
+		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", MultiSelect: true}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?"}, {ID: " q ", Question: "Which?"}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: " "}}}}},
 		{sessionID: session.ID, questions: []UserQuestion{{ID: "q", Question: "Which?", Options: []sessionevents.ACPQuestionOption{{Label: "A"}, {Label: " A "}}}}},

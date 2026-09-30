@@ -9,10 +9,13 @@
 - [x] Read the six extracted skills and attempt a live question call for the Databricks-to-Snowflake scenario.
 - [x] Reproduce and repair the immediate cancellation seen after native steering.
 - [ ] Activate the steering correction and complete the live question/answer trial.
+- [x] Support radio buttons for one answer and checkboxes for multiple answers, with an open field alongside choices.
+- [x] Tell the agent to provide concrete options whenever useful.
+- [x] Verify selection, custom answers, navigation and submission in the rendered UI and MCP round trip.
 
-`ask_user` accepts ordered `questions`, each with `id`, `question`, optional `header`, and optional `options` containing labels and descriptions. It uses the caller's thread binding, displays the existing question card, waits for all answers, and returns `answers` keyed by question id. Free text is always available. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle. There is no new plan-mode requirement or frontend implementation.
+`ask_user` accepts ordered `questions`, each with `id`, `question`, optional `header`, and optional `options` containing labels and descriptions. Options use radio buttons by default; `multi_select: true` uses checkboxes and requires options. The agent should provide concrete options whenever useful. Free text remains available alongside choices, and multi-select answers can combine choices with custom text. It uses the caller's thread binding, waits for all answers, and returns `answers` keyed by question id. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle, without entering plan mode.
 
-Verified: full backend suite, focused race checks for the new tool and native elicitation/steering, and affected static analysis. The HTTP MCP test supplies the real thread header and checks two questions, option descriptions, input order, a selected answer, a custom answer, transcript persistence, rejected incomplete answers, and cleanup. Review found no need for a separate form, permission queue, or answer endpoint.
+Verified: full backend suite, focused race checks for the new tool and native elicitation/steering, and affected static analysis. The HTTP MCP test supplies the real thread header and checks three questions, option descriptions, input order, single and multiple selections, custom answers, transcript persistence, rejected incomplete answers, and cleanup. Review found no need for a separate permission queue or answer endpoint.
 
 ## Thermo-nuclear review
 
@@ -34,4 +37,12 @@ Record whether a structured question card appears voluntarily, whether the quest
 
 The tool was available in the current Codex session. After reading all six skills, the migration example asked about workload scope, goal/deadline, target readiness and cutover constraints. It immediately returned `cancelled: true`, with no confirmed question-card display. The native-steering HTTP MCP regression reproduces this: overlapping native steering calls were counted as a queued future prompt. The queue guard now applies only to adapters advertising prompt queueing. Initial-prompt and native-steering round trips pass, queued elicitation still cancels correctly, and the full backend suite, repeated race checks and affected vet pass.
 
-Status: the initial reviewed implementation is on local main. The steering correction needs backend activation before another live question/answer trial. Voluntary Codex/Claude adoption remains unmeasured; no native-parity release certification is claimed.
+## Choice controls
+
+The user's screenshot showed a free-text-only first question: the simulation supplied choices only for Snowflake readiness. The tool description, field guidance and Jaz prompt now encourage concrete options. The shared question card uses native radio and checkbox inputs with visible descriptions and explicit Next navigation. Selection remains on the question until the user advances. Native elicitation array fields also preserve multiple-selection intent in the display contract.
+
+Verified in an isolated preview of the real permission card: selecting and deselecting checkboxes, retaining multiple choices plus a custom answer across navigation, radio exclusivity, custom text replacing a single choice, required-answer submission gating and the final submitted arrays. The preview intercepted the HTTP response; the backend test independently exercises the real MCP round trip and answer normalization. Screenshots: `/Users/wins/.jaz/artifacts/ask-user-choices-20260930/{checkboxes,radios}.png`.
+
+Full backend tests, focused race checks, affected vet, frontend tests, typecheck and targeted lint pass. No dependency was added.
+
+Status: the base tool and steering correction are on local main; choice controls are on `jaz/ask-user-tool`. The updated backend/frontend must be activated before an agent trial of multi-select questions. Voluntary Codex/Claude adoption remains unmeasured; no native-parity release certification is claimed.

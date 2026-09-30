@@ -507,12 +507,13 @@ type ACPPermission struct {
 }
 
 type ACPQuestion struct {
-	ID       string              `json:"id"`
-	Header   string              `json:"header,omitempty"`
-	Question string              `json:"question"`
-	IsOther  bool                `json:"is_other,omitempty"`
-	IsSecret bool                `json:"is_secret,omitempty"`
-	Options  []ACPQuestionOption `json:"options,omitempty"`
+	ID          string              `json:"id"`
+	Header      string              `json:"header,omitempty"`
+	Question    string              `json:"question"`
+	IsOther     bool                `json:"is_other,omitempty"`
+	IsSecret    bool                `json:"is_secret,omitempty"`
+	MultiSelect bool                `json:"multi_select,omitempty"`
+	Options     []ACPQuestionOption `json:"options,omitempty"`
 }
 
 type ACPQuestionOption struct {

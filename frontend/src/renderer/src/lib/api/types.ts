@@ -874,6 +874,7 @@ export interface ACPQuestion {
   question: string
   is_other?: boolean
   is_secret?: boolean
+  multi_select?: boolean
   options?: ACPQuestionOption[]
 }
 

@@ -252,6 +252,30 @@ func TestCreateElicitationPlainTextAnswerUsesRequestedField(t *testing.T) {
 	}
 }
 
+func TestElicitationArraySupportsMultipleSelection(t *testing.T) {
+	var schema acpschema.ElicitationSchema
+	if err := json.Unmarshal([]byte(`{"type":"object","properties":{"workloads":{"type":"array","items":{"type":"string","enum":["SQL","Spark"]}}}}`), &schema); err != nil {
+		t.Fatal(err)
+	}
+	questions, fields := elicitationQuestions("Which workloads?", &schema)
+	if len(questions) != 1 || !questions[0].MultiSelect || len(questions[0].Options) != 2 {
+		t.Fatalf("array question = %#v", questions)
+	}
+	raw, err := encodeElicitationResponse(fields, map[string]InteractiveAnswerValue{
+		"workloads": {Answers: []string{"SQL", "Spark"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got acpschema.CreateElicitationResponse
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
+		t.Fatal(err)
+	}
+	if string(got.Content["workloads"]) != `["SQL","Spark"]` {
+		t.Fatalf("array response = %s", raw)
+	}
+}
+
 func TestElicitationQuestionsReadCodexUserInputForm(t *testing.T) {
 	const message = "Codex needs your input to continue."
 	var schema acpschema.ElicitationSchema
