@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { COMPUTER_CHANNEL, type ComputerAPI } from '@shared/computerControl'
 import { browserPasswords } from '@preload/browserPasswords'
+import { browserDownloads } from '@preload/browserDownloads'
 import { installBrowserPasswordCapture } from '@preload/browser'
 import { BROWSER_PRELOAD_ARGUMENT } from '@shared/preview'
 import { BROWSER_COMMAND_CHANNEL, type BrowserCommandRequest } from '@shared/browserControl'
@@ -33,6 +34,7 @@ if (process.argv.includes(BROWSER_PRELOAD_ARGUMENT)) {
 } else {
   contextBridge.exposeInMainWorld('jaz', {
     browserPasswords,
+    browserDownloads,
     computer: {
       status: () => ipcRenderer.invoke(COMPUTER_CHANNEL + 'status'),
       requestPermissions: () => ipcRenderer.invoke(COMPUTER_CHANNEL + 'permissions'),

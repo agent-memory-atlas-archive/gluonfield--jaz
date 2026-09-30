@@ -51,6 +51,21 @@ synchronized throughout opening, closing and interrupted animations.
 Opening, closing and switching desktop panels use the same spring curve through
 a CSS width transition. Drag resizing and Reduced Motion remain immediate.
 
+## Downloads
+
+Use **Browser menu (⋮) → Downloads** for recent downloads from all side-browser
+tabs on this computer. The list shows transfer progress, the actual saved filename
+and location, and **Open** and **Show in folder** for completed files. **Cancel**
+stops an active download; the folder button opens the system Downloads directory.
+
+Downloads keep Electron's native Save dialog. Jaz records the location you choose,
+including renamed files. The latest 50 finished downloads and all active downloads
+are kept in `browser-downloads.json` in the desktop's app data directory. History
+survives restarting Jaz; unfinished transfers show as interrupted after restart.
+The history starts when this feature is installed. Existing files remain accessible
+through the Downloads folder. Downloads and their history stay on the desktop,
+including when the Jaz backend runs remotely.
+
 ## Saved passwords
 
 Submitting a top-level HTTPS login form offers **Save password?** or
