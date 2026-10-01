@@ -13,6 +13,10 @@ import { BotIcon } from './BotAvatar'
 import { BotMenu } from './BotMenu'
 import { BotNameInput } from './BotNameInput'
 import { NewBotPicker } from './NewBotPicker'
+import { usePinBot } from './usePinBot'
+
+// A row dragged onto the pinned tiles pins it.
+const DRAGGED_BOT = 'application/x-jaz-bot'
 
 export function BotsPanel({ mobile }: { mobile: boolean }) {
   const bots = useQuery({
@@ -22,6 +26,8 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
   const [query, setQuery] = useState<string | null>(null)
   const list = useMemo(() => bots.data ?? [], [bots.data])
   const { pinned, rest } = useMemo(() => botSections(list, query ?? ''), [list, query])
+  const pin = usePinBot()
+  const [dropping, setDropping] = useState(false)
 
   return (
     <>
@@ -67,7 +73,21 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
         ) : (
           <section className="flex shrink-0 flex-col gap-3">
             {pinned.length ? (
-              <div className="grid grid-cols-3 gap-px">
+              <div
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes(DRAGGED_BOT)) return
+                  e.preventDefault()
+                  setDropping(true)
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
+                }}
+                onDrop={(e) => {
+                  setDropping(false)
+                  pin(e.dataTransfer.getData(DRAGGED_BOT), true)
+                }}
+                className={`grid grid-cols-3 gap-px rounded-lg transition-colors duration-150 ${dropping ? 'bg-list-hover' : ''}`}
+              >
                 {pinned.map((bot) => (
                   <BotEntry key={bot.id} bot={bot} bots={list} tile />
                 ))}
@@ -113,6 +133,8 @@ function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: b
         params={{ botId: bot.id }}
         activeProps={{ className: 'bg-list-active!' }}
         {...menuTriggers}
+        draggable={!tile}
+        onDragStart={(e) => e.dataTransfer.setData(DRAGGED_BOT, bot.id)}
         className={`select-none rounded-lg text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${
           tile
             ? 'flex min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
