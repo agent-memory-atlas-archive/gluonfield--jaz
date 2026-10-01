@@ -108,15 +108,15 @@ type ChatTurn = {
   reply?: { key: string; at: string; text: string }
 }
 
-export type BotWork = { doing?: string; since?: string; note?: string }
+export type BotWork = { doing?: string; note?: string }
 
 // A bot's chat, read from its thread in one pass: what people typed, what bots
 // sent with send_message, apps opened in user turns, questions the bot asks
 // with their answers, and activity rows. Everything else is private work. A finished user turn without public output shows its
 // last written reply, so an answer is never lost. `doing`
 // names what the bot is busy with when a group, another bot or a routine
-// opened its latest turn, whose output lands elsewhere; `since` and `note` are
-// when that turn began and the last line the bot wrote in it.
+// opened its latest turn, whose output lands elsewhere; `note` is the last line
+// the bot wrote in it.
 export function botChat(
   messages: ChatMessage[],
   events: SessionEvent[],
@@ -182,7 +182,7 @@ export function botChat(
   for (const [id, entry] of questions) entry.answer = answers.get(id)
   // A bot held on the user's answer to its question is waiting, not working.
   const waiting = [...questions.values()].some((entry) => !entry.answer)
-  return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) }, waiting }
+  return { entries, work: { doing: busyWith(turn?.activity), note: turn?.reply?.text.split('\n').at(-1) }, waiting }
 }
 
 // What a bot's running subtasks have it doing, said as one person doing
