@@ -1,4 +1,7 @@
+import { CircleCheck, Users, type LucideIcon } from 'lucide-react'
 import type { IntegrationPlugin } from '@/lib/api/types'
+
+const pluginGlyphs: Record<string, LucideIcon> = { tasks: CircleCheck, crm: Users }
 
 const pluginAssetUrls: Record<string, string> = {
   gmail: '/integrations/gmail.svg',
@@ -11,14 +14,13 @@ const pluginAssetUrls: Record<string, string> = {
 
 export function PluginIcon({ plugin, compact = false }: { plugin: IntegrationPlugin; compact?: boolean }) {
   const sizeClass = compact ? 'size-8' : 'size-9'
-  const glyphSizeClass = compact ? 'size-5' : 'size-6'
   const iconSize = compact ? 16 : 18
   const assetUrl = pluginAssetUrl(plugin)
 
-  if (assetUrl) {
+  if (assetUrl || (plugin.icon.kind === 'asset' && pluginGlyphs[plugin.icon.value])) {
     return (
       <span className={`grid ${sizeClass} shrink-0 place-items-center rounded-[8px] bg-bg ring-1 ring-border/70`}>
-        <img src={assetUrl} alt="" className={`${glyphSizeClass} object-contain`} />
+        <PluginGlyph plugin={plugin} size={compact ? 20 : 24} />
       </span>
     )
   }
@@ -44,6 +46,10 @@ export function PluginIcon({ plugin, compact = false }: { plugin: IntegrationPlu
 }
 
 export function PluginGlyph({ plugin, size }: { plugin: IntegrationPlugin; size: number }) {
+  const Glyph = plugin.icon.kind === 'asset' ? pluginGlyphs[plugin.icon.value] : undefined
+  if (Glyph) {
+    return <Glyph size={size} strokeWidth={1.75} aria-hidden />
+  }
   const assetUrl = pluginAssetUrl(plugin)
   if (assetUrl) {
     return <img src={assetUrl} alt="" className="object-contain" style={{ width: size, height: size }} />
