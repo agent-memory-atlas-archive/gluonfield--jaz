@@ -73,7 +73,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
                 ))}
               </div>
             ) : null}
-            <div className="flex flex-col gap-px">
+            <div className="flex flex-col gap-0.5">
               {rest.map((bot) => (
                 <BotEntry key={bot.id} bot={bot} bots={list} />
               ))}
@@ -116,7 +116,7 @@ function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: b
         className={`select-none rounded-lg text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${
           tile
             ? 'flex min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
-            : 'flex items-center gap-2.5 px-2.5 py-1.5 text-[13px] max-sm:py-2.5 max-sm:text-[15px]'
+            : 'flex h-13 items-center gap-2.5 px-2.5 text-[13px] max-sm:h-16 max-sm:text-[15px]'
         }`}
       >
         <BotIcon avatars={botAvatars(bot, bots)} size={tile ? 44 : 28} working={working} />
