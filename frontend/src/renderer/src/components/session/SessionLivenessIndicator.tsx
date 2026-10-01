@@ -2,19 +2,11 @@ import { CircleAlert } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { agentLabel } from '@/lib/agentLabel'
+import { formatDuration } from '@/lib/format/time'
 import {
   deriveSessionRunSignal,
   type RunSignal,
 } from '@/lib/sessionLiveness'
-
-function formatDuration(ms: number | undefined): string {
-  if (ms === undefined) return ''
-  const seconds = Math.max(1, Math.floor(ms / 1000))
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m`
-  return `${Math.floor(minutes / 60)}h`
-}
 
 function detailFor(signal: RunSignal, ageMs: number | undefined): string {
   const age = formatDuration(ageMs)

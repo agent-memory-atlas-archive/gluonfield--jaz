@@ -48,3 +48,12 @@ export function messageTime(iso: string, now = Date.now()): string {
     ? date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
     : fullTime(iso)
 }
+
+export function formatDuration(ms: number | undefined): string {
+  if (ms === undefined) return ''
+  const seconds = Math.max(1, Math.floor(ms / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  return `${Math.floor(minutes / 60)}h`
+}

@@ -1,17 +1,19 @@
+import { useEffect, useState } from 'react'
 import { UserBubble } from '@/components/session/Bubble'
 import { UserMessageMarkdown } from '@/components/session/MessageMarkdown'
 import { SystemEventRow } from '@/components/session/SystemEventRow'
 import type { Bot, BotAvatar as Avatar } from '@/lib/api/types'
-import { BOT_COLORS, type ChatEntry } from '@/lib/bots'
-import { messageTime } from '@/lib/format/time'
+import { BOT_COLORS, type BotWork, type ChatEntry } from '@/lib/bots'
+import { formatDuration, messageTime } from '@/lib/format/time'
 import { BotAvatar } from './BotAvatar'
 
 const GONE: Avatar = { shape: 'circle', color: 'gray' }
 const QUIET_GAP_MS = 30 * 60_000
 
 // A messenger-style log shared by a bot's chat and a group: bubbles, the time
-// after a quiet gap, activity rows, and who is working now. `named` labels
-// each speaker with a name and face, which only a group needs.
+// after a quiet gap, activity rows, and who is working now, for how long and
+// on what. `named` labels each speaker with a name and face, which only a
+// group needs.
 export function ChatLog({
   entries,
   bots,
@@ -21,7 +23,7 @@ export function ChatLog({
   entries: ChatEntry[]
   bots: Bot[]
   named: boolean
-  working: { bot: Bot; doing?: string }[]
+  working: ({ bot: Bot } & BotWork)[]
 }) {
   const avatar = (id?: string) => bots.find((bot) => bot.id === id)?.avatar ?? GONE
   return (
@@ -65,14 +67,29 @@ export function ChatLog({
           </div>
         )
       })}
-      {working.map(({ bot, doing = 'working' }) => (
-        <p key={bot.id} role="status" className="mt-4 flex items-center gap-2 text-sm text-ink-3 first:mt-0">
+      {working.map(({ bot, doing = 'working', since, note }) => (
+        <div key={bot.id} role="status" className="mt-4 flex items-start gap-2 text-sm text-ink-3 first:mt-0">
           <BotAvatar avatar={bot.avatar} size={22} working />
-          <span className="live-shimmer">
-            {bot.name} is {doing}…
-          </span>
-        </p>
+          <div className="flex min-w-0 flex-col gap-0.5 pt-px">
+            <p>
+              <span className="live-shimmer">
+                {bot.name} is {doing}…
+              </span>
+              {since ? <Elapsed since={since} /> : null}
+            </p>
+            {note ? <p className="truncate text-[12px]">{note}</p> : null}
+          </div>
+        </div>
       ))}
     </div>
   )
+}
+
+function Elapsed({ since }: { since: string }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return <span className="tabular-nums"> · {formatDuration(now - Date.parse(since))}</span>
 }

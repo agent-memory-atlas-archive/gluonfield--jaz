@@ -68,24 +68,28 @@ export type ChatEntry =
   | { kind: 'activity'; key: string; at: string; event: SessionEvent }
 
 type ChatTurn = {
+  at: string
   user: boolean
   spoke: boolean
   activity?: BotActivityEvent
   reply?: { key: string; at: string; text: string }
 }
 
+export type BotWork = { doing?: string; since?: string; note?: string }
+
 // A bot's chat, read from its thread in one pass: what people typed, what bots
 // sent with send_message and the activity worth a row. Everything else is the
 // bot's private work. A finished turn the user started in which the bot sent
 // nothing shows its last written reply, so an answer is never lost. `doing`
 // names what the bot is busy with when a group, another bot or a routine
-// opened its latest turn, whose output lands elsewhere.
+// opened its latest turn, whose output lands elsewhere; `since` and `note` are
+// when that turn began and the last line the bot wrote in it.
 export function botChat(
   messages: ChatMessage[],
   events: SessionEvent[],
   self: { id: string; name: string },
   working: boolean,
-): { entries: ChatEntry[]; doing?: string } {
+): { entries: ChatEntry[]; work: BotWork } {
   const items = [
     ...messages.flatMap((message) =>
       message.role === 'user' ? [{ at: message.created_at, message, event: undefined }] : [],
@@ -101,7 +105,7 @@ export function botChat(
     if (message) {
       close()
       entries.push({ kind: 'user', key: `message:${message.seq}:${at}`, at, text: messageText(message) })
-      turn = { user: true, spoke: false }
+      turn = { at, user: true, spoke: false }
       continue
     }
     const key = `${event.session_id}:${event.seq ?? at}`
@@ -116,7 +120,7 @@ export function botChat(
       const opens = activity.kind !== 'message_sent'
       if (opens) close()
       if (activity.kind === 'message_sent' || activity.kind === 'message_received') entries.push({ kind: 'activity', key, at, event })
-      if (opens) turn = { user: false, spoke: false, activity }
+      if (opens) turn = { at, user: false, spoke: false, activity }
     } else if (event.loop_created || event.type === 'agent_switch') {
       entries.push({ kind: 'activity', key, at, event })
     } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {
@@ -124,7 +128,7 @@ export function botChat(
     }
   }
   if (!working) close()
-  return { entries, doing: busyWith(turn?.activity) }
+  return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) } }
 }
 
 function busyWith(activity?: BotActivityEvent): string | undefined {

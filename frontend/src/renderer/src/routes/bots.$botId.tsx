@@ -40,7 +40,7 @@ function BotRoute() {
       placeholder={`Message ${bot.name}`}
       chat={({ messages, events, working }) => {
         const chat = botChat(messages, events, bot, working)
-        return <ChatLog entries={chat.entries} bots={bots.data ?? []} named={false} working={working ? [{ bot, doing: chat.doing }] : []} />
+        return <ChatLog entries={chat.entries} bots={bots.data ?? []} named={false} working={working ? [{ bot, ...chat.work }] : []} />
       }}
     />
   )

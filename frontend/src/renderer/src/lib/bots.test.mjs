@@ -40,10 +40,10 @@ describe('bot chat log', () => {
     expect(shape(entries)).toEqual(['user: hi', 'bot: Hey.', '· message_sent', '· agent_switch'])
   })
 
-  test('a working bot says what it is busy with until the user writes again', () => {
-    const events = [said(2, 'Hey.'), woke(3, 'group', 'Team')]
-    expect(botChat([user(1, 1, 'hi')], events, self, true).doing).toBe('working in Team')
-    expect(botChat([user(1, 1, 'hi')], [...events, woke(4, 'routine', 'Say hi')], self, true).doing).toBe('running Say hi')
-    expect(botChat([user(1, 1, 'hi'), user(2, 5, 'still there?')], events, self, true).doing).toBeUndefined()
+  test('a working bot says what it is busy with, since when and its latest note, until the user writes again', () => {
+    const events = [said(2, 'Hey.'), woke(3, 'group', 'Team'), wrote(4, 'Reading the CRM.\n\nChecking two more threads.')]
+    expect(botChat([user(1, 1, 'hi')], events, self, true).work).toEqual({ doing: 'working in Team', since: at(3), note: 'Checking two more threads.' })
+    expect(botChat([user(1, 1, 'hi')], [...events, woke(5, 'routine', 'Say hi')], self, true).work).toEqual({ doing: 'running Say hi', since: at(5), note: undefined })
+    expect(botChat([user(1, 1, 'hi'), user(2, 6, 'still there?')], events, self, true).work.doing).toBeUndefined()
   })
 })
