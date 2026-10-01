@@ -26,19 +26,20 @@ type Avatar struct {
 }
 
 type Bot struct {
-	ID        string    `json:"id"`
-	Kind      string    `json:"kind"`
-	Name      string    `json:"name"`
-	Avatar    Avatar    `json:"avatar"`
-	Pinned    bool      `json:"pinned"`
-	Unread    bool      `json:"unread"`
-	Status    string    `json:"status"`
-	Preview   string    `json:"preview,omitempty"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Agent     string    `json:"agent,omitempty"`
-	Model     string    `json:"model,omitempty"`
-	Members   []string  `json:"members,omitempty"`
-	Routines  int       `json:"routines,omitempty"`
+	ID              string    `json:"id"`
+	Kind            string    `json:"kind"`
+	Name            string    `json:"name"`
+	Avatar          Avatar    `json:"avatar"`
+	Pinned          bool      `json:"pinned"`
+	Unread          bool      `json:"unread"`
+	Status          string    `json:"status"`
+	Preview         string    `json:"preview,omitempty"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	Agent           string    `json:"agent,omitempty"`
+	Model           string    `json:"model,omitempty"`
+	ReasoningEffort string    `json:"reasoning_effort,omitempty"`
+	Members         []string  `json:"members,omitempty"`
+	Routines        int       `json:"routines,omitempty"`
 }
 
 type CreateBot struct {
@@ -55,6 +56,10 @@ type UpdateBot struct {
 	Members *[]string `json:"members,omitempty"`
 	// Agent moves the bot to another agent, which starts a fresh native session.
 	Agent *string `json:"agent,omitempty"`
+	// Model picks the model the bot's agent runs with, together with
+	// ReasoningEffort.
+	Model           *string `json:"model,omitempty"`
+	ReasoningEffort string  `json:"reasoning_effort,omitempty"`
 }
 
 // Threads is the agent runtime bot threads run on.
@@ -63,6 +68,7 @@ type Threads interface {
 	StartInternalTurnWhenIdle(context.Context, acp.InternalTurnRequest) (acp.Job, error)
 	Wait(context.Context, acp.WaitRequest) (acp.Job, error)
 	SwitchAgent(ctx context.Context, sessionID, agent string) error
+	SetModel(ctx context.Context, sessionID, model, effort string) error
 }
 
 // Store keeps bot records and the threads they live in.

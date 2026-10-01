@@ -715,6 +715,7 @@ export interface Bot {
   updated_at: string
   agent?: string
   model?: string
+  reasoning_effort?: string
   members?: string[]
   routines?: number
 }
