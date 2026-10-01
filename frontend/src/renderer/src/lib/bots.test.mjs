@@ -30,7 +30,7 @@ describe('bot chat log', () => {
     expect(shape(botChat(messages, events, self, false).entries)).toEqual(['user: hi', '· message_sent', 'bot: Hi! What should we work on?'])
   })
 
-  test('a user-facing app carries its tool input and result live and in history, without private replies', () => {
+  test('a user-requested app preserves its result and suppresses private fallback replies', () => {
     const app = { server_id: 'crm', tool: 'show_crm', arguments: { path: '/o/deals' }, result: { content: [{ type: 'text', text: '{"path":"/o/deals"}' }], structuredContent: { path: '/o/deals' } } }
     const resource = event(3, { type: 'mcp_app', mcp_app: app })
     const events = [wrote(2, 'Looking up the deals.'), resource, tool(4), wrote(5, 'Private notes.')]
@@ -42,7 +42,7 @@ describe('bot chat log', () => {
   })
 
   test('apps from group and routine turns stay private until the user asks again', () => {
-    const app = { server_id: 'crm', tool: 'show_crm', arguments: { path: '/o/deals' }, result: {} }
+    const app = { server_id: 'crm', tool: 'show_crm', arguments: { path: '/o/deals' }, result: { content: [] } }
     const events = [said(2, 'Hey.'), woke(3, 'group', 'Team'), event(4, { type: 'mcp_app', mcp_app: app }), woke(5, 'routine', 'Digest'), event(6, { type: 'mcp_app', mcp_app: app }), event(8, { type: 'mcp_app', mcp_app: app })]
     const { entries } = botChat([user(1, 1, 'hi'), user(2, 7, 'show me deals')], events, self, false)
     expect(entries.map((entry) => entry.kind)).toEqual(['user', 'bot', 'user', 'app'])

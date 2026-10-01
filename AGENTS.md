@@ -25,7 +25,7 @@
 - Codex ACP defaults to the user's Codex OAuth credentials. Never silently pass coordinator provider keys to Codex subprocesses; a provider API key reaches Codex only when the user explicitly selects a non-OpenAI model provider (e.g. OpenRouter) for it.
 - Target deployments run the Jaz server on a VM and clients on user computers; never assume client-local file paths are visible to the server or agents.
 - Before handing off a completed feature or fix, run a code-review pass; use `thermo-nuclear-code-quality-review` when available.
-- Every test you add must be useful: it must run in the relevant verification path and either protect real behavior or clarify a tricky contract. A test that is skipped, does not run, or provides no useful signal must not exist just to raise coverage.
+- Never add useless or fake tests. Every test must run in the normal verification path, exercise real production behavior, and fail when that behavior breaks. Delete tautologies, tests of trivial helpers or forwarding, checks of source text or internal constants, duplicate coverage, and permanently skipped or inactive tests. Fakes may isolate external boundaries; they must preserve the real contract and never stand in for end-to-end verification.
 - Reference repos (`openclaw`, `hermes`) are learning material, not authority.
 
 ## Backend Architecture
