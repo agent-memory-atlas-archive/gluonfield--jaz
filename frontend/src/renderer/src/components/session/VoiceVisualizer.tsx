@@ -3,9 +3,12 @@ import { motion, useMotionValue, useSpring } from 'motion/react'
 import { shapeById, type ShapeId } from '@/lib/vendor/mote/shapes'
 import { eyeById, type EyeId } from '@/lib/vendor/mote/eyes'
 import { useReducedEffectsMotion } from '@/lib/effectsMotion'
-import { audioLevel } from '@/lib/voice/audioLevel'
+import { VoiceLevels } from '@/lib/voice/audioLevel'
 import { VoiceAvatarActivity, type VoiceAvatarState } from '@/lib/voice/avatar'
 import type { VoiceState } from '@/lib/voice/session'
+
+// The colour of Jaz's own voice face.
+export const VOICE_COLOR = '#2f8de3'
 
 const poses: Record<VoiceAvatarState, { shape: ShapeId; eyes: EyeId; tilt: number; gaze: number; duration: number }> = {
   listening: { shape: 'orb', eyes: 'listening', tilt: -3, gaze: 3, duration: 5.6 },
@@ -43,8 +46,7 @@ export function VoiceVisualizer({ voice, level = 0, outputLevel = 0, size = 88 }
   useEffect(() => {
     let raf = 0
     let timer: ReturnType<typeof setTimeout>
-    let samples = new Uint8Array(0)
-    let outputSamples = new Uint8Array(0)
+    const levels = new VoiceLevels()
     let previous: VoiceAvatarState | undefined
     let lastFrame = performance.now()
     let cycle = 0
@@ -54,14 +56,7 @@ export function VoiceVisualizer({ voice, level = 0, outputLevel = 0, size = 88 }
     const draw = () => {
       const now = performance.now()
       const { voice, level, outputLevel } = input.current
-      if (voice.analyser && samples.length !== voice.analyser.fftSize) {
-        samples = new Uint8Array(voice.analyser.fftSize)
-      }
-      if (voice.outputAnalyser && outputSamples.length !== voice.outputAnalyser.fftSize) {
-        outputSamples = new Uint8Array(voice.outputAnalyser.fftSize)
-      }
-      const incoming = voice.muted ? 0 : voice.analyser ? audioLevel(voice.analyser, samples) : level
-      const outgoing = voice.outputAnalyser ? audioLevel(voice.outputAnalyser, outputSamples) : outputLevel
+      const { input: incoming, output: outgoing } = levels.read(voice, level, outputLevel)
       const next = meter.sample(voice, incoming, outgoing, now)
       const pose = poses[next]
       const still = reducedMotion || next === 'muted' || next === 'error'
@@ -118,7 +113,7 @@ export function VoiceVisualizer({ voice, level = 0, outputLevel = 0, size = 88 }
       <g transform="translate(20 20)">
         <motion.g style={{ scale: amplitude, transformOrigin: '160px 160px' }}>
           <motion.g style={{ y: lift, rotate: rotation, transformOrigin: '160px 160px' }}>
-            <motion.path data-body fill="#2f8de3" initial={false} animate={{ d: shapeById(pose.shape).path }} transition={morph} />
+            <motion.path data-body fill={VOICE_COLOR} initial={false} animate={{ d: shapeById(pose.shape).path }} transition={morph} />
             <motion.g style={{ x: gazeX, y: gazeY }}>
               <motion.g style={{ scaleY: leftBlink, transformOrigin: `${eyes.leftCenter.x}px ${eyes.leftCenter.y}px` }}>
                 <motion.path data-eye="left" fill="#f4f2eb" initial={false} animate={{ d: eyes.leftPath }} transition={morph} />

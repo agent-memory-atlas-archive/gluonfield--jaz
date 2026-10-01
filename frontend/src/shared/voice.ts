@@ -10,6 +10,8 @@ export type VoiceStatus = {
 
 export type VoiceOverlayState = VoiceStatus & {
   sessionId: string
+  // The route the conversation lives on: its thread, or its bot's chat.
+  home: string
   docked: boolean
   level: number
   outputLevel: number

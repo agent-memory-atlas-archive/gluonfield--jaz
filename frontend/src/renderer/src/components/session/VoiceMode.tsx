@@ -1,54 +1,161 @@
 import { Mic, MicOff, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
-import { IconButton } from '@/components/ui/IconButton'
-import { VoiceVisualizer } from '@/components/session/VoiceVisualizer'
+import { type HTMLMotionProps, motion } from 'motion/react'
+import { useEffect, useRef } from 'react'
+import { BotAvatar } from '@/components/bots/BotAvatar'
+import { VOICE_COLOR, VoiceVisualizer } from '@/components/session/VoiceVisualizer'
+import { BOT_COLORS } from '@/lib/bots'
+import { useReducedEffectsMotion } from '@/lib/effectsMotion'
+import { VoiceLevels } from '@/lib/voice/audioLevel'
+import { useVoiceBot } from '@/lib/voice/bot'
 import type { VoiceHandle } from '@/lib/voice/session'
 
-export function VoiceMode({ voice }: { voice: VoiceHandle }) {
+const WAVE_DOTS = 12
+
+// Voice mode in a thread: the voice pill over the composer, and what the
+// connection is doing when it is not simply live.
+export function VoiceMode({ voice, sessionId }: { voice: VoiceHandle; sessionId: string }) {
   if (voice.phase === 'off') {
     return voice.error ? <p role="alert" className="mb-3 text-center text-xs text-danger">{voice.error}</p> : null
   }
   const status = voice.phase === 'connecting' ? 'Connecting voice…'
     : voice.phase === 'ending' ? 'Ending voice…'
     : voice.phase === 'error' ? 'Voice disconnected'
-    : voice.muted ? 'Microphone muted' : ''
+    : ''
 
   return (
     <div className="mb-3 flex flex-col items-center" aria-label="Voice conversation">
-      <div className="pointer-events-none">
-        <VoiceVisualizer voice={voice} />
-      </div>
-      <p className="mt-1 flex h-5 items-center text-xs text-ink-2">
-        {status ? <span role="status" aria-atomic="true">{status}</span> : null}
-      </p>
+      <VoicePill voice={voice} sessionId={sessionId} />
+      {status ? <p role="status" aria-atomic="true" className="mt-1.5 text-xs text-ink-2">{status}</p> : null}
       {voice.error ? <p role="alert" className="mt-1 max-w-sm text-center text-xs text-danger">{voice.error}</p> : null}
     </div>
   )
 }
 
-export function VoiceControls({ voice, floating = false }: { voice: VoiceHandle; floating?: boolean }) {
-  const microphoneLabel = voice.muted ? 'Unmute microphone' : 'Mute microphone'
-  const speakerLabel = voice.speakerMuted ? 'Unmute speaker' : 'Mute speaker'
-  const size = floating ? 'sm' : 'md'
-  const variant = floating ? 'inverse' : 'ghost'
-  const hitArea = floating ? '[-webkit-app-region:no-drag]' : 'relative after:absolute after:-inset-1 aria-pressed:bg-surface-2 aria-pressed:text-ink'
-  const buttons = (
-    <>
-      {voice.phase === 'error' ? (
-        <IconButton size={size} variant={variant} className={hitArea} title="Reconnect voice" aria-label="Reconnect voice" onClick={voice.start}>
-          <RotateCcw size={16} />
-        </IconButton>
+// Voice as one pill: the face of whoever is talking (a bot's own, or Jaz's), a
+// dotted line in its colour that moves with the sound, and the controls,
+// ending in red. With `onReturn` the face is a button back to the chat; a
+// pointer click reaches the floating pill's drag gesture, so it answers keys.
+export function VoicePill({ voice, sessionId, level = 0, outputLevel = 0, onReturn }: {
+  voice: VoiceHandle
+  sessionId: string
+  level?: number
+  outputLevel?: number
+  onReturn?: () => void
+}) {
+  const bot = useVoiceBot(sessionId)
+  const face = bot
+    ? <BotAvatar avatar={bot.avatar} size={34} working={voice.phase === 'connecting' || Boolean(voice.activity)} />
+    : <VoiceVisualizer voice={voice} size={44} level={level} outputLevel={outputLevel} />
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+      {onReturn ? (
+        <button
+          type="button"
+          aria-label="Return to voice chat"
+          title={voice.error || 'Open voice chat · Drag to move'}
+          onClick={(event) => {
+            if (event.detail === 0) {
+              onReturn()
+            }
+          }}
+          className="grid size-10 shrink-0 place-items-center rounded-full"
+        >
+          {face}
+        </button>
       ) : (
-        <IconButton size={size} variant={variant} className={hitArea} title={microphoneLabel} aria-label={microphoneLabel} aria-pressed={voice.muted} disabled={voice.phase !== 'listening'} onClick={voice.mute}>
-          {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
-        </IconButton>
+        <span className="grid size-10 shrink-0 place-items-center">{face}</span>
       )}
-      <IconButton size={size} variant={variant} className={floating ? hitArea : `${hitArea} bg-ink! text-bg! hover:bg-ink/85!`} title="Close voice mode" aria-label="Close voice mode" disabled={voice.phase === 'ending'} onClick={voice.end}>
-        <X size={17} />
-      </IconButton>
-      <IconButton size={size} variant={variant} className={hitArea} title={speakerLabel} aria-label={speakerLabel} aria-pressed={voice.speakerMuted} disabled={voice.phase !== 'listening'} onClick={voice.muteSpeaker}>
-        {voice.speakerMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
-      </IconButton>
-    </>
+      <VoiceWave voice={voice} color={bot ? BOT_COLORS[bot.avatar.color] : VOICE_COLOR} level={level} outputLevel={outputLevel} />
+      <div data-voice-control className="flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+        {voice.phase === 'error' ? (
+          <PillButton label="Reconnect voice" onClick={voice.start}>
+            <RotateCcw size={17} />
+          </PillButton>
+        ) : (
+          <PillButton label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} pressed={voice.muted} disabled={voice.phase !== 'listening'} onClick={voice.mute}>
+            {voice.muted ? <MicOff size={17} /> : <Mic size={17} />}
+          </PillButton>
+        )}
+        <PillButton label={voice.speakerMuted ? 'Unmute speaker' : 'Mute speaker'} pressed={voice.speakerMuted} disabled={voice.phase !== 'listening'} onClick={voice.muteSpeaker}>
+          {voice.speakerMuted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+        </PillButton>
+        <PillButton label="Close voice mode" danger disabled={voice.phase === 'ending'} onClick={voice.end}>
+          <X size={18} />
+        </PillButton>
+      </div>
+    </div>
   )
-  return floating ? <div className="flex items-center gap-1 rounded-full bg-black/70 p-0.5 shadow-[0_2px_10px_rgba(0,0,0,0.25)]">{buttons}</div> : buttons
+}
+
+function PillButton({ label, pressed, danger = false, ...props }: {
+  label: string
+  pressed?: boolean
+  danger?: boolean
+} & HTMLMotionProps<'button'>) {
+  return (
+    <motion.button
+      type="button"
+      title={label}
+      aria-label={label}
+      aria-pressed={pressed}
+      whileTap={props.disabled ? undefined : { scale: 0.96 }}
+      className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-full transition-colors duration-150 disabled:cursor-default disabled:opacity-50 ${
+        danger ? 'bg-danger text-white hover:bg-danger/90' : 'bg-ink/8 text-ink-2 hover:bg-ink/12 hover:text-ink aria-pressed:bg-ink/15 aria-pressed:text-ink'
+      }`}
+      {...props}
+    />
+  )
+}
+
+// A dotted line that rises into a wave while anyone speaks.
+function VoiceWave({ voice, color, level, outputLevel }: {
+  voice: VoiceHandle
+  color: string
+  level: number
+  outputLevel: number
+}) {
+  const reducedMotion = useReducedEffectsMotion()
+  const dots = useRef<(HTMLSpanElement | null)[]>([])
+  const input = useRef({ voice, level, outputLevel })
+
+  useEffect(() => {
+    input.current = { voice, level, outputLevel }
+  }, [voice, level, outputLevel])
+
+  useEffect(() => {
+    if (reducedMotion) {
+      return
+    }
+    const levels = new VoiceLevels()
+    let loudness = 0
+    let raf = 0
+    const draw = (now: number) => {
+      const { voice, level, outputLevel } = input.current
+      const { input: heard, output: spoken } = levels.read(voice, level, outputLevel)
+      loudness += (Math.min(1, Math.max(heard, spoken) * 2.5) - loudness) * 0.25
+      dots.current.forEach((dot, index) => {
+        if (dot) {
+          dot.style.height = `${4 + loudness * 18 * (0.5 + 0.5 * Math.sin(now / 150 + index * 0.9))}px`
+        }
+      })
+      raf = requestAnimationFrame(draw)
+    }
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [reducedMotion])
+
+  return (
+    <div aria-hidden className="mx-1 flex h-6 w-24 shrink-0 items-center justify-between">
+      {Array.from({ length: WAVE_DOTS }, (_, index) => (
+        <span
+          key={index}
+          ref={(dot) => {
+            dots.current[index] = dot
+          }}
+          className="h-1 w-1 rounded-full opacity-60"
+          style={{ background: color }}
+        />
+      ))}
+    </div>
+  )
 }

@@ -1,15 +1,17 @@
 import { useCallback } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useRouter } from '@tanstack/react-router'
+import { useVoiceBot, voiceHome } from '@/lib/voice/bot'
 import { initialVoiceState } from '@/lib/voice/session'
 import { useGlobalVoice } from '@/lib/voice/VoiceProvider'
 
 export function useVoiceMode(sessionId: string) {
   const voice = useGlobalVoice()
-  const navigate = useNavigate()
+  const router = useRouter()
   const { sessionId: owner, connect, start: reconnect, phase } = voice
+  const ownerBot = useVoiceBot(owner)
   const start = useCallback(() => {
     if (owner && phase !== 'off' && owner !== sessionId) {
-      void navigate({ to: '/sessions/$sessionId', params: { sessionId: owner } })
+      router.history.push(voiceHome(owner, ownerBot))
     } else if (owner && phase !== 'off') {
       if (phase === 'error') {
         reconnect()
@@ -17,6 +19,6 @@ export function useVoiceMode(sessionId: string) {
     } else {
       connect(sessionId)
     }
-  }, [connect, navigate, owner, phase, reconnect, sessionId])
+  }, [connect, owner, ownerBot, phase, reconnect, router, sessionId])
   return { ...voice, ...(owner !== sessionId ? initialVoiceState : {}), start }
 }

@@ -52,7 +52,7 @@ import { useSessionEvents } from '@/lib/hooks/useSessionEvents'
 import { useSessionHistory } from '@/lib/hooks/useSessionHistory'
 import { useSessionQueue } from '@/lib/hooks/useSessionQueue'
 import { useVoiceMode } from '@/lib/hooks/useVoiceMode'
-import { VoiceMode, VoiceControls } from '@/components/session/VoiceMode'
+import { VoiceMode } from '@/components/session/VoiceMode'
 import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { keys } from '@/lib/query/keys'
 import { type PlanApprovalAction } from '@/lib/taskSurface'
@@ -567,11 +567,10 @@ export function ThreadView({
               before={<ScrollToBottomButton visible={showScrollToBottom} onClick={scrollToBottom} />}
               onHeightChange={setBottomDockHeight}
             >
-              <VoiceMode voice={voice} />
+              <VoiceMode voice={voice} sessionId={sessionId} />
               {showPlanDecision ? (
                 <PlanDecisionCard
                   pending={planDecisionPending}
-                  controls={voice.phase === 'off' ? undefined : <VoiceControls voice={voice} />}
                   onImplement={() => {
                     if (!planDecisionApproval) return
                     setPlanDecisionPending(true)
@@ -615,7 +614,7 @@ export function ThreadView({
                     onStop={stopSession}
                     onClearGoal={clearGoal}
                     onVoice={voice.phase === 'off' ? voice.start : undefined}
-                    voiceControls={voice.phase === 'off' ? undefined : <VoiceControls voice={voice} />}
+                    voiceActive={voice.phase !== 'off'}
                     onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
                     onSteerQueuedPrompt={queue.onSteerQueuedPrompt}
                     onDeleteQueuedPrompt={queue.onDeleteQueuedPrompt}

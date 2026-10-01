@@ -88,7 +88,7 @@ export function ComposerCard({
   onStop,
   onClearGoal,
   onVoice,
-  voiceControls,
+  voiceActive = false,
   onUploadAttachment,
   onRemoveContext,
   onReplaceContexts,
@@ -123,13 +123,12 @@ export function ComposerCard({
   /** stops the goal auto-continuation loop server-side */
   onClearGoal?: () => void
   onVoice?: () => void
-  voiceControls?: ReactNode
+  voiceActive?: boolean
   onUploadAttachment?: (file: File) => Promise<Attachment>
   onRemoveContext?: (id: string) => void
   onReplaceContexts?: (contexts: ComposerContext[]) => void
   onTextChange?: (text: string) => void
 }) {
-  const voiceActive = Boolean(voiceControls)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [planModeOverride, setPlanModeOverride] = useState<boolean | null>(null)
   const [goalRequested, setGoalRequestedState] = useState(false)
@@ -511,7 +510,6 @@ export function ComposerCard({
                   <Mic size={16} />
                 </IconButton>
               ) : null}
-              {voiceControls}
               {streaming && onQueuePrompt && hasDraftContent && !voiceActive ? (
                 <button
                   type="button"
@@ -583,7 +581,7 @@ export function Composer({
   onStop,
   onClearGoal,
   onVoice,
-  voiceControls,
+  voiceActive = false,
   onUploadAttachment,
   onRemoveContext,
   onReplaceContexts,
@@ -614,7 +612,7 @@ export function Composer({
   onStop: () => void
   onClearGoal?: () => void
   onVoice?: () => void
-  voiceControls?: ReactNode
+  voiceActive?: boolean
   onUploadAttachment?: (file: File) => Promise<Attachment>
   onRemoveContext?: (id: string) => void
   onReplaceContexts?: (contexts: ComposerContext[]) => void
@@ -664,7 +662,7 @@ export function Composer({
         onStop={onStop}
         onClearGoal={onClearGoal}
         onVoice={onVoice}
-        voiceControls={voiceControls}
+        voiceActive={voiceActive}
         onUploadAttachment={onUploadAttachment}
         onRemoveContext={onRemoveContext}
         onReplaceContexts={onReplaceContexts}
@@ -676,13 +674,11 @@ export function Composer({
 export function PlanDecisionCard({
   disabled,
   pending,
-  controls,
   onImplement,
   onClarify,
 }: {
   disabled?: boolean
   pending?: boolean
-  controls?: ReactNode
   onImplement: () => void
   onClarify: (text: string) => void
 }) {
@@ -770,7 +766,6 @@ export function PlanDecisionCard({
           </motion.button>
         )}
       </div>
-      {controls ? <div className="mt-1 flex min-h-10 items-center justify-end gap-2">{controls}</div> : null}
     </div>
   )
 }

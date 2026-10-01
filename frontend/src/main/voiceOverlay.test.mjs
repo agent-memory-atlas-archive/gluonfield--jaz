@@ -72,7 +72,7 @@ mock.module('electron', () => ({
 const { attachVoiceOverlay } = await import('./voiceOverlay')
 afterAll(() => mock.restore())
 const sender = (window) => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame })
-const state = { sessionId: 'original', phase: 'listening', docked: true, muted: false, speakerMuted: false, activity: null, error: '', level: 0, outputLevel: 0 }
+const state = { sessionId: 'original', home: '/bots/original', phase: 'listening', docked: true, muted: false, speakerMuted: false, activity: null, error: '', level: 0, outputLevel: 0 }
 
 test('one overlay follows chat selection and owner focus without activating itself', () => {
   const owner = new Window()
@@ -99,7 +99,7 @@ test('one overlay follows chat selection and owner focus without activating itse
     expect(windows).toHaveLength(count + 1)
 
     ipcMain.emit('jaz:voice:command', sender(overlay), 'return')
-    expect(owner.sent.at(-1)).toEqual(['jaz:open-route', '/sessions/original'])
+    expect(owner.sent.at(-1)).toEqual(['jaz:open-route', '/bots/original'])
     expect(overlay.visible).toBe(false)
     owner.blur()
     ipcMain.emit('jaz:voice:command', sender(overlay), 'muteSpeaker')

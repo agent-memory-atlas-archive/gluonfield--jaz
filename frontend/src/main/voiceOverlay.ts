@@ -16,7 +16,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     }
     if (!overlay) {
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-      const size = { width: 128, height: 160 }
+      const size = { width: 340, height: 88 }
       overlay = new BrowserWindow({
         title: 'Jaz Voice',
         ...size,
@@ -91,7 +91,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     if (action === 'return') {
       owner.show()
       owner.focus()
-      owner.webContents.send('jaz:open-route', `/sessions/${encodeURIComponent(state.sessionId)}`)
+      owner.webContents.send('jaz:open-route', state.home)
     } else if (['mute', 'muteSpeaker', 'exit', 'reconnect'].includes(action)) {
       owner.webContents.send('jaz:voice:command', action)
     }
