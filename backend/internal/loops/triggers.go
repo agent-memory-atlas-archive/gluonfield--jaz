@@ -14,8 +14,8 @@ import (
 // trigger, so history backfills and resyncs stay quiet.
 const triggerWindow = 15 * time.Minute
 
-// HandleIncoming fires every active routine whose trigger matches a message
-// observed within the trigger window.
+// HandleIncoming fires every active routine whose trigger matches messages
+// observed within the trigger window, once per batch with all its matches.
 func (s *Service) HandleIncoming(ctx context.Context, messages []integrationingest.Incoming) {
 	now := s.now()
 	var recent []integrationingest.Incoming
@@ -32,14 +32,18 @@ func (s *Service) HandleIncoming(ctx context.Context, messages []integrationinge
 		s.Log.Warn("list routines for trigger failed", "error", err)
 		return
 	}
-	for _, message := range recent {
-		for _, routine := range routines {
-			if routine.Status != StatusActive || !routine.Trigger.matches(message) || message.At.Before(routine.CreatedAt) || !s.firstSighting(routine.ID, message.ID) {
-				continue
+	for _, routine := range routines {
+		var events []string
+		for _, message := range recent {
+			if routine.Status == StatusActive && routine.Trigger.matches(message) && !message.At.Before(routine.CreatedAt) && s.firstSighting(routine.ID, message.ID) {
+				events = append(events, describe(message))
 			}
-			if _, err := s.RunTriggered(ctx, routine.ID, describe(message)); err != nil {
-				s.Log.Info("trigger did not start a run", "routine", routine.ID, "error", err)
-			}
+		}
+		if len(events) == 0 {
+			continue
+		}
+		if _, err := s.RunTriggered(ctx, routine.ID, strings.Join(events, "\n\n")); err != nil {
+			s.Log.Warn("trigger did not start a run", "routine", routine.ID, "error", err)
 		}
 	}
 }

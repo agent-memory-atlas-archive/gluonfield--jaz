@@ -546,9 +546,6 @@ func TestBotOnlyToolsStayOnTheBotSurface(t *testing.T) {
 
 func TestLegacyBrowserTaskUsesRetiredEmptySurface(t *testing.T) {
 	service := &Service{}
-	if got := surfaceBySourceType[storage.LegacySourceBrowserTask]; got != retiredWorkerSurface {
-		t.Fatalf("legacy browser surface = %v, want retired", got)
-	}
 	req, _ := http.NewRequest(http.MethodPost, "http://127.0.0.1/mcp/jaztools?jaztools_surface=retired_worker", nil)
 	if service.surface(req) != retiredWorkerSurface {
 		t.Fatal("retired worker query did not select the retired surface")

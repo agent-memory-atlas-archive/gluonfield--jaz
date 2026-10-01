@@ -230,7 +230,7 @@ func TestACPLoopRunCreatesHiddenThreadAndFinishesFromCallback(t *testing.T) {
 	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusOK)
 }
 
-func TestRoutineRunsAsHiddenTurnInItsBotThread(t *testing.T) {
+func TestRoutineRunsAsATurnInItsBotThread(t *testing.T) {
 	store, err := sqlitestore.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -240,9 +240,11 @@ func TestRoutineRunsAsHiddenTurnInItsBotThread(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager := &fakeACPManager{job: acp.Job{ID: bot.ID}}
-	srv := &Server{Store: store, ACP: manager}
-	service := newLoopServiceForTest(store, NewLoopRunner(srv))
+	manager := &fakeACPManager{}
+	runner := NewLoopRunner(&Server{Store: store, ACP: manager})
+	bots := &fakeBotRoutines{called: make(chan []string, 1), release: make(chan acp.Job)}
+	runner.Bots = bots
+	service := newLoopServiceForTest(store, runner)
 	loop, err := service.Create(loops.CreateLoop{
 		Name:     "Morning triage",
 		Prompt:   "check the inbox",
@@ -257,24 +259,34 @@ func TestRoutineRunsAsHiddenTurnInItsBotThread(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var call []string
+	select {
+	case call = <-bots.called:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the routine never reached its bot")
+	}
+	if call[0] != bot.ID || call[1] != "Morning triage" || !strings.HasPrefix(call[2], "[routine] Morning triage · ") || !strings.HasSuffix(call[2], "\n\ncheck the inbox") {
+		t.Fatalf("routine turn = %q", call)
+	}
 	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusRunning)
-	manager.mu.Lock()
-	internal, spawned := manager.internal, manager.spawned
-	manager.mu.Unlock()
-	if internal.Session != bot.ID || !internal.AllowSilence || !strings.HasPrefix(internal.Message, "[routine] Morning triage · ") || !strings.Contains(internal.Message, "\n\ncheck the inbox\n\n") || !strings.HasSuffix(internal.Message, "unless the routine says to stay quiet.") {
-		t.Fatalf("routine turn = %+v", internal)
+	if _, ok, err := service.FinishThread(bot.ID, loops.RunStatusOK, ""); err != nil || ok {
+		t.Fatalf("another turn ending in the bot's thread closed the routine's run: %v, %v", ok, err)
 	}
-	if spawned.Slug != "" {
-		t.Fatalf("a bot routine spawned its own thread: %+v", spawned)
+	bots.release <- acp.Job{ID: bot.ID, State: acp.StateFailed, Error: "sign-in expired"}
+	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusError)
+	if manager.spawned.Slug != "" {
+		t.Fatalf("a bot routine spawned its own thread: %+v", manager.spawned)
 	}
-	events, err := store.LoadSessionEvents(bot.ID)
-	if err != nil || len(events) == 0 || events[len(events)-1].BotActivity == nil || events[len(events)-1].BotActivity.Label != "Morning triage" {
-		t.Fatalf("bot thread events = %+v, %v", events, err)
-	}
-	if _, ok, err := service.FinishThread(bot.ID, loops.RunStatusOK, ""); err != nil || !ok {
-		t.Fatalf("finish routine turn = %v, %v", ok, err)
-	}
-	waitForLoopRun(t, service, loop.ID, run.ID, loops.RunStatusOK)
+}
+
+type fakeBotRoutines struct {
+	called  chan []string
+	release chan acp.Job
+}
+
+func (f *fakeBotRoutines) RunRoutine(_ context.Context, botID, name, prompt string) (acp.Job, error) {
+	f.called <- []string{botID, name, prompt}
+	return <-f.release, nil
 }
 
 type fakeLoopExecutor struct {

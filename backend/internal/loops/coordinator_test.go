@@ -12,7 +12,7 @@ func TestCoordinatorCreateEmptyThreadAssignsBoardsButSkipsCard(t *testing.T) {
 	sink := &fakeEventSink{}
 	c := Coordinator{Loops: svc, Boards: boards, Card: CardSink{Store: sink, Bus: sink}}
 
-	loop, err := c.Create(CreateLoop{Name: "News", Runtime: RuntimeACP}, []string{"board-1"}, "")
+	loop, err := c.Create(CreateLoop{Name: "News", Prompt: "news", Runtime: RuntimeACP, Schedule: Schedule{Expr: "13 * * * *"}}, []string{"board-1"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +34,7 @@ func TestCoordinatorCreateAnnouncesToThread(t *testing.T) {
 	c := Coordinator{Loops: svc, Boards: boards, Card: CardSink{Store: sink, Bus: sink}}
 
 	if _, err := c.Create(
-		CreateLoop{Name: "News", Runtime: RuntimeACP, Schedule: Schedule{Expr: "13 * * * *"}},
+		CreateLoop{Name: "News", Prompt: "news", Runtime: RuntimeACP, Schedule: Schedule{Expr: "13 * * * *"}},
 		[]string{"board-1"}, "thread-1",
 	); err != nil {
 		t.Fatal(err)
@@ -64,18 +64,24 @@ func TestCoordinatorRejectsBadBoardsBeforeCreate(t *testing.T) {
 func TestCoordinatorGivesBotsOnlyToLoopsOffBoards(t *testing.T) {
 	svc := &fakeMCPService{}
 	boards := &fakeBoardService{boards: []BoardSummary{{ID: "board-1", Name: "News"}}}
+	owners := 0
 	owner := func(threadID string, _ CreateLoop) (string, error) {
+		owners++
 		return "bot-" + threadID, nil
 	}
 	c := Coordinator{Loops: svc, Boards: boards, Owner: owner}
+	hourly := Schedule{Expr: "0 * * * *"}
 
-	if _, err := c.Create(CreateLoop{Name: "Clocks", BotID: "bot-x"}, []string{"board-1"}, "thread-1"); err != nil {
+	if _, err := c.Create(CreateLoop{Name: "Broken", Prompt: "triage", Schedule: Schedule{Expr: "every hour"}}, nil, "thread-1"); err == nil || owners != 0 {
+		t.Fatalf("a rejected routine picked an owner: %v, %d owners", err, owners)
+	}
+	if _, err := c.Create(CreateLoop{Name: "Clocks", Prompt: "clocks", BotID: "bot-x", Schedule: hourly}, []string{"board-1"}, "thread-1"); err != nil {
 		t.Fatal(err)
 	}
 	if svc.created.BotID != "" {
 		t.Fatalf("a board widget was given bot %q", svc.created.BotID)
 	}
-	if _, err := c.Create(CreateLoop{Name: "Triage"}, nil, "thread-1"); err != nil {
+	if _, err := c.Create(CreateLoop{Name: "Triage", Prompt: "triage", Schedule: hourly}, nil, "thread-1"); err != nil {
 		t.Fatal(err)
 	}
 	if svc.created.BotID != "bot-thread-1" {

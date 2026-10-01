@@ -25,6 +25,7 @@ import (
 	"github.com/wins/jaz/backend/internal/coordinator"
 	"github.com/wins/jaz/backend/internal/deviceauth"
 	botsapi "github.com/wins/jaz/backend/internal/httpapi/bots"
+	hooksapi "github.com/wins/jaz/backend/internal/httpapi/hooks"
 	"github.com/wins/jaz/backend/internal/integrationingest"
 	"github.com/wins/jaz/backend/internal/jaztools"
 	"github.com/wins/jaz/backend/internal/loops"
@@ -309,6 +310,7 @@ func startServer(
 		loops.WithArtifactSurface(widgetService.LoopArtifactSurface),
 	)
 	botService := bots.NewService(store, layout.Bots, manager, loopService, events, logger)
+	loopRunner.Bots = botService
 	jazTools.SetLoops(loopService,
 		loops.WithBoards(widgetService.LoopBoards()),
 		loops.WithAgentNames(manager.Agents),
@@ -316,9 +318,8 @@ func startServer(
 		loops.WithOwner(botService.RoutineOwner),
 	)
 	jazTools.SetBots(bots.NewMCPTools(botService))
-	botsAPI := botsapi.NewHandler(botService, loopService)
-	handler.Routes = append(handler.Routes, app.BotRoutes(botsAPI)...)
-	handler.PublicRoutes = append(handler.PublicRoutes, app.BotWebhookRoute(botsAPI))
+	handler.Routes = append(handler.Routes, app.BotRoutes(botsapi.NewHandler(botService))...)
+	handler.PublicRoutes = append(handler.PublicRoutes, app.HookRoute(hooksapi.NewHandler(loopService)))
 	handler.RoutineOwner = botService.RoutineOwner
 	recordObservers.Add(loopService.HandleIncoming)
 	jazTools.SetThreads(threadService)
@@ -384,11 +385,10 @@ func startServer(
 				logger.WithPrefix("slack-sync").Warn("slack sync failed", "error", err)
 			})
 			go func() {
+				// Ownerless loops get their bots before the scheduler can run them.
 				if err := botService.AdoptLoops(loopCtx); err != nil {
 					logger.WithPrefix("bots").Error("adopting loops failed", "error", err)
 				}
-			}()
-			go func() {
 				if err := loops.StartScheduler(loopCtx, loopService, 30*time.Second); err != nil && loopCtx.Err() == nil {
 					logger.WithPrefix("loops").Error("scheduler stopped", "error", err)
 				}
@@ -425,14 +425,8 @@ func finishLoopFromACP(service *loops.Service, widgetPublisher *widgets.SessionP
 	if service == nil || job.ID == "" {
 		return
 	}
-	status := loops.RunStatusOK
+	status := server.LoopRunStatus(job.State)
 	errText := job.Error
-	switch job.State {
-	case acp.StateFailed:
-		status = loops.RunStatusError
-	case acp.StateCancelled:
-		status = loops.RunStatusCancelled
-	}
 	if status == loops.RunStatusOK {
 		if err := requireWidgetRunPublished(widgetPublisher, job.ID); err != nil {
 			status = loops.RunStatusError

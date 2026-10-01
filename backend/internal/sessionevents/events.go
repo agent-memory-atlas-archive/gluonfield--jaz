@@ -266,69 +266,27 @@ func (e *Event) NormalizePayload() {
 func (e Event) StorageContent() string {
 	switch e.Type {
 	case TypeVoiceMessage:
-		if e.Voice != nil {
-			if data, err := json.Marshal(e.Voice); err == nil {
-				return string(data)
-			}
-		}
+		return encodeContent(e.Content, e.Voice)
 	case TypeAgentSession:
-		if e.AgentSession != nil {
-			if data, err := json.Marshal(e.AgentSession); err == nil {
-				return string(data)
-			}
-		}
+		return encodeContent(e.Content, e.AgentSession)
 	case TypeAgentTask:
-		if e.AgentTask != nil {
-			if data, err := json.Marshal(e.AgentTask); err == nil {
-				return string(data)
-			}
-		}
+		return encodeContent(e.Content, e.AgentTask)
 	case TypeArtifact:
-		if e.Artifact == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.Artifact); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.Artifact)
 	case TypeLoopCreated:
-		if e.LoopCreated == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.LoopCreated); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.LoopCreated)
 	case TypeBotActivity:
 		return encodeContent(e.Content, e.BotActivity)
 	case TypeRoomMessage:
 		return encodeContent(e.Content, e.RoomMessage)
 	case TypeMCPApp:
-		if e.MCPApp == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.MCPApp); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.MCPApp)
 	case TypeProviderSubagent:
-		if e.ProviderSubagent == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.ProviderSubagent); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.ProviderSubagent)
 	case TypeSideChatMessage:
-		if e.SideChat == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.SideChat); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.SideChat)
 	case TypeGoalUpdate:
-		if e.Goal == nil {
-			return e.Content
-		}
-		if data, err := json.Marshal(e.Goal); err == nil {
-			return string(data)
-		}
+		return encodeContent(e.Content, e.Goal)
 	case TypeGoalClear:
 		return ""
 	}

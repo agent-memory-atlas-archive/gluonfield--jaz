@@ -17,13 +17,13 @@ import (
 )
 
 type Service struct {
-	Store Store
-	// Homes is where each bot's own directory lives, named after its id.
-	Homes    string
-	Threads  Threads
-	Routines Routines
-	Events   Publisher
-	Log      *log.Logger
+	store Store
+	// homes is where each bot's own directory lives, named after its id.
+	homes    string
+	threads  Threads
+	routines Routines
+	events   Publisher
+	log      *log.Logger
 
 	mu        sync.Mutex
 	voices    map[string]*voice
@@ -34,15 +34,25 @@ type Service struct {
 }
 
 func NewService(store Store, homes string, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {
-	return &Service{Store: store, Homes: homes, Threads: threads, Routines: routines, Events: events, Log: logger.WithPrefix("bots")}
+	return &Service{
+		store:     store,
+		homes:     homes,
+		threads:   threads,
+		routines:  routines,
+		events:    events,
+		log:       logger.WithPrefix("bots"),
+		voices:    map[string]*voice{},
+		followUps: map[string]int{},
+		waking:    map[string]bool{},
+	}
 }
 
 func (s *Service) List() ([]Bot, error) {
-	records, err := s.Store.ListBots()
+	records, err := s.store.ListBots()
 	if err != nil {
 		return nil, err
 	}
-	sessions, err := s.Store.ListSessions(storage.SessionFilter{SourceType: storage.SourceBot, IncludeSourced: true})
+	sessions, err := s.store.ListSessions(storage.SessionFilter{SourceType: storage.SourceBot, IncludeSourced: true})
 	if err != nil {
 		return nil, err
 	}
@@ -80,25 +90,28 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 	if name == "" {
 		return Bot{}, errors.New("name is required")
 	}
-	avatar, err := normalizeAvatar(input.Avatar)
-	if err != nil {
-		return Bot{}, err
+	avatar := randomAvatar()
+	if input.Avatar != nil {
+		if err := checkAvatar(*input.Avatar); err != nil {
+			return Bot{}, err
+		}
+		avatar = *input.Avatar
 	}
-	session, err := s.Threads.CreateSession(ctx, acp.SpawnRequest{
+	session, err := s.threads.CreateSession(ctx, acp.SpawnRequest{
 		ACPAgent:   strings.TrimSpace(input.Agent),
 		Slug:       "bot " + name,
 		Title:      name,
-		Home:       s.Homes,
+		Home:       s.homes,
 		Model:      strings.TrimSpace(input.Model),
 		SourceType: storage.SourceBot,
 	})
 	if err != nil {
 		return Bot{}, err
 	}
-	if err := s.Store.UpdateSessionTitle(session.ID, name); err != nil {
+	if err := s.store.UpdateSessionTitle(session.ID, name); err != nil {
 		return Bot{}, err
 	}
-	if err := s.Store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Shape: avatar.Shape, Color: avatar.Color}); err != nil {
+	if err := s.store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Shape: avatar.Shape, Color: avatar.Color}); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(session.ID)
@@ -113,7 +126,7 @@ func (s *Service) CreateGroup(name string, members []string) (Bot, error) {
 	if err != nil {
 		return Bot{}, err
 	}
-	session, err := s.Store.CreateSession(storage.CreateSession{
+	session, err := s.store.CreateSession(storage.CreateSession{
 		Slug:       "group " + name,
 		Title:      name,
 		Runtime:    storage.RuntimeACP,
@@ -122,8 +135,8 @@ func (s *Service) CreateGroup(name string, members []string) (Bot, error) {
 	if err != nil {
 		return Bot{}, err
 	}
-	avatar, _ := normalizeAvatar(nil)
-	if err := s.Store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindGroup, Shape: avatar.Shape, Color: avatar.Color, Members: members}); err != nil {
+	avatar := randomAvatar()
+	if err := s.store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindGroup, Shape: avatar.Shape, Color: avatar.Color, Members: members}); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(session.ID)
@@ -137,45 +150,45 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	if (input.Agent != nil || input.Model != nil) && record.Kind != KindBot {
 		return Bot{}, errors.New("only a bot has an agent")
 	}
+	if input.Members != nil && record.Kind != KindGroup {
+		return Bot{}, errors.New("only a group has members")
+	}
 	if input.ReasoningEffort != "" && input.Model == nil {
 		return Bot{}, errors.New("a reasoning effort needs its model")
 	}
-	if input.Agent != nil {
-		if err := s.Threads.SwitchAgent(ctx, id, strings.TrimSpace(*input.Agent)); err != nil {
-			return Bot{}, err
-		}
-	}
-	if input.Model != nil {
-		if err := s.Threads.SetModel(ctx, id, strings.TrimSpace(*input.Model), strings.TrimSpace(input.ReasoningEffort)); err != nil {
-			return Bot{}, err
-		}
-	}
+	name := ""
 	if input.Name != nil {
-		name := strings.TrimSpace(*input.Name)
-		if name == "" {
+		if name = strings.TrimSpace(*input.Name); name == "" {
 			return Bot{}, errors.New("name is required")
-		}
-		if err := s.Store.UpdateSessionTitle(id, name); err != nil {
-			return Bot{}, err
 		}
 	}
 	if input.Avatar != nil {
-		avatar, err := normalizeAvatar(input.Avatar)
-		if err != nil {
+		if err := checkAvatar(*input.Avatar); err != nil {
 			return Bot{}, err
 		}
-		record.Shape = avatar.Shape
-		record.Color = avatar.Color
+		record.Shape, record.Color = input.Avatar.Shape, input.Avatar.Color
 	}
 	if input.Members != nil {
-		if record.Kind != KindGroup {
-			return Bot{}, errors.New("only a group has members")
-		}
 		if record.Members, err = s.memberBots(*input.Members); err != nil {
 			return Bot{}, err
 		}
 	}
-	if err := s.Store.SaveBot(record); err != nil {
+	if input.Agent != nil {
+		if err := s.threads.SwitchAgent(ctx, id, strings.TrimSpace(*input.Agent)); err != nil {
+			return Bot{}, err
+		}
+	}
+	if input.Model != nil {
+		if err := s.threads.SetModel(ctx, id, strings.TrimSpace(*input.Model), strings.TrimSpace(input.ReasoningEffort)); err != nil {
+			return Bot{}, err
+		}
+	}
+	if name != "" {
+		if err := s.store.UpdateSessionTitle(id, name); err != nil {
+			return Bot{}, err
+		}
+	}
+	if err := s.store.SaveBot(record); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(id)
@@ -183,7 +196,7 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 
 // Pin pins exactly ids, in that order, and unpins every other bot and group.
 func (s *Service) Pin(ids []string) error {
-	return s.Store.PinBots(ids)
+	return s.store.PinBots(ids)
 }
 
 // Delete archives the bot's thread, deletes the routines it owns and takes
@@ -192,7 +205,7 @@ func (s *Service) Delete(id string) error {
 	if _, _, err := s.load(id); err != nil {
 		return err
 	}
-	records, err := s.Store.ListBots()
+	records, err := s.store.ListBots()
 	if err != nil {
 		return err
 	}
@@ -201,11 +214,11 @@ func (s *Service) Delete(id string) error {
 			continue
 		}
 		group.Members = slices.DeleteFunc(group.Members, func(member string) bool { return member == id })
-		if err := s.Store.SaveBot(group); err != nil {
+		if err := s.store.SaveBot(group); err != nil {
 			return err
 		}
 	}
-	routines, err := s.Routines.List()
+	routines, err := s.routines.List()
 	if err != nil {
 		return err
 	}
@@ -213,21 +226,24 @@ func (s *Service) Delete(id string) error {
 		if routine.BotID != id {
 			continue
 		}
-		if err := s.Routines.Delete(routine.ID); err != nil {
+		if err := s.routines.Delete(routine.ID); err != nil {
 			return err
 		}
 	}
-	return s.Store.SetArchived(id, true)
+	return s.store.SetArchived(id, true)
 }
 
 // RoutineOwner returns the bot a new routine belongs to: the bot it names, the
-// bot whose thread created it, or else a new bot of its own.
+// bot whose thread or subtask created it, or else a new bot of its own.
 func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, error) {
 	if in.BotID != "" {
 		if !s.isBot(in.BotID) {
 			return "", fmt.Errorf("%s is not a bot", in.BotID)
 		}
 		return in.BotID, nil
+	}
+	if session, err := s.store.LoadSession(threadID); err == nil && session.SourceType == storage.SourceBotWorker {
+		threadID = session.SourceID
 	}
 	if s.isBot(threadID) {
 		return threadID, nil
@@ -243,19 +259,19 @@ func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, er
 // AdoptLoops gives every loop that has no owner and is not on a board a bot
 // of its own, so every routine lives with a bot or a board.
 func (s *Service) AdoptLoops(ctx context.Context) error {
-	routines, err := s.Routines.List()
+	routines, err := s.routines.List()
 	if err != nil {
 		return err
 	}
 	for _, routine := range routines {
-		if routine.BotID != "" || s.Routines.OnBoard(routine) {
+		if routine.BotID != "" || s.routines.OnBoard(routine) {
 			continue
 		}
 		bot, err := s.Create(ctx, CreateBot{Name: routine.Name, Agent: routine.ACPAgent, Model: routine.Model})
 		if err != nil {
 			return fmt.Errorf("adopt loop %s: %w", routine.ID, err)
 		}
-		if _, err := s.Routines.Update(routine.ID, loops.UpdateLoop{BotID: &bot.ID}); err != nil {
+		if _, err := s.routines.Update(routine.ID, loops.UpdateLoop{BotID: &bot.ID}); err != nil {
 			return fmt.Errorf("adopt loop %s: %w", routine.ID, err)
 		}
 	}
@@ -263,11 +279,11 @@ func (s *Service) AdoptLoops(ctx context.Context) error {
 }
 
 func (s *Service) load(id string) (storage.BotRecord, storage.Session, error) {
-	record, err := s.Store.LoadBot(id)
+	record, err := s.store.LoadBot(id)
 	if err != nil {
 		return storage.BotRecord{}, storage.Session{}, err
 	}
-	session, err := s.Store.LoadSession(id)
+	session, err := s.store.LoadSession(id)
 	if err != nil {
 		return storage.BotRecord{}, storage.Session{}, err
 	}
@@ -310,7 +326,7 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 // preview is the newest chat message in a bot's or group's thread; a group's
 // preview names its speaker.
 func (s *Service) preview(threadID string, group bool) string {
-	event, ok, err := s.Store.LoadLatestSessionEvent(threadID, sessionevents.TypeRoomMessage)
+	event, ok, err := s.store.LoadLatestSessionEvent(threadID, sessionevents.TypeRoomMessage)
 	if err != nil || !ok || event.RoomMessage == nil {
 		return ""
 	}
@@ -326,7 +342,7 @@ func (s *Service) preview(threadID string, group bool) string {
 }
 
 func (s *Service) routineCounts() (map[string]int, error) {
-	routines, err := s.Routines.List()
+	routines, err := s.routines.List()
 	if err != nil {
 		return nil, err
 	}
@@ -353,14 +369,15 @@ func (s *Service) memberBots(ids []string) ([]string, error) {
 	return members, nil
 }
 
-func normalizeAvatar(avatar *Avatar) (Avatar, error) {
-	if avatar == nil {
-		// A random face skips the neutral white and gray at the ends of colors.
-		vivid := colors[1 : len(colors)-1]
-		return Avatar{Shape: shapes[rand.IntN(len(shapes))], Color: vivid[rand.IntN(len(vivid))]}, nil
-	}
+// randomAvatar skips the neutral white and gray at the ends of colors.
+func randomAvatar() Avatar {
+	vivid := colors[1 : len(colors)-1]
+	return Avatar{Shape: shapes[rand.IntN(len(shapes))], Color: vivid[rand.IntN(len(vivid))]}
+}
+
+func checkAvatar(avatar Avatar) error {
 	if !slices.Contains(shapes, avatar.Shape) || !slices.Contains(colors, avatar.Color) {
-		return Avatar{}, fmt.Errorf("unsupported avatar %s/%s", avatar.Shape, avatar.Color)
+		return fmt.Errorf("unsupported avatar %s/%s", avatar.Shape, avatar.Color)
 	}
-	return *avatar, nil
+	return nil
 }

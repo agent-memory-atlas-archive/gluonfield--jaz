@@ -19,9 +19,6 @@ func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg A
 	if branch != "" && !req.Worktree {
 		return "", "", fmt.Errorf("branch requires worktree=true")
 	}
-	if req.Home != "" && (directory != "" || req.Worktree) {
-		return "", "", fmt.Errorf("a home cannot also take a directory or worktree")
-	}
 	workspace, err := m.resolveCwd("")
 	if err != nil {
 		return "", "", err

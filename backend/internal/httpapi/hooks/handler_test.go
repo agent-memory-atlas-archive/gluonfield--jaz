@@ -1,4 +1,4 @@
-package bots
+package hooks
 
 import (
 	"context"
@@ -33,11 +33,11 @@ func (f *fakeRoutines) RunTriggered(_ context.Context, _ string, event string) (
 func TestWebhookRunsRoutineOnlyWithItsSecret(t *testing.T) {
 	secret := "s3cret"
 	sum := sha256.Sum256([]byte(secret))
-	routines := &fakeRoutines{loop: loops.Loop{ID: "loop-1", Trigger: &loops.Trigger{Kind: loops.TriggerWebhook}, WebhookHash: hex.EncodeToString(sum[:])}}
+	routines := &fakeRoutines{loop: loops.Loop{ID: "loop-1", Status: loops.StatusPaused, Trigger: &loops.Trigger{Kind: loops.TriggerWebhook}, WebhookHash: hex.EncodeToString(sum[:])}}
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/hooks/{routine}", NewHandler(nil, routines).Webhook)
+	mux.HandleFunc("POST /v1/hooks/{routine}", NewHandler(routines).Webhook)
 
-	for _, auth := range []string{"", "Bearer wrong"} {
+	for _, auth := range []string{"Bearer " + secret, "", "Bearer wrong"} {
 		request := httptest.NewRequest(http.MethodPost, "/v1/hooks/loop-1", strings.NewReader("{}"))
 		request.Header.Set("Authorization", auth)
 		response := httptest.NewRecorder()
@@ -45,6 +45,7 @@ func TestWebhookRunsRoutineOnlyWithItsSecret(t *testing.T) {
 		if response.Code != http.StatusNotFound {
 			t.Fatalf("auth %q = %d, want 404", auth, response.Code)
 		}
+		routines.loop.Status = loops.StatusActive
 	}
 	request := httptest.NewRequest(http.MethodPost, "/v1/hooks/loop-1", strings.NewReader(`{"status":"deployed"}`))
 	request.Header.Set("Authorization", "Bearer "+secret)

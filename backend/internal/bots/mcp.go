@@ -2,8 +2,6 @@ package bots
 
 import (
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/mcpsession"
@@ -74,11 +72,7 @@ type MCPMessageOutput struct {
 }
 
 func (t *MCPTools) Message(_ context.Context, req *mcp.CallToolRequest, input MCPMessageInput) (*mcp.CallToolResult, MCPMessageOutput, error) {
-	id, err := t.resolve(input.Bot)
-	if err != nil {
-		return nil, MCPMessageOutput{}, err
-	}
-	if err := t.service.Message(mcpsession.SessionID(req), id, input.Message); err != nil {
+	if err := t.service.Message(mcpsession.SessionID(req), input.Bot, input.Message); err != nil {
 		return nil, MCPMessageOutput{}, err
 	}
 	return nil, MCPMessageOutput{Delivered: true}, nil
@@ -97,18 +91,4 @@ func (t *MCPTools) Send(_ context.Context, req *mcp.CallToolRequest, input MCPSe
 		return nil, MCPSendOutput{}, err
 	}
 	return nil, MCPSendOutput{Sent: true}, nil
-}
-
-func (t *MCPTools) resolve(ref string) (string, error) {
-	ref = strings.TrimPrefix(strings.TrimSpace(ref), "bot:")
-	bots, err := t.service.List()
-	if err != nil {
-		return "", err
-	}
-	for _, bot := range bots {
-		if bot.ID == ref || strings.EqualFold(bot.Name, ref) {
-			return bot.ID, nil
-		}
-	}
-	return "", fmt.Errorf("no bot or group named %q", ref)
 }

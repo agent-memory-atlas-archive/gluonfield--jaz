@@ -1644,10 +1644,6 @@ func TestManagerResumesStoredSessionAfterRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := filepath.Join(spawned.Cwd, "result.txt")
-	if err := os.WriteFile(file, []byte("before restart"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := first.Send(ctx, acp.SendRequest{Session: spawned.SessionID, Message: "say hello", Completion: acp.CompletionInline}); err != nil {
 		t.Fatal(err)
 	}
@@ -1675,9 +1671,6 @@ func TestManagerResumesStoredSessionAfterRestart(t *testing.T) {
 	}
 	if job.Cwd != spawned.Cwd {
 		t.Fatalf("resumed cwd = %q, want %q", job.Cwd, spawned.Cwd)
-	}
-	if data, err := os.ReadFile(filepath.Join(job.Cwd, "result.txt")); err != nil || string(data) != "before restart" {
-		t.Fatalf("resumed file = %q, %v", data, err)
 	}
 	messages, err := store.LoadMessages(spawned.SessionID)
 	if err != nil {

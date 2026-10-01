@@ -9,24 +9,23 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/loops"
-	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
 type LoopRunner struct {
-	store  storage.Store
-	acp    ACPManager
-	events *sessionevents.Bus
-	log    *log.Logger
+	acp ACPManager
+	log *log.Logger
+	// Bots runs the routines that live in a bot's thread.
+	Bots BotRoutines
+}
+
+// BotRoutines runs a routine as a turn in its bot's thread.
+type BotRoutines interface {
+	RunRoutine(ctx context.Context, botID, name, prompt string) (acp.Job, error)
 }
 
 func NewLoopRunner(server *Server) *LoopRunner {
-	return &LoopRunner{
-		store:  server.Store,
-		acp:    server.ACP,
-		events: server.Events,
-		log:    server.logger().WithPrefix("loops"),
-	}
+	return &LoopRunner{acp: server.ACP, log: server.logger().WithPrefix("loops")}
 }
 
 func (r *LoopRunner) StartLoopRun(_ context.Context, execution loops.Execution) {
@@ -91,32 +90,32 @@ func (r *LoopRunner) startACPLoopRun(execution loops.Execution) {
 	}
 }
 
-// startBotTurn runs a routine as a hidden turn in its bot's thread once the
-// thread is free. The run closes when that turn finishes, like any loop run.
+// startBotTurn runs a routine in its bot's thread and closes the run when that
+// turn ends. The run records no thread: the bot's thread outlives it, so that
+// thread's turn endings cannot tell which run they close.
 func (r *LoopRunner) startBotTurn(execution loops.Execution) {
-	loop := execution.Loop
+	if err := execution.Controller.MarkRunning(execution.Run.ID, ""); err != nil {
+		r.logger().Error("mark routine run running failed", "run", execution.Run.ID, "bot", execution.Thread, "error", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 	defer cancel()
-	job, err := r.acp.StartInternalTurnWhenIdle(ctx, acp.InternalTurnRequest{Session: execution.Thread, Message: execution.Prompt, AllowSilence: true})
+	job, err := r.Bots.RunRoutine(ctx, execution.Thread, execution.Loop.Name, execution.Prompt)
 	if err != nil {
 		r.finishLoopRun(execution, loops.RunStatusError, err.Error())
 		return
 	}
-	r.announce(execution.Thread, sessionevents.BotActivityEvent{Kind: "routine", Label: loop.Name})
-	if err := execution.Controller.MarkRunning(execution.Run.ID, job.ID); err != nil {
-		r.logger().Error("mark routine run running failed", "run", execution.Run.ID, "bot", execution.Thread, "error", err)
-	}
+	r.finishLoopRun(execution, LoopRunStatus(job.State), job.Error)
 }
 
-func (r *LoopRunner) announce(threadID string, activity sessionevents.BotActivityEvent) {
-	events := []sessionevents.Event{{SessionID: threadID, Type: sessionevents.TypeBotActivity, BotActivity: &activity, At: time.Now().UTC()}}
-	if err := r.store.AppendSessionEvents(threadID, events...); err != nil {
-		r.logger().Warn("append bot activity failed", "thread", threadID, "error", err)
-		return
+// LoopRunStatus is the status a finished turn gives the loop run it served.
+func LoopRunStatus(state string) string {
+	switch state {
+	case acp.StateFailed:
+		return loops.RunStatusError
+	case acp.StateCancelled:
+		return loops.RunStatusCancelled
 	}
-	if r.events != nil {
-		r.events.Publish(events[0])
-	}
+	return loops.RunStatusOK
 }
 
 func (r *LoopRunner) finishLoopRun(execution loops.Execution, status, errText string) {

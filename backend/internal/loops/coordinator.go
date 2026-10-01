@@ -55,6 +55,10 @@ func (c Coordinator) Create(in CreateLoop, boardIDs []string, threadID string) (
 	if err := c.validateBoards(boardIDs); err != nil {
 		return Loop{}, err
 	}
+	// Validate before picking an owner, which may create a bot.
+	if _, _, err := NormalizeCreate(in, time.Now()); err != nil {
+		return Loop{}, err
+	}
 	if len(boardIDs) > 0 {
 		in.BotID = ""
 	} else if c.Owner != nil {

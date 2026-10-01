@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wins/jaz/backend/internal/integrationingest"
 	"github.com/wins/jaz/backend/internal/loops"
 	"github.com/wins/jaz/backend/internal/storage"
 )
@@ -521,5 +522,39 @@ func TestLoopReasoningEffortAndDirectoryRoundTrip(t *testing.T) {
 		ReasoningEffort: "extreme",
 	}); err == nil {
 		t.Fatal("expected invalid reasoning effort to error")
+	}
+}
+
+type executionRecorder chan loops.Execution
+
+func (r executionRecorder) StartLoopRun(_ context.Context, execution loops.Execution) {
+	r <- execution
+}
+
+func TestMessagesInOneSyncFireTheirRoutineOnce(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	runs := make(executionRecorder, 2)
+	service := newLoopServiceForTest(store, runs)
+	routine, err := service.Create(loops.CreateLoop{Prompt: "triage quotes", Trigger: &loops.Trigger{Kind: loops.TriggerGmail, Contains: "quote"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().UTC()
+	service.HandleIncoming(context.Background(), []integrationingest.Incoming{
+		{Provider: "gmail", ID: "m1", From: "ujjwal", Subject: "First quote", At: at},
+		{Provider: "gmail", ID: "m2", From: "dennis", Subject: "Second quote", At: at},
+	})
+	execution := <-runs
+	if execution.Loop.ID != routine.ID || !strings.Contains(execution.Prompt, "First quote") || !strings.Contains(execution.Prompt, "Second quote") {
+		t.Fatalf("triggered run prompt = %q", execution.Prompt)
+	}
+	select {
+	case extra := <-runs:
+		t.Fatalf("one sync started a second run: %q", extra.Prompt)
+	case <-time.After(50 * time.Millisecond):
 	}
 }

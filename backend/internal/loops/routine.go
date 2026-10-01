@@ -12,9 +12,7 @@ import (
 
 // runPrompt is what a run sends: what fired it, then the routine's prompt. A
 // turn in the bot's own thread is also labelled with the routine and the local
-// time, which a run in a fresh thread gets from its system prompt, and says
-// how the bot is heard, as its other turns do: a bot whose prompt predates that
-// rule would otherwise answer in private text.
+// time, which a run in a fresh thread gets from its system prompt.
 func runPrompt(loop Loop, now time.Time, event string, inThread bool) string {
 	var b strings.Builder
 	if inThread {
@@ -31,9 +29,6 @@ func runPrompt(loop Loop, now time.Time, event string, inThread bool) string {
 		b.WriteString("\n")
 	}
 	b.WriteString(loop.Prompt)
-	if inThread {
-		b.WriteString("\n\nThe user wants this routine's outcome: send it with send_message, the only thing they see, unless the routine says to stay quiet.")
-	}
 	return b.String()
 }
 
@@ -50,9 +45,10 @@ func ensureWebhookSecret(loop *Loop) {
 	loop.WebhookSecret = secret
 }
 
-// VerifyWebhookSecret reports whether secret opens loop's webhook trigger.
+// VerifyWebhookSecret reports whether secret opens loop's webhook trigger,
+// which only an active routine has.
 func VerifyWebhookSecret(loop Loop, secret string) bool {
-	if loop.Trigger == nil || loop.Trigger.Kind != TriggerWebhook || loop.WebhookHash == "" || secret == "" {
+	if loop.Status != StatusActive || loop.Trigger == nil || loop.Trigger.Kind != TriggerWebhook || loop.WebhookHash == "" || secret == "" {
 		return false
 	}
 	return subtle.ConstantTimeCompare([]byte(hashSecret(secret)), []byte(loop.WebhookHash)) == 1

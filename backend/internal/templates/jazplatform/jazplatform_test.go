@@ -7,6 +7,25 @@ import (
 	"github.com/wins/jaz/backend/internal/connections"
 )
 
+// A turn's date, time and directory close the prompt, so everything before
+// them stays byte-identical across turns and the provider's prompt cache holds.
+func TestTurnContextClosesThePrompt(t *testing.T) {
+	data := Data{Agents: "agents", Date: "June 16, 2026", Time: "12:34:56 BST", Timezone: "BST (UTC+01:00)", Weekday: "Tuesday", Human: "Tuesday, June 16, 2026 at 12:34:56 BST", Cwd: "/tmp/a", Skills: "skills-block"}
+	first, err := Render(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data.Date, data.Time, data.Weekday, data.Human, data.Cwd = "June 17, 2026", "08:00:00 BST", "Wednesday", "Wednesday, June 17, 2026 at 08:00:00 BST", "/tmp/b"
+	second, err := Render(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cut := strings.Index(first, "Date: June 16, 2026")
+	if cut < 0 || !strings.HasPrefix(second, first[:cut]) || !strings.Contains(second[cut:], "/tmp/b") {
+		t.Fatalf("the turn context changed the prompt before its end:\n%s\n---\n%s", first, second)
+	}
+}
+
 func TestRenderNamesEverySurfaceExplicitly(t *testing.T) {
 	prompt, err := Render(Data{
 		Agents:     "agents",
@@ -100,13 +119,6 @@ func TestRenderNamesEverySurfaceExplicitly(t *testing.T) {
 		"## memory/LONG_TERM.md\n\n- Goal: $5m.",
 		"## memory/SHORT_TERM.md\n\n- Focus: jaz memory.",
 		"## memory/daily/2026-06-11.md\n\n- shipped templates",
-		"Date: June 16, 2026",
-		"Time: 12:34:56 BST",
-		"Timezone: BST (UTC+01:00)",
-		"Weekday: Tuesday",
-		"Now: Tuesday, June 16, 2026 at 12:34:56 BST",
-		"Current working directory: /tmp/jaz/workspaces/default/.worktrees/task",
-		"Device: Desktop",
 	)
 	if strings.Contains(prompt, "You are Jaz") {
 		t.Fatalf("platform prompt must not carry the coordinator identity:\n%s", prompt)

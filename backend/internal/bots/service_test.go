@@ -288,6 +288,10 @@ func TestRoutineOwnerChecksNamedBotsKeepsBotThreadAndGivesOtherThreadsANewBot(t 
 	if owner, err := service.RoutineOwner("chat-thread", loops.CreateLoop{BotID: "gimli"}); err != nil || owner != "gimli" {
 		t.Fatalf("named owner = %q, %v", owner, err)
 	}
+	world.sessions["research"] = storage.Session{ID: "research", SourceType: storage.SourceBotWorker, SourceID: "gimli"}
+	if owner, err := service.RoutineOwner("research", loops.CreateLoop{Name: "Watch"}); err != nil || owner != "gimli" || len(world.created) != 1 {
+		t.Fatalf("a subtask's routine went to %q (%v), %d bots created", owner, err, len(world.created))
+	}
 	world.sessions["crew"] = storage.Session{ID: "crew", Title: "Crew"}
 	world.records["crew"] = storage.BotRecord{ThreadID: "crew", Kind: KindGroup}
 	for _, named := range []string{"crew", "missing"} {
@@ -406,24 +410,36 @@ func TestASlowMemberDoesNotHoldUpTheOthers(t *testing.T) {
 	waitUntil(t, func() bool { return slices.Contains(world.roomMessages(group.ID), "Research: Here is a meme.") })
 }
 
-func TestGroupMentionPicksResponders(t *testing.T) {
+func TestUpdateChangesNothingWhenAnyPartIsInvalid(t *testing.T) {
 	world := newFakeWorld()
-	world.addBot("a", "Research")
-	world.addBot("b", "Marketing")
+	world.addBot("gimli", "Gimli")
 	service := newTestService(world)
-	group, err := service.CreateGroup("Launch", []string{"a", "b"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	world.replies["b"] = []string{"On it."}
 
-	if err := service.Post(group.ID, "[@Marketing](bot:b) draft the post"); err != nil {
-		t.Fatal(err)
+	name := "Thorin"
+	if _, err := service.Update(t.Context(), "gimli", UpdateBot{Name: &name, Avatar: &Avatar{Shape: "blob", Color: "plaid"}}); err == nil {
+		t.Fatal("an unsupported avatar was accepted")
 	}
-	waitUntil(t, func() bool { return world.promptCount("b") == 1 })
-	time.Sleep(20 * time.Millisecond)
-	if world.promptCount("a") != 0 {
-		t.Fatal("an unmentioned member took a turn")
+	if title := world.sessions["gimli"].Title; title != "Gimli" {
+		t.Fatalf("a rejected update renamed the bot to %q", title)
+	}
+}
+
+func TestRoutineRunsAsAnnouncedTurnInItsBotsThread(t *testing.T) {
+	world := newFakeWorld()
+	world.addBot("gimli", "Gimli")
+	service := newTestService(world)
+
+	job, err := service.RunRoutine(t.Context(), "gimli", "Digest", "summarise the inbox")
+	if err != nil || job.State != acp.StateIdle {
+		t.Fatalf("routine turn = %+v, %v", job, err)
+	}
+	world.mu.Lock()
+	defer world.mu.Unlock()
+	if prompts := world.prompts["gimli"]; len(prompts) != 1 || !strings.HasPrefix(prompts[0], "summarise the inbox") {
+		t.Fatalf("routine prompts = %q", prompts)
+	}
+	if events := world.events["gimli"]; len(events) != 1 || events[0].BotActivity == nil || events[0].BotActivity.Kind != "routine" || events[0].BotActivity.Label != "Digest" {
+		t.Fatalf("bot chat events = %+v", events)
 	}
 }
 
@@ -443,7 +459,7 @@ func TestMessageRelaysReplyToSender(t *testing.T) {
 	if asked := world.prompts["egg"][0]; !strings.HasPrefix(asked, "[message from Gimli]") || !strings.Contains(asked, "What model do you run on?") {
 		t.Fatalf("recipient prompt = %q", asked)
 	}
-	if relayed := world.prompts["gimli"][0]; !strings.HasPrefix(relayed, "[reply from dr eggbot]") || !strings.Contains(relayed, "temporal harness") {
+	if relayed := world.prompts["gimli"][0]; !strings.HasPrefix(relayed, "[reply from dr eggbot]") || !strings.Contains(relayed, "temporal harness") || strings.Contains(relayed, "private notes") {
 		t.Fatalf("relayed reply = %q", relayed)
 	}
 	if len(world.published) == 0 {

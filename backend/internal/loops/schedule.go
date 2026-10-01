@@ -1,6 +1,7 @@
 package loops
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,6 +11,10 @@ import (
 )
 
 var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+
+// errEventWithoutTrigger rejects a routine that waits for an event no trigger
+// can deliver, so it would never run.
+var errEventWithoutTrigger = errors.New("an event schedule needs a trigger")
 
 func NormalizeCreate(input CreateLoop, now time.Time) (CreateLoop, time.Time, error) {
 	input.Name = strings.TrimSpace(input.Name)
@@ -46,6 +51,8 @@ func NormalizeCreate(input CreateLoop, now time.Time) (CreateLoop, time.Time, er
 	input.Trigger = trigger
 	if trigger != nil {
 		input.Schedule = Schedule{Kind: ScheduleEvent}
+	} else if strings.TrimSpace(input.Schedule.Kind) == ScheduleEvent {
+		return input, time.Time{}, errEventWithoutTrigger
 	}
 	schedule, next, err := NormalizeSchedule(input.Schedule, now)
 	if err != nil {
@@ -122,6 +129,9 @@ func NormalizeUpdate(current Loop, input UpdateLoop, now time.Time) (Loop, bool,
 			next.Trigger = nil
 		}
 		reschedule = true
+	}
+	if next.Schedule.Kind == ScheduleEvent && next.Trigger == nil {
+		return next, false, errEventWithoutTrigger
 	}
 	if next.Status == StatusActive && next.NextRunAt.IsZero() {
 		reschedule = true

@@ -43,7 +43,9 @@ func (s *Service) Post(groupID, text string) error {
 // member when the user or an outsider wrote it, and nobody when a member did:
 // bots follow up on each other only when addressed.
 func (s *Service) post(group storage.BotRecord, name string, message sessionevents.RoomMessageEvent) error {
-	s.appendEvent(sessionevents.Event{SessionID: group.ThreadID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()})
+	if err := s.appendEvent(sessionevents.Event{SessionID: group.ThreadID, Type: sessionevents.TypeRoomMessage, RoomMessage: &message, At: time.Now().UTC()}); err != nil {
+		return err
+	}
 	fromMember := slices.Contains(group.Members, message.BotID)
 	wake := group.Members
 	if mentioned := mentions(message.Text); len(mentioned) > 0 {
@@ -53,9 +55,6 @@ func (s *Service) post(group storage.BotRecord, name string, message sessioneven
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.followUps == nil {
-		s.followUps = make(map[string]int)
-	}
 	if !fromMember {
 		s.followUps[group.ThreadID] = 0
 	}
@@ -84,9 +83,6 @@ func (s *Service) wakeLocked(groupID, name, member string) {
 		s.waking[key] = true
 		return
 	}
-	if s.waking == nil {
-		s.waking = make(map[string]bool)
-	}
 	s.waking[key] = false
 	go s.takeTurns(key, groupID, name, member)
 }
@@ -98,7 +94,7 @@ func (s *Service) takeTurns(key, groupID, name, member string) {
 		s.waking[key] = false
 		s.mu.Unlock()
 		if err := s.memberTurn(groupID, name, member); err != nil {
-			s.Log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
+			s.log.Warn("group turn failed", "group", groupID, "member", member, "error", err)
 		}
 		s.mu.Lock()
 		owed := s.waking[key]
@@ -115,11 +111,11 @@ func (s *Service) takeTurns(key, groupID, name, member string) {
 // memberTurn gives member a turn in the group, in which it posts with
 // send_message.
 func (s *Service) memberTurn(groupID, name, member string) error {
-	record, err := s.Store.LoadBot(groupID)
+	record, err := s.store.LoadBot(groupID)
 	if err != nil {
 		return err
 	}
-	events, err := s.Store.LoadSessionEvents(groupID)
+	events, err := s.store.LoadSessionEvents(groupID)
 	if err != nil {
 		return err
 	}

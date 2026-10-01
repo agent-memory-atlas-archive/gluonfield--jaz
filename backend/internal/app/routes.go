@@ -17,6 +17,7 @@ import (
 	deviceapi "github.com/wins/jaz/backend/internal/httpapi/devices"
 	feedapi "github.com/wins/jaz/backend/internal/httpapi/feed"
 	filesystemapi "github.com/wins/jaz/backend/internal/httpapi/filesystem"
+	hooksapi "github.com/wins/jaz/backend/internal/httpapi/hooks"
 	mcpappsapi "github.com/wins/jaz/backend/internal/httpapi/mcpapps"
 	modelcapabilitiesapi "github.com/wins/jaz/backend/internal/httpapi/modelcapabilities"
 	previewapi "github.com/wins/jaz/backend/internal/httpapi/preview"
@@ -230,9 +231,9 @@ func BotRoutes(handler *botsapi.Handler) server.Routes {
 	}
 }
 
-// BotWebhookRoute serves routine webhooks without the device key: each
-// routine authenticates its callers with its own secret.
-func BotWebhookRoute(handler *botsapi.Handler) server.PublicRoute {
+// HookRoute serves routine webhooks without the device key: each routine
+// authenticates its callers with its own secret.
+func HookRoute(handler *hooksapi.Handler) server.PublicRoute {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/hooks/{routine}", handler.Webhook)
 	return server.PublicRoute{

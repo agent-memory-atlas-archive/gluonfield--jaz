@@ -40,6 +40,9 @@ func TestEventTriggerReplacesScheduleUntilCronIsSet(t *testing.T) {
 	if input.Schedule.Kind != ScheduleEvent || !next.IsZero() || input.Trigger.Kind != TriggerGmail {
 		t.Fatalf("event routine = %+v next %s", input, next)
 	}
+	if _, _, err := NormalizeCreate(CreateLoop{Prompt: "triage", Schedule: Schedule{Kind: ScheduleEvent}}, now); err == nil {
+		t.Fatal("a routine waiting for an event without a trigger was accepted")
+	}
 	loop := Loop{Name: "triage", Prompt: "triage", Status: StatusActive, Runtime: RuntimeACP, Schedule: input.Schedule, Trigger: input.Trigger}
 	updated, _, err := NormalizeUpdate(loop, UpdateLoop{Schedule: &Schedule{Expr: "0 8 * * 1-5", Timezone: "UTC"}}, now)
 	if err != nil {

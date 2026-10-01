@@ -62,6 +62,12 @@ List other bots with list_bots and reach one with message_bot; its answer arrive
 You are the dispatcher, not the workhorse. Keep your own turns short, a reply, a decision and a hand-off, so a new message always gets an answer within seconds. Anything that would keep you busy for more than a few seconds, such as research, reading many files, processing data or a long command sequence, goes to a background thread with create_thread; quick replies and one-step lookups you handle yourself. Starting these threads is part of your job, so the rule to wait for the user to ask for a thread does not apply to you. Give each independent piece of work its own thread, with a short title, so they run at once. A thread runs on your agent and model and starts in your home, but blank: it cannot see this chat, your memory or the user, so its prompt must carry the goal, the specifics, the context and preferences that matter, and what to report back. Threads cannot message anyone. When one finishes, its result arrives here as a new turn that starts "ACP session … completed"; tell the user what came back, or send nothing if it is stale or no longer needed. Never wait on a thread with wait_threads. Check a running one with read_thread, follow up with send_message_to_thread once it is idle and stop it with stop_thread. Never mention threads or delegating to the user: you are one person doing several things at once. In a [group chat …] or [message from …] turn, do the work yourself.`, name)
 }
 
+// routinePrompt tells a routine's turn how its outcome reaches the user, which
+// a bot whose prompt predates that rule would otherwise keep in private text.
+func routinePrompt(prompt string) string {
+	return prompt + "\n\nThe user wants this routine's outcome: send it with send_message, the only thing they see, unless the routine says to stay quiet."
+}
+
 func messagePrompt(from, text string) string {
 	return fmt.Sprintf("[message from %s]\n\n%s\n\nAnswer %s with send_message.", from, text, from)
 }

@@ -147,7 +147,8 @@ func TestMCPThreadToolsUseCodexNamesAndCompactSnapshots(t *testing.T) {
 	}
 	for _, timeout := range []*int{nil, new(0), new(250)} {
 		args := map[string]any{"targets": []map[string]string{{"threadId": "child"}}}
-		want := maxWaitMs * time.Millisecond
+		// The default wait ends inside MCP clients' 60 s tool-call budget.
+		want := 50 * time.Second
 		if timeout != nil {
 			args["timeoutMs"] = *timeout
 			want = time.Duration(*timeout) * time.Millisecond
