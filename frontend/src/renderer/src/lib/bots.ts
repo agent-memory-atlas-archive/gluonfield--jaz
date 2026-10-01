@@ -57,6 +57,21 @@ export function botSections(bots: Bot[], pins = pinOrder(bots)) {
   }
 }
 
+// The panel mid-drag: every bot where it would land, and the dragged bot also
+// left hidden where it started once its preview moves to the other section,
+// because the element a drag starts from must stay mounted for it to end.
+export function dragSections(bots: Bot[], pins: string[], drag?: { id: string; pins: string[] }) {
+  const { pinned, rest } = botSections(bots, drag?.pins ?? pins)
+  const tiles = pinned.map((bot) => ({ bot, hidden: false }))
+  const rows = rest.map((bot) => ({ bot, hidden: false }))
+  const source = drag && bots.find((bot) => bot.id === drag.id)
+  if (source && pins.includes(source.id) !== drag.pins.includes(source.id)) {
+    const origin = pins.includes(source.id) ? tiles : rows
+    origin.push({ bot: source, hidden: true })
+  }
+  return { tiles, rows }
+}
+
 // The pins with id moved beside target, after it when `after`; with no
 // target, id joins the end unless it is already pinned.
 export function placePin(pins: string[], id: string, target: string | undefined, after: boolean): string[] {

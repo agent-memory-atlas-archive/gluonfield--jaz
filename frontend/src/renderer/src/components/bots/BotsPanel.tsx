@@ -8,7 +8,7 @@ import { MarkdownText } from '@/components/session/MessageMarkdown'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { botAvatars, botSections, pinOrder, placePin } from '@/lib/bots'
+import { botAvatars, dragSections, pinOrder, placePin } from '@/lib/bots'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
 import { BotIcon } from './BotAvatar'
 import { BotMenu } from './BotMenu'
@@ -30,13 +30,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
   const pins = useMemo(() => pinOrder(list), [list])
   const pin = usePins()
   const [drag, setDrag] = useState<PinDrag | null>(null)
-  // A drag shows where the bot would land. The dragged element itself stays
-  // mounted, hidden, where it started, or the drag could not end.
-  const { pinned, rest } = botSections(list, drag?.pins ?? pins)
-  const source = drag && list.find((bot) => bot.id === drag.id)
-  const moved = Boolean(source && pins.includes(source.id) !== drag?.pins.includes(source.id))
-  const tiles = moved && source && pins.includes(source.id) ? [...pinned, source] : pinned
-  const rows = moved && source && !pins.includes(source.id) ? [...rest, source] : rest
+  const { tiles, rows } = dragSections(list, pins, drag ?? undefined)
   const startDrag = (id: string) => setDrag({ id, pins })
 
   return (
@@ -56,7 +50,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
             onDragOver={(e) => {
               if (!drag) return
               e.preventDefault()
-              const next = landing(e, drag, pinned.map((bot) => bot.id))
+              const next = landing(e, drag, tiles.flatMap(({ bot, hidden }) => (hidden ? [] : [bot.id])))
               if (next.join() !== drag.pins.join()) setDrag({ ...drag, pins: next })
             }}
             onDrop={(e) => {
@@ -71,16 +65,16 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
             {tiles.length ? (
               <div data-pins className="grid grid-cols-[repeat(auto-fill,80px)] gap-px">
                 <AnimatePresence initial={false} mode="popLayout">
-                  {tiles.map((bot) => (
-                    <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} hidden={moved && !pinned.includes(bot)} onDrag={startDrag} />
+                  {tiles.map(({ bot, hidden }) => (
+                    <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} hidden={hidden} onDrag={startDrag} />
                   ))}
                 </AnimatePresence>
               </div>
             ) : null}
             <div className="flex flex-col gap-0.5">
               <AnimatePresence initial={false} mode="popLayout">
-                {rows.map((bot) => (
-                  <BotEntry key={bot.id} bot={bot} bots={list} dragged={drag?.id === bot.id} hidden={moved && !rest.includes(bot)} onDrag={startDrag} />
+                {rows.map(({ bot, hidden }) => (
+                  <BotEntry key={bot.id} bot={bot} bots={list} dragged={drag?.id === bot.id} hidden={hidden} onDrag={startDrag} />
                 ))}
               </AnimatePresence>
             </div>

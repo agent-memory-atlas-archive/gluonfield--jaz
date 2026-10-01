@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { botChat, placePin } from './bots'
+import { botChat, dragSections, placePin } from './bots'
 
 describe('bot chat log', () => {
   const self = { id: 'gimli', name: 'Gimli' }
@@ -74,4 +74,14 @@ test('a dragged pin lands beside the tile under it, and holds still over itself 
   expect(placePin(['a', 'b'], 'x', undefined, false)).toEqual(['a', 'b', 'x'])
   expect(placePin(['a', 'b', 'c'], 'b', 'b', true)).toEqual(['a', 'b', 'c'])
   expect(placePin(['a', 'b'], 'a', undefined, false)).toEqual(['a', 'b'])
+})
+
+test('a drag previews where the bot lands and keeps it, hidden, where the drag began', () => {
+  const bot = (id, pinned) => ({ id, name: id, pinned, updated_at: '2026-10-01T09:00:00Z' })
+  const bots = [bot('a', 1), bot('b', 2), bot('c')]
+  const shape = ({ tiles, rows }) => [tiles, rows].map((section) => section.map(({ bot, hidden }) => bot.id + (hidden ? ' hidden' : '')))
+  expect(shape(dragSections(bots, ['a', 'b']))).toEqual([['a', 'b'], ['c']])
+  expect(shape(dragSections(bots, ['a', 'b'], { id: 'b', pins: ['b', 'a'] }))).toEqual([['b', 'a'], ['c']])
+  expect(shape(dragSections(bots, ['a', 'b'], { id: 'a', pins: ['b'] }))).toEqual([['b', 'a hidden'], ['a', 'c']])
+  expect(shape(dragSections(bots, ['a', 'b'], { id: 'c', pins: ['a', 'c', 'b'] }))).toEqual([['a', 'c', 'b'], ['c hidden']])
 })

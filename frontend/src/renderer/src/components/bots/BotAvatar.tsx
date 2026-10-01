@@ -1,7 +1,8 @@
-import { motion, useReducedMotion } from 'motion/react'
+import { motion } from 'motion/react'
 import type { ReactNode, SVGProps } from 'react'
 import type { BotAvatar as Avatar, BotShape } from '@/lib/api/types'
 import { BOT_COLORS } from '@/lib/bots'
+import { useReducedEffectsMotion } from '@/lib/effectsMotion'
 
 // Drawn on a 100×100 grid; `eyes` is the vertical center of the eye pair.
 // The eyes are tilted capsules set right of center, so the face glances aside.
@@ -52,7 +53,7 @@ export function BotAvatar({
 }) {
   const fill = BOT_COLORS[avatar.color]
   const { eyes, body } = SHAPES[avatar.shape]
-  const reduced = useReducedMotion()
+  const reduced = useReducedEffectsMotion()
   const animate = working && !reduced
   return (
     <motion.svg

@@ -64,8 +64,11 @@ export interface Session {
   slug: string
   title?: string
   parent_id?: string
-  // What started the thread, such as 'bot'; absent for an interactive chat.
+  // What started the thread, such as 'bot', and which one; both absent for an
+  // interactive chat. A bot's own thread has no source id; one it started for a
+  // worker names the bot.
   source_type?: string
+  source_id?: string
   status: 'idle' | 'running' | 'error' | 'interrupted'
   error?: string
   archived?: boolean
