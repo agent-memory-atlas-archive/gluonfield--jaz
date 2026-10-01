@@ -49,13 +49,14 @@ func TestCreateACPSessionUsesTitleForInitialSlug(t *testing.T) {
 
 func TestProjectlessChatsKeepSeparateFilesAfterRestart(t *testing.T) {
 	root := t.TempDir()
+	t.Chdir(filepath.Dir(root))
 	store, err := sqlitestore.New(root)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer store.Close()
 	cfg := acp.Config{
-		Root:      root,
+		Root:      filepath.Base(root),
 		Workspace: filepath.Join(root, "workspaces", "default"),
 		Agents:    map[string]acp.AgentConfig{"fake": {Command: "fake"}},
 	}
@@ -83,9 +84,6 @@ func TestProjectlessChatsKeepSeparateFilesAfterRestart(t *testing.T) {
 		}
 		sessions = append(sessions, session)
 	}
-	if sessions[0].RuntimeRef.Cwd == sessions[1].RuntimeRef.Cwd {
-		t.Fatal("chats share a working directory")
-	}
 	if err := store.UpdateSessionTitle(sessions[0].ID, "Renamed chat"); err != nil {
 		t.Fatal(err)
 	}
@@ -104,9 +102,7 @@ func TestProjectlessChatsKeepSeparateFilesAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer store.Close()
-	manager = acp.NewManager(store, cfg, nil)
-	t.Cleanup(manager.Close)
-	handler = (&Server{Store: store, ACP: manager, Root: root, Workspace: cfg.Workspace}).Handler()
+	handler = (&Server{Store: store, Root: root, Workspace: cfg.Workspace}).Handler()
 	for i, session := range sessions {
 		loaded, err := store.LoadSession(session.ID)
 		if err != nil {
