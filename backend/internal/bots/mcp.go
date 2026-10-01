@@ -28,15 +28,19 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 		Title:       "Message a Jaz bot",
 		Description: "Send a message to a Jaz bot or post it to a group chat. Delivery is asynchronous: a bot's reply arrives later as a new turn in this thread, so do not wait for it.",
 	}, t.Message)
+}
+
+// AddBotTo adds the tools only a bot's own thread gets.
+func (t *MCPTools) AddBotTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "start_worker",
 		Title:       "Start a worker",
-		Description: "Only for Jaz bots: hand a self-contained piece of heavy work to a background worker running on the model the user chose for your workers. The worker starts blank and cannot see your chat, memory or the user, so the prompt must carry the goal, the specifics, the context it needs and what to report back. Returns at once with the worker's thread id; its result arrives later as a new turn here, so do not wait for it.",
+		Description: "Hand a self-contained piece of heavy work to a background worker running on the model the user chose for your workers. The worker starts blank and cannot see your chat, memory or the user, so the prompt must carry the goal, the specifics, the context it needs and what to report back. Returns at once with the worker's thread id; its result arrives later as a new turn here, so do not wait for it.",
 	}, t.StartWorker)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_message",
 		Title:       "Send a chat message",
-		Description: "Only for Jaz bots: send a chat message as yourself. It is the only thing anyone sees from you. In a group chat turn it posts to the group, when answering a bot it goes to that bot, and otherwise it reaches the user in your chat.",
+		Description: "Send a chat message as yourself. It is the only thing anyone sees from you. In a group chat turn it posts to the group, when answering a bot it goes to that bot, and otherwise it reaches the user in your chat.",
 	}, t.Send)
 }
 

@@ -34,7 +34,7 @@ func (s *Service) StartWorker(ctx context.Context, botID, title, prompt string) 
 		Slug:            "worker " + title,
 		Title:           title,
 		Directory:       session.RuntimeRef.Cwd,
-		SourceType:      storage.SourceBot,
+		SourceType:      storage.SourceBotWorker,
 		SourceID:        botID,
 	})
 	if err != nil {

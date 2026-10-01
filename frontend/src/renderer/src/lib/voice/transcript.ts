@@ -9,7 +9,7 @@ export function voiceThreadEvents(snapshot: SessionMessages) {
 // messages it sends, so its narration stays private; any other agent, the
 // bot's workers included, through its written text.
 export function voiceReplies(snapshot: SessionMessages, events: SessionEvent[]): { event: SessionEvent; text: string }[] {
-  const bot = snapshot.session.source_type === 'bot' && !snapshot.session.source_id
+  const bot = snapshot.session.source_type === 'bot'
   return events.flatMap((event) => {
     const text = bot
       ? event.room_message?.speaker === 'bot' && event.room_message.bot_id === snapshot.session.id ? event.room_message.text : ''

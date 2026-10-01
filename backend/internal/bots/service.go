@@ -137,6 +137,9 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	if (input.Agent != nil || input.Model != nil || input.Worker != nil) && record.Kind != KindBot {
 		return Bot{}, errors.New("only a bot has an agent")
 	}
+	if input.ReasoningEffort != "" && input.Model == nil {
+		return Bot{}, errors.New("a reasoning effort needs its model")
+	}
 	if input.Agent != nil {
 		if err := s.Threads.SwitchAgent(ctx, id, strings.TrimSpace(*input.Agent)); err != nil {
 			return Bot{}, err

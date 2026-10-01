@@ -23,8 +23,11 @@ const (
 )
 
 const (
-	SourceLoopRun      = "loop_run"
-	SourceBot          = "bot"
+	SourceLoopRun = "loop_run"
+	SourceBot     = "bot"
+	// SourceBotWorker tags a thread a bot started for background work; its
+	// source id is the bot.
+	SourceBotWorker    = "bot_worker"
 	SourceMemoryDream  = "memory_dream"
 	SourceMemorySearch = "memory_search"
 	SourceMemorySource = "memory_source"

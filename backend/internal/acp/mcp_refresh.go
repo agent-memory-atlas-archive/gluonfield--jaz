@@ -37,7 +37,7 @@ func (m *Manager) mcpRevision() uint64 {
 }
 
 func supportedMCPRefresh(raw json.RawMessage, policy string) string {
-	if policy != MCPServerPolicyAll && policy != MCPServerPolicyWidget {
+	if !fullMCPPolicy(policy) {
 		return ""
 	}
 	var response acpschema.InitializeResponse

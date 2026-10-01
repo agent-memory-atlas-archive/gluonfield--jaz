@@ -13,6 +13,7 @@ import (
 	"github.com/gluonfield/jazmem/pkg/jazmem"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/acp"
+	"github.com/wins/jaz/backend/internal/bots"
 	"github.com/wins/jaz/backend/internal/browsercontrol"
 	"github.com/wins/jaz/backend/internal/computercontrol"
 	"github.com/wins/jaz/backend/internal/connections"
@@ -501,9 +502,53 @@ func TestSourceWorkerSurfaceIsRestrictedToMemoryTools(t *testing.T) {
 	}
 }
 
+func TestBotOnlyToolsStayOnTheBotSurface(t *testing.T) {
+	store, err := sqlitestore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	memory, err := jazmem.Open(jazmem.Config{Root: t.TempDir(), DBPath: filepath.Join(t.TempDir(), "memory.sqlite")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = memory.Close() })
+	service := New(
+		memoryservice.New(memory, store, fakeScheduler{}, "http://127.0.0.1:5299/mcp/jaztools"),
+		serverconfig.URLs{JazToolsMCP: "http://127.0.0.1:5299/mcp/jaztools"},
+		store,
+		sessionevents.New(),
+		store,
+		store,
+		&widgets.SessionPublisher{Service: widgets.NewService(store, nil), Sessions: store, Loops: store},
+		testCalendarTools(t, store),
+		testGmailTools(t, store),
+		connections.NewWhatsAppMCPTools(store, nil, nil),
+		connections.NewTelegramMCPTools(store, nil, nil),
+	)
+	service.SetLoops(loops.NewService(store, &fakeExecutor{started: make(chan loops.Run, 1)}, nil))
+	service.SetBots(bots.NewMCPTools(nil))
+	for surface, botOnly := range map[toolSurface]bool{threadSurface: false, botSurface: true} {
+		session, closeSession := connectClient(t, service.server(surface))
+		if !hasTool(t, session, "message_bot") {
+			t.Fatalf("surface %v cannot message bots", surface)
+		}
+		for _, name := range []string{"send_message", "start_worker"} {
+			if hasTool(t, session, name) != botOnly {
+				t.Fatalf("surface %v advertises %s = %v", surface, name, !botOnly)
+			}
+		}
+		closeSession()
+	}
+	req, _ := http.NewRequest(http.MethodPost, "http://127.0.0.1/mcp/jaztools?jaztools_surface=bot", nil)
+	if service.surface(req) != botSurface {
+		t.Fatal("bot query did not select the bot surface")
+	}
+}
+
 func TestLegacyBrowserTaskUsesRetiredEmptySurface(t *testing.T) {
 	service := &Service{}
-	if got := workerSurfaceBySourceType[storage.LegacySourceBrowserTask]; got != retiredWorkerSurface {
+	if got := surfaceBySourceType[storage.LegacySourceBrowserTask]; got != retiredWorkerSurface {
 		t.Fatalf("legacy browser surface = %v, want retired", got)
 	}
 	req, _ := http.NewRequest(http.MethodPost, "http://127.0.0.1/mcp/jaztools?jaztools_surface=retired_worker", nil)

@@ -35,6 +35,7 @@ const (
 const (
 	surfaceQueryParam        = "jaztools_surface"
 	widgetSurfaceName        = "widget"
+	botSurfaceName           = "bot"
 	memorySearchSurfaceName  = "memory_search_worker"
 	memorySourceSurfaceName  = "memory_source_worker"
 	retiredWorkerSurfaceName = "retired_worker"
@@ -79,6 +80,7 @@ type Service struct {
 	mu          sync.Mutex
 	thread      serverSlot
 	widget      serverSlot
+	bot         serverSlot
 	search      serverSlot
 	source      serverSlot
 	retired     serverSlot
@@ -91,6 +93,7 @@ type toolSurface int
 const (
 	threadSurface toolSurface = iota
 	widgetSurface
+	botSurface
 	searchWorkerSurface
 	sourceWorkerSurface
 	retiredWorkerSurface
@@ -219,6 +222,7 @@ func (s *Service) slots() []surfaceSlot {
 	return []surfaceSlot{
 		{surface: threadSurface, slot: &s.thread},
 		{surface: widgetSurface, slot: &s.widget},
+		{surface: botSurface, slot: &s.bot},
 		{surface: searchWorkerSurface, slot: &s.search},
 		{surface: sourceWorkerSurface, slot: &s.source},
 		{surface: retiredWorkerSurface, slot: &s.retired},
@@ -233,6 +237,8 @@ func (s *Service) slot(surface toolSurface) *serverSlot {
 		return &s.source
 	case widgetSurface:
 		return &s.widget
+	case botSurface:
+		return &s.bot
 	case retiredWorkerSurface:
 		return &s.retired
 	default:
@@ -252,8 +258,11 @@ func (s *Service) newServer(surface toolSurface) *mcp.Server {
 	s.loopTools.AddTo(server)
 	if s.botTools != nil {
 		s.botTools.AddTo(server)
+		if surface == botSurface {
+			s.botTools.AddBotTo(server)
+		}
 	}
-	if surface == threadSurface && s.goalTools != nil {
+	if (surface == threadSurface || surface == botSurface) && s.goalTools != nil {
 		s.goalTools.AddTo(server)
 	}
 	s.calendarTools.AddTo(server)
@@ -305,13 +314,15 @@ func (s *Service) surface(r *http.Request) toolSurface {
 		return retiredWorkerSurface
 	case widgetSurfaceName:
 		return widgetSurface
+	case botSurfaceName:
+		return botSurface
 	}
 	if requestedSurface != "" {
 		return retiredWorkerSurface
 	}
 	if session, ok := s.sessionFromRequest(r); ok {
-		if workerSurface, found := workerSurfaceBySourceType[session.SourceType]; found {
-			return workerSurface
+		if sourced, found := surfaceBySourceType[session.SourceType]; found {
+			return sourced
 		}
 	}
 	if s.widgetSession(r) {
@@ -320,9 +331,10 @@ func (s *Service) surface(r *http.Request) toolSurface {
 	return threadSurface
 }
 
-// workerSurfaceBySourceType routes a backend worker session, identified by its
-// source type, to its restricted tool surface. Adding a worker is one entry.
-var workerSurfaceBySourceType = map[string]toolSurface{
+// surfaceBySourceType routes a session identified by its source type to its
+// tool surface: a backend worker to its restricted one, a bot to its own.
+var surfaceBySourceType = map[string]toolSurface{
+	storage.SourceBot:               botSurface,
 	storage.SourceMemorySearch:      searchWorkerSurface,
 	storage.SourceMemorySource:      sourceWorkerSurface,
 	storage.SourceMemoryDream:       sourceWorkerSurface,
@@ -372,7 +384,7 @@ func (s *Service) syncThreadTools() {
 }
 
 func (s *Service) syncAgentToolsFor(slot *serverSlot, surface toolSurface) {
-	if !surface.agentToolsAllowed() || slot.server == nil || slot.agentTools || s.agentTools == nil {
+	if surface.workerOnly() || slot.server == nil || slot.agentTools || s.agentTools == nil {
 		return
 	}
 	s.agentTools.AddTo(slot.server)
@@ -380,7 +392,7 @@ func (s *Service) syncAgentToolsFor(slot *serverSlot, surface toolSurface) {
 }
 
 func (s *Service) syncThreadToolsFor(slot *serverSlot, surface toolSurface) {
-	if !surface.threadToolsAllowed() || slot.server == nil || slot.threadTools || s.threadTools == nil {
+	if surface.workerOnly() || slot.server == nil || slot.threadTools || s.threadTools == nil {
 		return
 	}
 	s.threadTools.AddMCPTools(slot.server)
@@ -405,7 +417,7 @@ func (s *Service) syncMemoryToolsFor(slot *serverSlot, surface toolSurface) {
 }
 
 func (s *Service) syncBrowserToolsFor(slot *serverSlot, surface toolSurface) {
-	if !surface.browserToolsAllowed() || slot.server == nil || s.browserSettings == nil {
+	if surface.workerOnly() || slot.server == nil || s.browserSettings == nil {
 		return
 	}
 	if jazsettings.BrowserEnabled(s.browserSettings) {
@@ -439,16 +451,4 @@ func (s *Service) removeMemoryTools(server *mcp.Server, surface toolSurface) {
 
 func (surface toolSurface) workerOnly() bool {
 	return surface == searchWorkerSurface || surface == sourceWorkerSurface || surface == retiredWorkerSurface
-}
-
-func (surface toolSurface) agentToolsAllowed() bool {
-	return surface == threadSurface || surface == widgetSurface
-}
-
-func (surface toolSurface) threadToolsAllowed() bool {
-	return surface == threadSurface || surface == widgetSurface
-}
-
-func (surface toolSurface) browserToolsAllowed() bool {
-	return surface == threadSurface || surface == widgetSurface
 }

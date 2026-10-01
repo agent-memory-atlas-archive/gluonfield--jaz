@@ -20,8 +20,18 @@ var restrictedWorkerPolicies = map[string]string{
 	storage.LegacySourceBrowserTask: MCPServerPolicyRetiredWorker,
 }
 
+// mcpServerPolicyForSourceType is a worker's restricted policy, the bot
+// policy for a bot's own thread, or every server.
 func mcpServerPolicyForSourceType(sourceType string) string {
+	if sourceType == storage.SourceBot {
+		return MCPServerPolicyBot
+	}
 	return restrictedWorkerPolicies[sourceType]
+}
+
+// fullMCPPolicy reports whether a policy gives a session every MCP server.
+func fullMCPPolicy(policy string) bool {
+	return policy == MCPServerPolicyAll || policy == MCPServerPolicyWidget || policy == MCPServerPolicyBot
 }
 
 func restrictedWorkerPolicy(policy string) bool {

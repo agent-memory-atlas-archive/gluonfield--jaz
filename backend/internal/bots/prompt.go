@@ -1,7 +1,6 @@
 package bots
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -10,13 +9,9 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
-// Prompt is the identity module a bot's thread starts with. A bot's workers
-// share its source but have no record, and run without an identity.
+// Prompt is the identity module a bot's thread starts with.
 func Prompt(bots BotLoader, session storage.Session) (promptmodule.Modules, error) {
 	record, err := bots.LoadBot(session.ID)
-	if errors.Is(err, storage.ErrBotNotFound) {
-		return nil, nil
-	}
 	if err != nil || record.Kind != KindBot {
 		return nil, err
 	}

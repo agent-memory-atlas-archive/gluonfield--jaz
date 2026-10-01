@@ -532,7 +532,7 @@ func TestWorkersRunAsChildrenOnTheWorkerSetup(t *testing.T) {
 
 	setups := make([]string, 0, len(world.created))
 	for _, req := range world.created {
-		if req.ParentID != "scout" || req.SourceType != storage.SourceBot || req.Directory != "/work/scout" {
+		if req.ParentID != "scout" || req.SourceType != storage.SourceBotWorker || req.SourceID != "scout" || req.Directory != "/work/scout" {
 			t.Fatalf("worker spawn = %#v", req)
 		}
 		setups = append(setups, req.ACPAgent+"/"+req.Model+"/"+req.ReasoningEffort)
@@ -542,8 +542,5 @@ func TestWorkersRunAsChildrenOnTheWorkerSetup(t *testing.T) {
 	}
 	if first := world.sent[0]; first.Session != inherited || first.Message != "Find flights to Oslo." || first.Completion != acp.CompletionAsync || !first.ParentVisible {
 		t.Fatalf("worker prompt = %#v", first)
-	}
-	if modules, err := Prompt(world, world.sessions[inherited]); err != nil || modules != nil {
-		t.Fatalf("worker identity = %v, %v", modules, err)
 	}
 }

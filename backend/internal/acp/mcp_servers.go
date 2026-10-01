@@ -85,12 +85,7 @@ func mcpServerAllowed(policy string, server mcpconfig.Server) bool {
 	if restrictedWorkerPolicy(policy) {
 		return isJaztoolsServer(server)
 	}
-	switch policy {
-	case MCPServerPolicyAll, MCPServerPolicyWidget:
-		return true
-	default:
-		return false
-	}
+	return fullMCPPolicy(policy)
 }
 
 // mcpServerURL routes the jaztools server to the tool surface named by the

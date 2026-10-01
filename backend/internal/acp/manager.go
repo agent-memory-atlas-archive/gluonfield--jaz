@@ -37,6 +37,7 @@ const (
 const (
 	MCPServerPolicyAll                = ""
 	MCPServerPolicyWidget             = "widget"
+	MCPServerPolicyBot                = "bot"
 	MCPServerPolicyMemorySearchWorker = "memory_search_worker"
 	MCPServerPolicyMemorySourceWorker = "memory_source_worker"
 	MCPServerPolicyRetiredWorker      = "retired_worker"
