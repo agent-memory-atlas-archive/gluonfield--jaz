@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -84,6 +85,40 @@ func (m *Manager) validateAgentModelProvider(agent string, cfg AgentConfig) erro
 		return nil
 	}
 	return fmt.Errorf("model provider %q does not support %q required by acp agent %q", modelProvider, capability, CanonicalAgentName(agent))
+}
+
+// botSubtask makes a thread a bot starts its subtask: it stays out of the
+// sidebar, starts in the bot's home and, as Codex and Grok sub-agents do, runs
+// on the bot's agent and model unless asked otherwise.
+func (m *Manager) botSubtask(req SpawnRequest) (SpawnRequest, error) {
+	if req.ParentID == "" || req.SourceType != "" {
+		return req, nil
+	}
+	parent, err := m.store.LoadSession(req.ParentID)
+	if errors.Is(err, storage.ErrSessionNotFound) {
+		return req, nil
+	}
+	if err != nil {
+		return req, err
+	}
+	if parent.SourceType != storage.SourceBot || parent.RuntimeRef == nil {
+		return req, nil
+	}
+	req.SourceType, req.SourceID = storage.SourceBotWorker, parent.ID
+	if req.Directory == "" && req.Home == "" && !req.Worktree {
+		req.Directory = parent.RuntimeRef.Cwd
+	}
+	if req.ACPAgent != "" && CanonicalAgentName(req.ACPAgent) != parent.RuntimeRef.Agent {
+		return req, nil
+	}
+	req.ACPAgent = parent.RuntimeRef.Agent
+	if req.Model == "" && req.ModelProvider == "" {
+		req.ModelProvider, req.Model = parent.ModelProvider, parent.Model
+		if req.ReasoningEffort == "" {
+			req.ReasoningEffort = parent.ReasoningEffort
+		}
+	}
+	return req, nil
 }
 
 func (m *Manager) defaultSpawnAgent() (string, error) {

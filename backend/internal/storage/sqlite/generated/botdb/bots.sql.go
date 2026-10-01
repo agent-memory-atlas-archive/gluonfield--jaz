@@ -10,7 +10,7 @@ import (
 )
 
 const getBot = `-- name: GetBot :one
-SELECT thread_id, kind, shape, color, members, pinned, worker_agent, worker_model, worker_effort
+SELECT thread_id, kind, shape, color, members, pinned
 FROM bots
 WHERE thread_id = ?1
 LIMIT 1
@@ -26,15 +26,12 @@ func (q *Queries) GetBot(ctx context.Context, threadID string) (Bot, error) {
 		&i.Color,
 		&i.Members,
 		&i.Pinned,
-		&i.WorkerAgent,
-		&i.WorkerModel,
-		&i.WorkerEffort,
 	)
 	return i, err
 }
 
 const listBots = `-- name: ListBots :many
-SELECT thread_id, kind, shape, color, members, pinned, worker_agent, worker_model, worker_effort
+SELECT thread_id, kind, shape, color, members, pinned
 FROM bots
 `
 
@@ -54,9 +51,6 @@ func (q *Queries) ListBots(ctx context.Context) ([]Bot, error) {
 			&i.Color,
 			&i.Members,
 			&i.Pinned,
-			&i.WorkerAgent,
-			&i.WorkerModel,
-			&i.WorkerEffort,
 		); err != nil {
 			return nil, err
 		}
@@ -95,27 +89,21 @@ func (q *Queries) UnpinBots(ctx context.Context) error {
 }
 
 const upsertBot = `-- name: UpsertBot :exec
-INSERT INTO bots (thread_id, kind, shape, color, members, worker_agent, worker_model, worker_effort)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+INSERT INTO bots (thread_id, kind, shape, color, members)
+VALUES (?1, ?2, ?3, ?4, ?5)
 ON CONFLICT(thread_id) DO UPDATE SET
   kind = excluded.kind,
   shape = excluded.shape,
   color = excluded.color,
-  members = excluded.members,
-  worker_agent = excluded.worker_agent,
-  worker_model = excluded.worker_model,
-  worker_effort = excluded.worker_effort
+  members = excluded.members
 `
 
 type UpsertBotParams struct {
-	ThreadID     string `json:"thread_id"`
-	Kind         string `json:"kind"`
-	Shape        string `json:"shape"`
-	Color        string `json:"color"`
-	Members      string `json:"members"`
-	WorkerAgent  string `json:"worker_agent"`
-	WorkerModel  string `json:"worker_model"`
-	WorkerEffort string `json:"worker_effort"`
+	ThreadID string `json:"thread_id"`
+	Kind     string `json:"kind"`
+	Shape    string `json:"shape"`
+	Color    string `json:"color"`
+	Members  string `json:"members"`
 }
 
 func (q *Queries) UpsertBot(ctx context.Context, arg UpsertBotParams) error {
@@ -125,9 +113,6 @@ func (q *Queries) UpsertBot(ctx context.Context, arg UpsertBotParams) error {
 		arg.Shape,
 		arg.Color,
 		arg.Members,
-		arg.WorkerAgent,
-		arg.WorkerModel,
-		arg.WorkerEffort,
 	)
 	return err
 }

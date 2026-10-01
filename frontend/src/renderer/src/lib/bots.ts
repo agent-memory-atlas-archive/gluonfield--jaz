@@ -181,9 +181,9 @@ export function botChat(
   return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) } }
 }
 
-// What a bot's running workers have it doing, said as one person doing
+// What a bot's running subtasks have it doing, said as one person doing
 // several things at once.
-export function workersDoing(threads: SpawnedThreadView[]): string | undefined {
+export function subtasksDoing(threads: SpawnedThreadView[]): string | undefined {
   const titles = threads.filter(threadRunning).map((thread) => thread.title || thread.slug)
   return titles.length ? `working on ${titles.join(', ')}` : undefined
 }

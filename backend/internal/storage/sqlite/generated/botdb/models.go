@@ -5,13 +5,10 @@
 package botdb
 
 type Bot struct {
-	ThreadID     string `json:"thread_id"`
-	Kind         string `json:"kind"`
-	Shape        string `json:"shape"`
-	Color        string `json:"color"`
-	Members      string `json:"members"`
-	Pinned       int64  `json:"pinned"`
-	WorkerAgent  string `json:"worker_agent"`
-	WorkerModel  string `json:"worker_model"`
-	WorkerEffort string `json:"worker_effort"`
+	ThreadID string `json:"thread_id"`
+	Kind     string `json:"kind"`
+	Shape    string `json:"shape"`
+	Color    string `json:"color"`
+	Members  string `json:"members"`
+	Pinned   int64  `json:"pinned"`
 }

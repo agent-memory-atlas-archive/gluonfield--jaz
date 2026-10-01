@@ -134,7 +134,7 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	if err != nil {
 		return Bot{}, err
 	}
-	if (input.Agent != nil || input.Model != nil || input.Worker != nil) && record.Kind != KindBot {
+	if (input.Agent != nil || input.Model != nil) && record.Kind != KindBot {
 		return Bot{}, errors.New("only a bot has an agent")
 	}
 	if input.ReasoningEffort != "" && input.Model == nil {
@@ -166,12 +166,6 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 		}
 		record.Shape = avatar.Shape
 		record.Color = avatar.Color
-	}
-	if input.Worker != nil {
-		record.Worker = storage.BotWorker{}
-		if agent := strings.TrimSpace(input.Worker.Agent); agent != "" {
-			record.Worker = storage.BotWorker{Agent: agent, Model: strings.TrimSpace(input.Worker.Model), ReasoningEffort: strings.TrimSpace(input.Worker.ReasoningEffort)}
-		}
 	}
 	if input.Members != nil {
 		if record.Kind != KindGroup {
@@ -307,9 +301,6 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 	}
 	bot.Model = session.Model
 	bot.ReasoningEffort = session.ReasoningEffort
-	if worker := record.Worker; worker.Agent != "" {
-		bot.Worker = &Worker{Agent: worker.Agent, Model: worker.Model, ReasoningEffort: worker.ReasoningEffort}
-	}
 	if ref := session.RuntimeRef; ref != nil {
 		bot.Agent = ref.Agent
 	}

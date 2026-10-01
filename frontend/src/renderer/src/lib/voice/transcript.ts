@@ -7,7 +7,7 @@ export function voiceThreadEvents(snapshot: SessionMessages) {
 
 // What the agent says, as its chat shows it: a bot speaks only through the
 // messages it sends, so its narration stays private; any other agent, the
-// bot's workers included, through its written text.
+// bot's subtasks included, through its written text.
 export function voiceReplies(snapshot: SessionMessages, events: SessionEvent[]): { event: SessionEvent; text: string }[] {
   const bot = snapshot.session.source_type === 'bot'
   return events.flatMap((event) => {

@@ -33,11 +33,6 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 // AddBotTo adds the tools only a bot's own thread gets.
 func (t *MCPTools) AddBotTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "start_worker",
-		Title:       "Start a worker",
-		Description: "Hand a self-contained piece of heavy work to a background worker running on the model the user chose for your workers. The worker starts blank and cannot see your chat, memory or the user, so the prompt must carry the goal, the specifics, the context it needs and what to report back. Returns at once with the worker's thread id; its result arrives later as a new turn here, so do not wait for it.",
-	}, t.StartWorker)
-	mcp.AddTool(server, &mcp.Tool{
 		Name:        "send_message",
 		Title:       "Send a chat message",
 		Description: "Send a chat message as yourself. It is the only thing anyone sees from you. In a group chat turn it posts to the group, when answering a bot it goes to that bot, and otherwise it reaches the user in your chat.",
@@ -87,23 +82,6 @@ func (t *MCPTools) Message(_ context.Context, req *mcp.CallToolRequest, input MC
 		return nil, MCPMessageOutput{}, err
 	}
 	return nil, MCPMessageOutput{Delivered: true}, nil
-}
-
-type MCPWorkerInput struct {
-	Title  string `json:"title" jsonschema:"what the worker does in three to five words, shown to the user"`
-	Prompt string `json:"prompt" jsonschema:"everything the worker needs to do the work and report back"`
-}
-
-type MCPWorkerOutput struct {
-	ThreadID string `json:"threadId"`
-}
-
-func (t *MCPTools) StartWorker(ctx context.Context, req *mcp.CallToolRequest, input MCPWorkerInput) (*mcp.CallToolResult, MCPWorkerOutput, error) {
-	id, err := t.service.StartWorker(ctx, mcpsession.SessionID(req), input.Title, input.Prompt)
-	if err != nil {
-		return nil, MCPWorkerOutput{}, err
-	}
-	return nil, MCPWorkerOutput{ThreadID: id}, nil
 }
 
 type MCPSendInput struct {

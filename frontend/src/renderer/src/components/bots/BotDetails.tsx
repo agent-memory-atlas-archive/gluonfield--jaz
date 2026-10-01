@@ -13,11 +13,11 @@ import { BotNameInput } from './BotNameInput'
 import { BotRoutines } from './BotRoutines'
 import { useUpdateBot } from './useUpdateBot'
 
-type Tab = 'routines' | 'workers' | 'agent'
+type Tab = 'routines' | 'subtasks' | 'agent'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'routines', label: 'Routines' },
-  { value: 'workers', label: 'Workers' },
+  { value: 'subtasks', label: 'Subtasks' },
   { value: 'agent', label: 'Agent' },
 ]
 
@@ -37,11 +37,11 @@ export function BotDetails({ bot, focusName, agentSession, working, threads, sub
       <Segmented value={tab} options={TABS} onChange={setTab} layoutId={`bot-details-${bot.id}`} />
       {tab === 'routines' ? (
         <BotRoutines bot={bot} />
-      ) : tab === 'workers' ? (
+      ) : tab === 'subtasks' ? (
         threads.length || subagents.length ? (
           <OverviewRuns threads={threads} subagents={subagents} />
         ) : (
-          <p className="text-[13px] text-ink-3">{bot.name} hands heavy work to workers that run in the background.</p>
+          <p className="text-[13px] text-ink-3">{bot.name} hands longer work to subtasks that run in the background.</p>
         )
       ) : (
         <BotAgentSettings bot={bot} agentSession={agentSession} working={working} />

@@ -261,7 +261,7 @@ func TestRoutineRunsAsHiddenTurnInItsBotThread(t *testing.T) {
 	manager.mu.Lock()
 	internal, spawned := manager.internal, manager.spawned
 	manager.mu.Unlock()
-	if internal.Session != bot.ID || !internal.AllowSilence || !strings.HasPrefix(internal.Message, "[routine] Morning triage · ") || !strings.HasSuffix(internal.Message, "check the inbox") {
+	if internal.Session != bot.ID || !internal.AllowSilence || !strings.HasPrefix(internal.Message, "[routine] Morning triage · ") || !strings.Contains(internal.Message, "\n\ncheck the inbox\n\n") || !strings.HasSuffix(internal.Message, "unless the routine says to stay quiet.") {
 		t.Fatalf("routine turn = %+v", internal)
 	}
 	if spawned.Slug != "" {

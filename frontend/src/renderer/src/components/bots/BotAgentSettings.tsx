@@ -10,15 +10,13 @@ import type { ModelSelection } from '@/lib/modelPicker'
 import { useModelReasoningState } from '@/lib/modelReasoning'
 import { useUpdateBot } from './useUpdateBot'
 
-// The bot's agent and model, and what its background workers run on, in the
-// composer's picker. A running agent's own options are the truth for the bot;
-// before it starts, the bot's stored pick is.
+// The bot's agent and model in the composer's picker. A running agent's own
+// options are the truth for the bot; before it starts, the bot's stored pick is.
 export function BotAgentSettings({ bot, agentSession, working }: { bot: Bot; agentSession?: AgentSessionState; working: boolean }) {
   const settings = useQuery(agentSettingsQuery)
   const update = useUpdateBot(bot.id)
   const agents = enabledACPAgents(settings.data)
   const live = (category: string) => agentSession?.config_options?.find((option) => option.category === category)?.current_value
-  const worker = bot.worker?.agent ? bot.worker : undefined
   return (
     <div className="-mx-2.5 flex flex-col">
       <Row label="Agent">
@@ -33,27 +31,6 @@ export function BotAgentSettings({ bot, agentSession, working }: { bot: Bot; age
           onChange={(next) => update.mutate({ model: next.model, reasoning_effort: next.effort })}
         />
       </Row>
-      <Row label="Workers">
-        <Select
-          aria-label="Workers"
-          variant="plain"
-          value={worker?.agent ?? ''}
-          options={[{ value: '', label: 'Same as bot' }, ...agentOptions(agents, worker?.agent ?? '')]}
-          disabled={update.isPending}
-          onChange={(agent) => update.mutate({ worker: { agent } })}
-        />
-      </Row>
-      {worker ? (
-        <Row label="Worker model">
-          <AgentModelSelect
-            agent={worker.agent}
-            model={worker.model}
-            effort={worker.reasoning_effort}
-            disabled={update.isPending}
-            onChange={(next) => update.mutate({ worker: { agent: worker.agent, model: next.model, reasoning_effort: next.effort } })}
-          />
-        </Row>
-      ) : null}
     </div>
   )
 }

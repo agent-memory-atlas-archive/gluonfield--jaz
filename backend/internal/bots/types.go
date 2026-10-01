@@ -38,17 +38,8 @@ type Bot struct {
 	Agent           string    `json:"agent,omitempty"`
 	Model           string    `json:"model,omitempty"`
 	ReasoningEffort string    `json:"reasoning_effort,omitempty"`
-	Worker          *Worker   `json:"worker,omitempty"`
 	Members         []string  `json:"members,omitempty"`
 	Routines        int       `json:"routines,omitempty"`
-}
-
-// Worker is the agent, model and effort a bot's background workers run with.
-// An empty Agent means the bot's own.
-type Worker struct {
-	Agent           string `json:"agent"`
-	Model           string `json:"model,omitempty"`
-	ReasoningEffort string `json:"reasoning_effort,omitempty"`
 }
 
 type CreateBot struct {
@@ -68,7 +59,6 @@ type UpdateBot struct {
 	// ReasoningEffort.
 	Model           *string `json:"model,omitempty"`
 	ReasoningEffort string  `json:"reasoning_effort,omitempty"`
-	Worker          *Worker `json:"worker,omitempty"`
 }
 
 // Threads is the agent runtime bot threads run on.

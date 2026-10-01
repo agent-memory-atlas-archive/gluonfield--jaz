@@ -429,6 +429,10 @@ func (m *Manager) CreateSession(ctx context.Context, req SpawnRequest) (storage.
 }
 
 func (m *Manager) createSession(ctx context.Context, req SpawnRequest) (createdSession, error) {
+	req, err := m.botSubtask(req)
+	if err != nil {
+		return createdSession{}, err
+	}
 	req, cfg, effort, err := m.spawnConfig(req)
 	if err != nil {
 		return createdSession{}, err

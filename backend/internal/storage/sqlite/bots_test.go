@@ -19,10 +19,7 @@ func TestBotRecordAndRoutineOwnershipRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	record := storage.BotRecord{
-		ThreadID: thread.ID, Kind: "group", Shape: "cloud", Color: "teal", Members: []string{"a", "b"},
-		Worker: storage.BotWorker{Agent: "codex", Model: "gpt-6.1-sol", ReasoningEffort: "xhigh"},
-	}
+	record := storage.BotRecord{ThreadID: thread.ID, Kind: "group", Shape: "cloud", Color: "teal", Members: []string{"a", "b"}}
 	if err := store.SaveBot(record); err != nil {
 		t.Fatal(err)
 	}

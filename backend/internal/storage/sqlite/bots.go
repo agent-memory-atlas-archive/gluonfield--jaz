@@ -21,14 +21,11 @@ func (s *Store) SaveBot(record storage.BotRecord) error {
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
 	return botdb.New(s.db).UpsertBot(context.Background(), botdb.UpsertBotParams{
-		ThreadID:     record.ThreadID,
-		Kind:         record.Kind,
-		Shape:        record.Shape,
-		Color:        record.Color,
-		Members:      string(members),
-		WorkerAgent:  record.Worker.Agent,
-		WorkerModel:  record.Worker.Model,
-		WorkerEffort: record.Worker.ReasoningEffort,
+		ThreadID: record.ThreadID,
+		Kind:     record.Kind,
+		Shape:    record.Shape,
+		Color:    record.Color,
+		Members:  string(members),
 	})
 }
 
@@ -82,6 +79,5 @@ func botFromDB(row botdb.Bot) storage.BotRecord {
 	_ = json.Unmarshal([]byte(row.Members), &members)
 	return storage.BotRecord{
 		ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Pinned: int(row.Pinned), Members: members,
-		Worker: storage.BotWorker{Agent: row.WorkerAgent, Model: row.WorkerModel, ReasoningEffort: row.WorkerEffort},
 	}
 }
