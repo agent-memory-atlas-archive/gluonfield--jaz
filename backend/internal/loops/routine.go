@@ -12,7 +12,9 @@ import (
 
 // runPrompt is what a run sends: what fired it, then the routine's prompt. A
 // turn in the bot's own thread is also labelled with the routine and the local
-// time, which a run in a fresh thread gets from its system prompt.
+// time, which a run in a fresh thread gets from its system prompt, and says
+// how the bot is heard, as its other turns do: a bot whose prompt predates that
+// rule would otherwise answer in private text.
 func runPrompt(loop Loop, now time.Time, event string, inThread bool) string {
 	var b strings.Builder
 	if inThread {
@@ -29,6 +31,9 @@ func runPrompt(loop Loop, now time.Time, event string, inThread bool) string {
 		b.WriteString("\n")
 	}
 	b.WriteString(loop.Prompt)
+	if inThread {
+		b.WriteString("\n\nOnly what you send with send_message reaches the user; when nothing is worth saying, send nothing.")
+	}
 	return b.String()
 }
 
