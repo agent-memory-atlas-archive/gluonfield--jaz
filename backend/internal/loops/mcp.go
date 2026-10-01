@@ -84,7 +84,7 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_create",
 		Title:       "Create Jaz loop",
-		Description: "Create a routine: a prompt a Jaz bot runs on a schedule or when a trigger fires. Called from a bot's thread, the routine belongs to that bot and each run is a turn in that thread; otherwise pass bot, or a new bot named after the routine is created (acp_agent, model and directory configure that new bot)." + agentHint,
+		Description: "Create a routine: a prompt a Jaz bot runs on a schedule or when a trigger fires. Called from a bot's thread, the routine belongs to that bot and each run is a turn in that thread; otherwise pass bot, or a new bot named after the routine is created (acp_agent and model configure that new bot)." + agentHint,
 	}, t.Create)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_update",

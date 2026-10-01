@@ -32,7 +32,7 @@ func runPrompt(loop Loop, now time.Time, event string, inThread bool) string {
 	}
 	b.WriteString(loop.Prompt)
 	if inThread {
-		b.WriteString("\n\nOnly what you send with send_message reaches the user; when nothing is worth saying, send nothing.")
+		b.WriteString("\n\nThe user wants this routine's outcome: send it with send_message, the only thing they see, unless the routine says to stay quiet.")
 	}
 	return b.String()
 }
