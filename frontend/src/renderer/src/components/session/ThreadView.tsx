@@ -467,7 +467,7 @@ export function ThreadView({
             >
               <div
                 ref={threadFind.rootRef}
-                className={`${THREAD_COLUMN_CLASS} pt-2`}
+                className={`${THREAD_COLUMN_CLASS} pt-6`}
                 style={{ paddingBottom: transcriptBottomPadding }}
               >
                 {chat ? (
