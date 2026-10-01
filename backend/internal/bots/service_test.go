@@ -1,6 +1,7 @@
 package bots
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strings"
@@ -23,6 +24,7 @@ type fakeWorld struct {
 	prompts   map[string][]string
 	replies   map[string][]string
 	created   []acp.SpawnRequest
+	models    map[string]string
 	loops     []loops.Loop
 	published []sessionevents.Event
 	held      map[string]chan struct{}
@@ -36,6 +38,7 @@ func newFakeWorld() *fakeWorld {
 		events:   map[string][]sessionevents.Event{},
 		prompts:  map[string][]string{},
 		replies:  map[string][]string{},
+		models:   map[string]string{},
 		held:     map[string]chan struct{}{},
 	}
 }
@@ -186,7 +189,13 @@ func (t fakeThreads) CreateSession(_ context.Context, req acp.SpawnRequest) (sto
 	t.world.mu.Lock()
 	t.world.created = append(t.world.created, req)
 	t.world.mu.Unlock()
-	return t.world.CreateSession(storage.CreateSession{Slug: req.Slug, Title: req.Title, SourceType: req.SourceType})
+	session, err := t.world.CreateSession(storage.CreateSession{Slug: req.Slug, Title: req.Title, SourceType: req.SourceType})
+	// Like the manager, an omitted agent is the default one.
+	session.RuntimeRef = &storage.RuntimeRef{Agent: cmp.Or(req.ACPAgent, acp.AgentCodex)}
+	t.world.mu.Lock()
+	t.world.sessions[session.ID] = session
+	t.world.mu.Unlock()
+	return session, err
 }
 
 func (t fakeThreads) StartInternalTurnWhenIdle(_ context.Context, req acp.InternalTurnRequest) (acp.Job, error) {
@@ -218,7 +227,10 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
 }
 
-func (fakeThreads) SetModel(context.Context, string, string, string) error {
+func (t fakeThreads) SetModel(_ context.Context, sessionID, model, effort string) error {
+	t.world.mu.Lock()
+	defer t.world.mu.Unlock()
+	t.world.models[sessionID] = model + "/" + effort
 	return nil
 }
 
@@ -432,6 +444,25 @@ func TestTheUserMeetsTheirNewBotButNotOneMadeForARoutine(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if world.promptCount(owner) != 0 {
 		t.Fatal("a bot made for a routine introduced itself")
+	}
+}
+
+func TestNewBotsStartOnALightModelUnlessGivenOne(t *testing.T) {
+	world := newFakeWorld()
+	service := newTestService(world)
+
+	for _, tc := range []struct{ agent, model, want string }{
+		{"", "", "gpt-6-luna/medium"},
+		{acp.AgentClaude, "", "opus[1m]/medium"},
+		{acp.AgentClaude, "sonnet", ""},
+	} {
+		bot, err := service.create(t.Context(), CreateBot{Name: "Bot " + tc.agent + tc.model, Agent: tc.agent, Model: tc.model})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := world.models[bot.ID]; got != tc.want {
+			t.Fatalf("%s bot %q starts on %q, want %q", tc.agent, tc.model, got, tc.want)
+		}
 	}
 }
 

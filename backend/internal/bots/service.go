@@ -77,6 +77,13 @@ func (s *Service) Load(id string) (Bot, error) {
 	return s.view(record, session), nil
 }
 
+// botModels is what a new bot runs on unless it is given a model: a bot takes
+// many short turns, so it starts on a lighter setup than a chat, by agent.
+var botModels = map[string]struct{ model, effort string }{
+	acp.AgentCodex:  {"gpt-6-luna", "medium"},
+	acp.AgentClaude: {"opus[1m]", "medium"},
+}
+
 // Create makes a bot for the user, who meets it as it says hello and asks what
 // to focus on.
 func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
@@ -111,6 +118,11 @@ func (s *Service) create(ctx context.Context, input CreateBot) (Bot, error) {
 	})
 	if err != nil {
 		return Bot{}, err
+	}
+	if start, ok := botModels[session.RuntimeRef.Agent]; ok && strings.TrimSpace(input.Model) == "" {
+		if err := s.threads.SetModel(ctx, session.ID, start.model, start.effort); err != nil {
+			return Bot{}, err
+		}
 	}
 	if err := s.store.UpdateSessionTitle(session.ID, name); err != nil {
 		return Bot{}, err
