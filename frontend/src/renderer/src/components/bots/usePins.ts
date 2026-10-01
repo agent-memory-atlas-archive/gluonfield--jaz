@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { pinBots } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { botSections } from '@/lib/bots'
+import { pinOrder } from '@/lib/bots'
 import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { keys } from '@/lib/query/keys'
 
@@ -9,7 +9,7 @@ import { keys } from '@/lib/query/keys'
 export function usePins() {
   const queryClient = useQueryClient()
   return (update: (pins: string[]) => string[]) => {
-    const pins = botSections(queryClient.getQueryData<Bot[]>(keys.bots) ?? []).pinned.map((bot) => bot.id)
+    const pins = pinOrder(queryClient.getQueryData<Bot[]>(keys.bots) ?? [])
     const next = update(pins)
     if (next.join() === pins.join()) return
     queryClient.setQueryData<Bot[]>(keys.bots, (bots) => bots?.map((bot) => ({ ...bot, pinned: next.indexOf(bot.id) + 1 || undefined })))

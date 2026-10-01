@@ -42,11 +42,18 @@ export function botIdFromTarget(target: string): string | undefined {
   return target.startsWith(TARGET_PREFIX) ? target.slice(TARGET_PREFIX.length) : undefined
 }
 
-// Pinned tiles keep a stable order; the list below moves with activity.
-export function botSections(bots: Bot[]) {
+export function pinOrder(bots: Bot[]): string[] {
+  return bots
+    .filter((bot) => bot.pinned)
+    .toSorted((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0) || a.name.localeCompare(b.name))
+    .map((bot) => bot.id)
+}
+
+// Pinned tiles in pin order; the list below moves with activity.
+export function botSections(bots: Bot[], pins = pinOrder(bots)) {
   return {
-    pinned: bots.filter((bot) => bot.pinned).toSorted((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0) || a.name.localeCompare(b.name)),
-    rest: bots.filter((bot) => !bot.pinned).toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
+    pinned: pins.flatMap((id) => bots.find((bot) => bot.id === id) ?? []),
+    rest: bots.filter((bot) => !pins.includes(bot.id)).toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
   }
 }
 

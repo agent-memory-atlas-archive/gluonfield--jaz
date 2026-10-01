@@ -8,7 +8,7 @@ import { MarkdownText } from '@/components/session/MessageMarkdown'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { botAvatars, botSections, placePin } from '@/lib/bots'
+import { botAvatars, botSections, pinOrder, placePin } from '@/lib/bots'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
 import { BotIcon } from './BotAvatar'
 import { BotMenu } from './BotMenu'
@@ -28,11 +28,16 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
     refetchInterval: (query) => (query.state.data?.some((bot) => bot.status === 'running') ? 3_000 : 15_000),
   })
   const list = useMemo(() => bots.data ?? [], [bots.data])
-  const { pinned, rest } = useMemo(() => botSections(list), [list])
-  const pins = pinned.map((bot) => bot.id)
+  const pins = useMemo(() => pinOrder(list), [list])
   const pin = usePins()
   const [drag, setDrag] = useState<PinDrag | null>(null)
-  const tiles = drag ? drag.pins.flatMap((id) => list.find((bot) => bot.id === id) ?? []) : pinned
+  // A drag shows where the bot would land. The dragged element itself stays
+  // mounted, hidden, where it started, or the drag could not end.
+  const { pinned, rest } = botSections(list, drag?.pins ?? pins)
+  const source = drag && list.find((bot) => bot.id === drag.id)
+  const moved = Boolean(source && pins.includes(source.id) !== drag?.pins.includes(source.id))
+  const tiles = moved && source && pins.includes(source.id) ? [...pinned, source] : pinned
+  const rows = moved && source && !pins.includes(source.id) ? [...rest, source] : rest
   const startDrag = (id: string) => setDrag({ id, pins })
 
   return (
@@ -52,15 +57,14 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
             onDragOver={(e) => {
               if (!drag) return
               e.preventDefault()
-              const next = landing(e, drag, pins, tiles.map((bot) => bot.id))
+              const next = landing(e, drag, pinned.map((bot) => bot.id))
               if (next.join() !== drag.pins.join()) setDrag({ ...drag, pins: next })
             }}
             onDrop={(e) => {
               if (!drag) return
               e.preventDefault()
               setDrag(null)
-              const onTiles = (e.target as Element).closest('[data-pins]')
-              pin(() => (onTiles ? drag.pins : drag.pins.filter((id) => id !== drag.id)))
+              pin(() => drag.pins)
             }}
             onDragEnd={() => setDrag(null)}
             className="flex flex-1 shrink-0 flex-col gap-3"
@@ -69,15 +73,15 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
               <div data-pins className="grid grid-cols-3 gap-px">
                 <AnimatePresence initial={false} mode="popLayout">
                   {tiles.map((bot) => (
-                    <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} onDrag={startDrag} />
+                    <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} hidden={moved && !pinned.includes(bot)} onDrag={startDrag} />
                   ))}
                 </AnimatePresence>
               </div>
             ) : null}
             <div className="flex flex-col gap-0.5">
               <AnimatePresence initial={false} mode="popLayout">
-                {rest.map((bot) => (
-                  <BotEntry key={bot.id} bot={bot} bots={list} dragged={drag?.id === bot.id} onDrag={startDrag} />
+                {rows.map((bot) => (
+                  <BotEntry key={bot.id} bot={bot} bots={list} dragged={drag?.id === bot.id} hidden={moved && !rest.includes(bot)} onDrag={startDrag} />
                 ))}
               </AnimatePresence>
             </div>
@@ -90,12 +94,12 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
 }
 
 // Where a dragged bot lands among the pins: beside the tile in the grid cell
-// under the pointer, or last past the tiles. Cells come from the grid, not the
-// tiles, so a tile still sliding cannot bounce the drop back. Off the tiles a
-// pinned bot keeps its place, so the drop can unpin it, and a row leaves.
-function landing(e: DragEvent, drag: PinDrag, pinned: string[], tiles: string[]): string[] {
+// under the pointer, last past the tiles, or out of the pins anywhere else.
+// Cells come from the grid, not the tiles, so a tile still sliding cannot
+// bounce the drop back.
+function landing(e: DragEvent, drag: PinDrag, tiles: string[]): string[] {
   const grid = (e.target as Element).closest('[data-pins]')
-  if (!grid) return pinned.includes(drag.id) ? drag.pins : drag.pins.filter((id) => id !== drag.id)
+  if (!grid) return drag.pins.filter((id) => id !== drag.id)
   const box = grid.getBoundingClientRect()
   const width = box.width / TILE_COLUMNS
   const height = box.height / Math.ceil(tiles.length / TILE_COLUMNS)
@@ -107,12 +111,13 @@ function landing(e: DragEvent, drag: PinDrag, pinned: string[], tiles: string[])
 
 // A pinned bot is a tile (face over name); the rest are rows with a preview.
 // Tiles and rows slide to new places, and scale in and out as they come and go.
-function BotEntry({ ref, bot, bots, tile = false, dragged, onDrag }: {
+function BotEntry({ ref, bot, bots, tile = false, dragged, hidden, onDrag }: {
   ref?: Ref<HTMLDivElement>
   bot: Bot
   bots: Bot[]
   tile?: boolean
   dragged: boolean
+  hidden: boolean
   onDrag: (id: string) => void
 }) {
   const [renaming, setRenaming] = useState(false)
@@ -136,6 +141,7 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, onDrag }: {
   return (
     <motion.div
       ref={ref}
+      hidden={hidden}
       layout="position"
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: dragged ? 0.4 : 1, scale: 1 }}
@@ -149,6 +155,11 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, onDrag }: {
         activeProps={{ className: 'bg-list-active!' }}
         {...menuTriggers}
         onDragStart={(e) => {
+          // The bot itself is dragged, not its link: no URL card, and nothing
+          // to drop into a text field.
+          const box = e.currentTarget.getBoundingClientRect()
+          e.dataTransfer.clearData()
+          e.dataTransfer.setDragImage(e.currentTarget, e.clientX - box.left, e.clientY - box.top)
           e.dataTransfer.effectAllowed = 'move'
           onDrag(bot.id)
         }}
