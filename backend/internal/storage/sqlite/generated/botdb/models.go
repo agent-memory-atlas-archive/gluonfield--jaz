@@ -10,4 +10,5 @@ type Bot struct {
 	Shape    string `json:"shape"`
 	Color    string `json:"color"`
 	Members  string `json:"members"`
+	Pinned   int64  `json:"pinned"`
 }

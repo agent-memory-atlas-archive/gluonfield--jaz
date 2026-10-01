@@ -67,6 +67,16 @@ func (w *fakeWorld) ListBots() ([]storage.BotRecord, error) {
 	return out, nil
 }
 
+func (w *fakeWorld) PinBots(ids []string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for id, record := range w.records {
+		record.Pinned = slices.Index(ids, id) + 1
+		w.records[id] = record
+	}
+	return nil
+}
+
 func (w *fakeWorld) CreateSession(input storage.CreateSession) (storage.Session, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()

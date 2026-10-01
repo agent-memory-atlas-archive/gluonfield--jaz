@@ -47,3 +47,48 @@ func TestBotRecordAndRoutineOwnershipRoundTrip(t *testing.T) {
 		t.Fatal("the secret returned at creation does not open the stored routine")
 	}
 }
+
+func TestPinBotsReplacesTheOrderAndSurvivesEdits(t *testing.T) {
+	store, err := New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	var ids []string
+	for _, slug := range []string{"a", "b", "c"} {
+		thread, err := store.CreateSession(storage.CreateSession{Slug: slug, Title: slug, SourceType: storage.SourceBot})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.SaveBot(storage.BotRecord{ThreadID: thread.ID, Kind: "bot", Shape: "circle", Color: "blue"}); err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, thread.ID)
+	}
+	pins := func() []int {
+		var out []int
+		for _, id := range ids {
+			record, err := store.LoadBot(id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, record.Pinned)
+		}
+		return out
+	}
+	if err := store.PinBots([]string{ids[0], ids[1]}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.PinBots([]string{ids[2], ids[0]}); err != nil {
+		t.Fatal(err)
+	}
+	if got := pins(); !reflect.DeepEqual(got, []int{2, 0, 1}) {
+		t.Fatalf("pins after reorder = %v", got)
+	}
+	if err := store.SaveBot(storage.BotRecord{ThreadID: ids[2], Kind: "bot", Shape: "cloud", Color: "teal"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := pins(); !reflect.DeepEqual(got, []int{2, 0, 1}) {
+		t.Fatalf("pins after an edit = %v", got)
+	}
+}

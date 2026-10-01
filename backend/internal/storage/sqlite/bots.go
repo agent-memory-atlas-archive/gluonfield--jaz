@@ -52,8 +52,30 @@ func (s *Store) ListBots() ([]storage.BotRecord, error) {
 	return records, nil
 }
 
+// PinBots pins exactly ids, in that order, and unpins every other bot.
+func (s *Store) PinBots(ids []string) error {
+	ctx := context.Background()
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	q := botdb.New(tx)
+	if err := q.UnpinBots(ctx); err != nil {
+		return err
+	}
+	for i, id := range ids {
+		if err := q.PinBot(ctx, botdb.PinBotParams{Pinned: int64(i + 1), ThreadID: id}); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func botFromDB(row botdb.Bot) storage.BotRecord {
 	var members []string
 	_ = json.Unmarshal([]byte(row.Members), &members)
-	return storage.BotRecord{ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Members: members}
+	return storage.BotRecord{ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Pinned: int(row.Pinned), Members: members}
 }

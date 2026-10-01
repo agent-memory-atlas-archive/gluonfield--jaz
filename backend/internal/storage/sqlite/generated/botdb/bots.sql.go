@@ -10,7 +10,7 @@ import (
 )
 
 const getBot = `-- name: GetBot :one
-SELECT thread_id, kind, shape, color, members
+SELECT thread_id, kind, shape, color, members, pinned
 FROM bots
 WHERE thread_id = ?1
 LIMIT 1
@@ -25,12 +25,13 @@ func (q *Queries) GetBot(ctx context.Context, threadID string) (Bot, error) {
 		&i.Shape,
 		&i.Color,
 		&i.Members,
+		&i.Pinned,
 	)
 	return i, err
 }
 
 const listBots = `-- name: ListBots :many
-SELECT thread_id, kind, shape, color, members
+SELECT thread_id, kind, shape, color, members, pinned
 FROM bots
 `
 
@@ -49,6 +50,7 @@ func (q *Queries) ListBots(ctx context.Context) ([]Bot, error) {
 			&i.Shape,
 			&i.Color,
 			&i.Members,
+			&i.Pinned,
 		); err != nil {
 			return nil, err
 		}
@@ -61,6 +63,29 @@ func (q *Queries) ListBots(ctx context.Context) ([]Bot, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const pinBot = `-- name: PinBot :exec
+UPDATE bots SET pinned = ?1 WHERE thread_id = ?2
+`
+
+type PinBotParams struct {
+	Pinned   int64  `json:"pinned"`
+	ThreadID string `json:"thread_id"`
+}
+
+func (q *Queries) PinBot(ctx context.Context, arg PinBotParams) error {
+	_, err := q.db.ExecContext(ctx, pinBot, arg.Pinned, arg.ThreadID)
+	return err
+}
+
+const unpinBots = `-- name: UnpinBots :exec
+UPDATE bots SET pinned = 0
+`
+
+func (q *Queries) UnpinBots(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, unpinBots)
+	return err
 }
 
 const upsertBot = `-- name: UpsertBot :exec

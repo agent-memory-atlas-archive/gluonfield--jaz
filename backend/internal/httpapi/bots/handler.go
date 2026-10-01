@@ -39,6 +39,10 @@ type groupRequest struct {
 	Members []string `json:"members"`
 }
 
+type pinsRequest struct {
+	IDs []string `json:"ids"`
+}
+
 type messageRequest struct {
 	Text string `json:"text"`
 }
@@ -82,6 +86,18 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	bot, err := h.bots.Update(r.Context(), r.PathValue("bot"), input)
 	writeBot(w, bot, err)
+}
+
+func (h *Handler) Pin(w http.ResponseWriter, r *http.Request) {
+	var input pinsRequest
+	if !decode(w, r, &input) {
+		return
+	}
+	if err := h.bots.Pin(input.IDs); err != nil {
+		httpapi.WriteError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {

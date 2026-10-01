@@ -1,22 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { type DragEvent, useMemo, useState } from 'react'
 import { stateDot } from '@/components/sidebar/SessionRow'
 import { PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { botAvatars, botSections } from '@/lib/bots'
+import { botAvatars, botSections, placePin } from '@/lib/bots'
 import { useContextMenuTrigger } from '@/lib/hooks/useContextMenuTrigger'
 import { BotIcon } from './BotAvatar'
 import { BotMenu } from './BotMenu'
 import { BotNameInput } from './BotNameInput'
 import { NewBotPicker } from './NewBotPicker'
-import { usePinBot } from './usePinBot'
+import { usePins } from './usePins'
 
-// A row dragged onto the pinned tiles pins it.
-const DRAGGED_BOT = 'application/x-jaz-bot'
+// A dragged bot and the pinned order it would leave behind if dropped now.
+type PinDrag = { id: string; pins: string[] }
 
 export function BotsPanel({ mobile }: { mobile: boolean }) {
   const bots = useQuery({
@@ -25,9 +25,15 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
   })
   const [query, setQuery] = useState<string | null>(null)
   const list = useMemo(() => bots.data ?? [], [bots.data])
-  const { pinned, rest } = useMemo(() => botSections(list, query ?? ''), [list, query])
-  const pin = usePinBot()
-  const [dropping, setDropping] = useState(false)
+  const { pins, pinned, rest } = useMemo(() => botSections(list, query ?? ''), [list, query])
+  const pin = usePins()
+  const [drag, setDrag] = useState<PinDrag | null>(null)
+  const shown = [...pinned, ...rest]
+  const tiles = drag ? drag.pins.flatMap((id) => shown.find((bot) => bot.id === id) ?? []) : pinned
+  const startDrag = (id: string) => {
+    // A frame later, so the drag image is taken before the bot fades.
+    requestAnimationFrame(() => setDrag({ id, pins }))
+  }
 
   return (
     <>
@@ -71,31 +77,33 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
         ) : bots.isError && !bots.data ? (
           <p className="px-2.5 py-1 text-[13px] text-ink-3">Backend unreachable</p>
         ) : (
-          <section className="flex shrink-0 flex-col gap-3">
-            {pinned.length ? (
-              <div
-                onDragOver={(e) => {
-                  if (!e.dataTransfer.types.includes(DRAGGED_BOT)) return
-                  e.preventDefault()
-                  setDropping(true)
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropping(false)
-                }}
-                onDrop={(e) => {
-                  setDropping(false)
-                  pin(e.dataTransfer.getData(DRAGGED_BOT), true)
-                }}
-                className={`grid grid-cols-3 gap-px rounded-lg transition-colors duration-150 ${dropping ? 'bg-list-hover' : ''}`}
-              >
-                {pinned.map((bot) => (
-                  <BotEntry key={bot.id} bot={bot} bots={list} tile />
+          <section
+            onDragOver={(e) => {
+              if (!drag) return
+              e.preventDefault()
+              const next = landing(e, drag, pins)
+              if (next.join() !== drag.pins.join()) setDrag({ ...drag, pins: next })
+            }}
+            onDrop={(e) => {
+              if (!drag) return
+              e.preventDefault()
+              setDrag(null)
+              const onTiles = (e.target as Element).closest('[data-pins]')
+              pin(() => (onTiles ? drag.pins : drag.pins.filter((id) => id !== drag.id)))
+            }}
+            onDragEnd={() => setDrag(null)}
+            className="flex flex-1 shrink-0 flex-col gap-3"
+          >
+            {tiles.length ? (
+              <div data-pins className="grid grid-cols-3 gap-px">
+                {tiles.map((bot) => (
+                  <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} onDrag={startDrag} />
                 ))}
               </div>
             ) : null}
             <div className="flex flex-col gap-0.5">
               {rest.map((bot) => (
-                <BotEntry key={bot.id} bot={bot} bots={list} />
+                <BotEntry key={bot.id} bot={bot} bots={list} dragged={drag?.id === bot.id} onDrag={startDrag} />
               ))}
             </div>
             {!list.length ? <p className="px-2.5 py-1 text-[13px] text-ink-3">No bots yet</p> : null}
@@ -106,8 +114,28 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
   )
 }
 
+// Where a dragged bot lands among the pins: beside the tile under the pointer,
+// or last over the tiles' empty space. Off the tiles a pinned bot keeps its
+// place, so the drop can unpin it, and a row leaves the pins.
+function landing(e: DragEvent, drag: PinDrag, pinned: string[]): string[] {
+  const target = e.target as Element
+  const tile = target.closest<HTMLElement>('[data-pin]')
+  if (tile) {
+    const box = tile.getBoundingClientRect()
+    return placePin(drag.pins, drag.id, tile.dataset.pin, e.clientX > box.left + box.width / 2)
+  }
+  if (target.closest('[data-pins]')) return placePin(drag.pins, drag.id, undefined, false)
+  return pinned.includes(drag.id) ? drag.pins : drag.pins.filter((id) => id !== drag.id)
+}
+
 // A pinned bot is a tile (face over name); the rest are rows with a preview.
-function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: boolean }) {
+function BotEntry({ bot, bots, tile = false, dragged, onDrag }: {
+  bot: Bot
+  bots: Bot[]
+  tile?: boolean
+  dragged: boolean
+  onDrag: (id: string) => void
+}) {
   const [renaming, setRenaming] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const menuTriggers = useContextMenuTrigger(setMenu)
@@ -133,9 +161,12 @@ function BotEntry({ bot, bots, tile = false }: { bot: Bot; bots: Bot[]; tile?: b
         params={{ botId: bot.id }}
         activeProps={{ className: 'bg-list-active!' }}
         {...menuTriggers}
-        draggable={!tile}
-        onDragStart={(e) => e.dataTransfer.setData(DRAGGED_BOT, bot.id)}
-        className={`select-none rounded-lg text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${
+        data-pin={tile ? bot.id : undefined}
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move'
+          onDrag(bot.id)
+        }}
+        className={`select-none rounded-lg text-ink transition-[background-color,opacity] duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${dragged ? 'opacity-40' : ''} ${
           tile
             ? 'flex min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
             : 'flex h-13 items-center gap-2.5 px-2.5 text-[13px] max-sm:h-16 max-sm:text-[15px]'

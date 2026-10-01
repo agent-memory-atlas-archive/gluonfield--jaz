@@ -176,6 +176,11 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	return s.Load(id)
 }
 
+// Pin pins exactly ids, in that order, and unpins every other bot and group.
+func (s *Service) Pin(ids []string) error {
+	return s.Store.PinBots(ids)
+}
+
 // Delete archives the bot's thread, deletes the routines it owns and takes
 // it out of its groups.
 func (s *Service) Delete(id string) error {
@@ -278,7 +283,7 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 		Kind:      record.Kind,
 		Name:      session.Title,
 		Avatar:    Avatar{Shape: record.Shape, Color: record.Color},
-		Pinned:    session.Pinned,
+		Pinned:    record.Pinned,
 		Unread:    session.Unread,
 		Status:    session.Status,
 		UpdatedAt: session.UpdatedAt,

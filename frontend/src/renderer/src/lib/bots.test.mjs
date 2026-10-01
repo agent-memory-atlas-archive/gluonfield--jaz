@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { botChat } from './bots'
+import { botChat, placePin } from './bots'
 
 describe('bot chat log', () => {
   const self = { id: 'gimli', name: 'Gimli' }
@@ -46,4 +46,13 @@ describe('bot chat log', () => {
     expect(botChat([user(1, 1, 'hi')], [...events, woke(5, 'routine', 'Say hi')], self, true).work).toEqual({ doing: 'running Say hi', since: at(5), note: undefined })
     expect(botChat([user(1, 1, 'hi'), user(2, 6, 'still there?')], events, self, true).work.doing).toBeUndefined()
   })
+})
+
+test('a dragged pin lands beside the tile under it, and holds still over itself or empty space', () => {
+  expect(placePin(['a', 'b', 'c'], 'c', 'a', false)).toEqual(['c', 'a', 'b'])
+  expect(placePin(['a', 'b', 'c'], 'a', 'b', true)).toEqual(['b', 'a', 'c'])
+  expect(placePin(['a', 'b'], 'x', 'a', true)).toEqual(['a', 'x', 'b'])
+  expect(placePin(['a', 'b'], 'x', undefined, false)).toEqual(['a', 'b', 'x'])
+  expect(placePin(['a', 'b', 'c'], 'b', 'b', true)).toEqual(['a', 'b', 'c'])
+  expect(placePin(['a', 'b'], 'a', undefined, false)).toEqual(['a', 'b'])
 })
