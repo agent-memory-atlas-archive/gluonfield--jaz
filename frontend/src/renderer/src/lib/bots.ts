@@ -1,4 +1,4 @@
-import type { Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, SessionEvent } from '@/lib/api/types'
+import type { Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, MCPAppEvent, SessionEvent } from '@/lib/api/types'
 import { messageText } from '@/lib/messageText'
 import { type SpawnedThreadView, threadRunning } from '@/lib/spawnedThreads'
 
@@ -72,6 +72,7 @@ export type ChatEntry =
   | { kind: 'user'; key: string; at: string; text: string }
   | { kind: 'bot'; key: string; at: string; botId?: string; name: string; text: string }
   | { kind: 'activity'; key: string; at: string; event: SessionEvent }
+  | { kind: 'app'; key: string; at: string; app: MCPAppEvent }
 
 type ChatTurn = {
   at: string
@@ -84,9 +85,9 @@ type ChatTurn = {
 export type BotWork = { doing?: string; since?: string; note?: string }
 
 // A bot's chat, read from its thread in one pass: what people typed, what bots
-// sent with send_message and the activity worth a row. Everything else is the
-// bot's private work. A finished turn the user started in which the bot sent
-// nothing shows its last written reply, so an answer is never lost. `doing`
+// sent with send_message, apps opened in user turns and activity rows. Everything
+// else is private work. A finished user turn without public output shows its
+// last written reply, so an answer is never lost. `doing`
 // names what the bot is busy with when a group, another bot or a routine
 // opened its latest turn, whose output lands elsewhere; `since` and `note` are
 // when that turn began and the last line the bot wrote in it.
@@ -127,6 +128,9 @@ export function botChat(
       if (opens) close()
       if (activity.kind === 'message_sent' || activity.kind === 'message_received') entries.push({ kind: 'activity', key, at, event })
       if (opens) turn = { at, user: false, spoke: false, activity }
+    } else if (event.type === 'mcp_app' && event.mcp_app && turn?.user) {
+      entries.push({ kind: 'app', key, at, app: event.mcp_app })
+      turn.spoke = true
     } else if (event.loop_created || event.type === 'agent_switch') {
       entries.push({ kind: 'activity', key, at, event })
     } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {

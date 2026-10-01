@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { MCPAppFrame } from '@/components/apps/MCPAppFrame'
 import { UserBubble } from '@/components/session/Bubble'
 import { UserMessageMarkdown } from '@/components/session/MessageMarkdown'
 import { SystemEventRow } from '@/components/session/SystemEventRow'
@@ -44,6 +45,8 @@ export function ChatLog({
               <UserBubble text={entry.text} createdAt={entry.at} />
             ) : entry.kind === 'activity' ? (
               <SystemEventRow event={entry.event} />
+            ) : entry.kind === 'app' ? (
+              <MCPAppFrame app={entry.app} call={entry.app} active />
             ) : (
               <div className="flex items-end gap-2.5">
                 {named ? (
