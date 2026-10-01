@@ -113,14 +113,15 @@ export interface ThreadDetailsView {
 
 // One thread's full view: transcript, composer, and side panel. `header` and
 // `details` let an owning surface (a bot) replace the titlebar identity and the
-// Overview panel; `chat` replaces the agent transcript with a chat log.
+// Overview panel, and `openDetails` decide whether that panel starts open;
+// `chat` replaces the agent transcript with a chat log.
 export function ThreadView({
   sessionId,
   message,
   initialPrompt,
   header,
   details,
-  openDetails = false,
+  openDetails,
   placeholder,
   chat,
 }: {

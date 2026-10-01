@@ -27,7 +27,10 @@ export function SidePanelStateProvider({ children }: { children: ReactNode }) {
   return <PanelStates.Provider value={panels}>{children}</PanelStates.Provider>
 }
 
-export function useSidePanelState(sessionId: string, sideChatAvailable = false, openOverview = false) {
+// A panel starts open or closed as the user last left one, unless its owner
+// decides with `startOpen`; that choice and its toggles stay out of the shared
+// preference.
+export function useSidePanelState(sessionId: string, sideChatAvailable = false, startOpen?: boolean) {
   const panels = useContext(PanelStates)
   if (!panels) {
     throw new Error('Side panel state requires SidePanelStateProvider')
@@ -60,8 +63,8 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false, 
     if (saved) {
       return saved.open
     }
-    if (openOverview) {
-      return true
+    if (startOpen !== undefined) {
+      return startOpen
     }
     const stored = localStorage.getItem(PANEL_OPEN_KEY)
     return stored === 'open' ? true : stored === 'closed' ? false : !isMobileViewport()
@@ -87,8 +90,10 @@ export function useSidePanelState(sessionId: string, sideChatAvailable = false, 
   }, [panels, sessionId, state, open, mode, widthOverride])
 
   useEffect(() => {
-    localStorage.setItem(PANEL_OPEN_KEY, open ? 'open' : 'closed')
-  }, [open])
+    if (startOpen === undefined) {
+      localStorage.setItem(PANEL_OPEN_KEY, open ? 'open' : 'closed')
+    }
+  }, [open, startOpen])
 
   const showTabs = useCallback(() => {
     setSidebarOpen?.(false)
