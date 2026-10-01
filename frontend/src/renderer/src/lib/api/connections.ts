@@ -5,8 +5,9 @@ import type { ConnectionQRStatus, ConnectionStart, IntegrationPlugin } from './t
 
 export const connectionPluginsQuery = queryOptions({
   queryKey: keys.connectionPlugins,
-  queryFn: async () => {
+  queryFn: async ({ client }) => {
     const data = await get<{ plugins: IntegrationPlugin[] | null }>('/v1/connections/plugins')
+    void client.invalidateQueries({ queryKey: keys.mcpApps, exact: true })
     return data.plugins ?? []
   },
 })

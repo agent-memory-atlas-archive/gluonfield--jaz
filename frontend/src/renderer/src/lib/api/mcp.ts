@@ -110,7 +110,7 @@ export function deepLinkTarget(url: string): { tool: string; path: string } | un
 
 // entrypointKey names an entrypoint in routes and panel tab ids.
 export function entrypointKey(entry: Pick<MCPEntrypoint, 'server_id' | 'tool'>): string {
-  return `${entry.server_id}/${encodeURIComponent(entry.tool)}`
+  return `${encodeURIComponent(entry.server_id)}/${encodeURIComponent(entry.tool)}`
 }
 
 // fileEntrypoint is the viewer a connected server offers for a file path.
