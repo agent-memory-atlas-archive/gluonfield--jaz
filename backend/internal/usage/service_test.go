@@ -136,6 +136,8 @@ func TestDailyCategorizesUsageBySourceType(t *testing.T) {
 		{SessionID: "dream-1", SourceType: storage.SourceMemoryDream, Usage: storage.Usage{InputTokens: 30, OutputTokens: 3}, Source: storage.UsageEventSourceTurn, CreatedAt: day},
 		{SessionID: "search-1", SourceType: storage.SourceMemorySearch, Usage: storage.Usage{InputTokens: 20, OutputTokens: 2}, Source: storage.UsageEventSourceTurn, CreatedAt: day},
 		{SessionID: "browser-1", SourceType: storage.LegacySourceBrowserTask, Usage: storage.Usage{InputTokens: 10, OutputTokens: 1}, Source: storage.UsageEventSourceTurn, CreatedAt: day},
+		{SessionID: "bot-1", SourceType: storage.SourceBot, Usage: storage.Usage{InputTokens: 60, OutputTokens: 6}, Source: storage.UsageEventSourceTurn, CreatedAt: day},
+		{SessionID: "subtask-1", SourceType: storage.SourceBotWorker, Usage: storage.Usage{InputTokens: 30, OutputTokens: 3}, Source: storage.UsageEventSourceTurn, CreatedAt: day},
 		{SessionID: "imported", SourceType: storage.SourceLoopRun, Usage: storage.Usage{InputTokens: 9_000}, Source: storage.UsageEventSourceSessionImport, CreatedAt: day},
 	}}
 	daily, err := (Service{store: store, now: func() time.Time { return now }}).Daily(DailyQuery{Days: 1, Location: time.UTC})
@@ -155,11 +157,15 @@ func TestDailyCategorizesUsageBySourceType(t *testing.T) {
 		storage.SourceMemoryDream:       33,
 		storage.SourceMemorySearch:      22,
 		storage.LegacySourceBrowserTask: 11,
+		storage.SourceBot:               99, // the bot's own thread and its subtask
 	}
 	for category, total := range want {
 		if got[category] != total {
 			t.Fatalf("category %q = %d, want %d (all: %#v)", category, got[category], total, bucket.Categories)
 		}
+	}
+	if _, split := got[storage.SourceBotWorker]; split {
+		t.Fatalf("a bot's subtasks are their own category: %#v", bucket.Categories)
 	}
 	if summed != bucket.Usage.InputOutputTokens() {
 		t.Fatalf("categories sum to %d, daily total is %d", summed, bucket.Usage.InputOutputTokens())

@@ -49,12 +49,16 @@ type CategoryUsage struct {
 }
 
 // CategoryChat is the category for interactive sessions, which carry no source
-// type. Worker categories reuse their storage source-type keys verbatim.
+// type. Other categories reuse their storage source-type keys verbatim, except
+// that a bot's subtasks are the bot's own work.
 const CategoryChat = "chat"
 
 func usageCategory(sourceType string) string {
-	if sourceType == "" {
+	switch sourceType {
+	case "":
 		return CategoryChat
+	case storage.SourceBotWorker:
+		return storage.SourceBot
 	}
 	return sourceType
 }
