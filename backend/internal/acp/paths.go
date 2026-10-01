@@ -18,7 +18,7 @@ import (
 // fresh directory named after its slug. worktree=true swaps the directory for
 // a disposable git worktree on a session branch.
 func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg AgentConfig, slug, id string) (string, string, error) {
-	directory := strings.TrimSpace(req.Directory)
+	directory := req.Directory
 	branch := strings.TrimSpace(req.Branch)
 	if branch != "" && !req.Worktree {
 		return "", "", fmt.Errorf("branch requires worktree=true")

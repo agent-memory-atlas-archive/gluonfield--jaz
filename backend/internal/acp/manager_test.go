@@ -1644,6 +1644,10 @@ func TestManagerResumesStoredSessionAfterRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	file := filepath.Join(spawned.Cwd, "result.txt")
+	if err := os.WriteFile(file, []byte("before restart"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := first.Send(ctx, acp.SendRequest{Session: spawned.SessionID, Message: "say hello", Completion: acp.CompletionInline}); err != nil {
 		t.Fatal(err)
 	}
@@ -1668,6 +1672,12 @@ func TestManagerResumesStoredSessionAfterRestart(t *testing.T) {
 	}
 	if job.ACPSession != "fake-session" {
 		t.Fatalf("acp session = %q", job.ACPSession)
+	}
+	if job.Cwd != spawned.Cwd {
+		t.Fatalf("resumed cwd = %q, want %q", job.Cwd, spawned.Cwd)
+	}
+	if data, err := os.ReadFile(filepath.Join(job.Cwd, "result.txt")); err != nil || string(data) != "before restart" {
+		t.Fatalf("resumed file = %q, %v", data, err)
 	}
 	messages, err := store.LoadMessages(spawned.SessionID)
 	if err != nil {
@@ -2020,8 +2030,9 @@ func TestSpawnSessionDirectories(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace := t.TempDir()
+	root := t.TempDir()
 	manager := acp.NewManager(store, acp.Config{
-		Root:      t.TempDir(),
+		Root:      root,
 		Workspace: workspace,
 		Agents: map[string]acp.AgentConfig{
 			"fake": {
@@ -2088,14 +2099,15 @@ func TestSpawnSessionDirectories(t *testing.T) {
 		t.Fatalf("home was not created: %v", err)
 	}
 
-	// No directory: a fresh per-session directory named after the slug.
+	// No directory: a permanent per-chat home named after the session id.
 	spawned, err = manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "fake", Slug: "adhoc-task"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _, _ = manager.Cancel(context.Background(), spawned.SessionID) }()
-	if spawned.Cwd != filepath.Join(workspace, spawned.Slug) {
-		t.Fatalf("default cwd = %q, want workspace/%s", spawned.Cwd, spawned.Slug)
+	want = filepath.Join(root, "chats", spawned.SessionID)
+	if spawned.Cwd != want {
+		t.Fatalf("default cwd = %q, want %q", spawned.Cwd, want)
 	}
 
 	// Escapes are rejected and the failure lands on the session row.

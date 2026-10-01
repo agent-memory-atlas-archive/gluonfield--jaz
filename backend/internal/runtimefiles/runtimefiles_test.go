@@ -16,6 +16,7 @@ func TestEnsureCreatesRuntimeLayout(t *testing.T) {
 	for _, dir := range []string{
 		layout.Root,
 		layout.Sessions,
+		layout.Chats,
 		layout.Workspaces,
 		layout.DefaultWorkspace,
 		layout.UserSkills,

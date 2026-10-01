@@ -15,6 +15,7 @@ import (
 	"github.com/wins/jaz/backend/internal/mcpsession"
 	"github.com/wins/jaz/backend/internal/promptmodule"
 	"github.com/wins/jaz/backend/internal/provider"
+	"github.com/wins/jaz/backend/internal/runtimefiles"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 )
@@ -99,9 +100,8 @@ type SpawnRequest struct {
 	ACPAgent string
 	Slug     string
 	Title    string
-	// Directory is where the agent works, relative to the jaz workspace
-	// (absolute paths must stay inside it); created if missing. Empty means
-	// a fresh per-session directory named after the slug.
+	// Directory selects a project on the server. Relative paths are resolved
+	// inside the Jaz workspace; omitted paths use a permanent per-chat home.
 	Directory string
 	// Home gives the session a permanent directory of its own instead: one
 	// under this root named after the session's id, created if missing.
@@ -435,6 +435,9 @@ func (m *Manager) createSession(ctx context.Context, req SpawnRequest) (createdS
 	}
 	if err := m.validateSpawnModelBeforePersist(ctx, req, cfg); err != nil {
 		return createdSession{}, err
+	}
+	if req.Directory == "" && req.Home == "" && !req.Worktree {
+		req.Home = runtimefiles.New(m.cfg.Root).Chats
 	}
 	session, err := m.createStoredSession(req, cfg, effort)
 	if err != nil {
