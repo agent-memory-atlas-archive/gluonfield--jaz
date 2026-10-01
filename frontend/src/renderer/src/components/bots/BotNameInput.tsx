@@ -2,31 +2,32 @@ import { useRef, useState } from 'react'
 import type { Bot } from '@/lib/api/types'
 import { useUpdateBot } from './useUpdateBot'
 
-// Blur or Enter saves; Escape puts the old name back.
+// Blur or Enter saves; Escape puts the old name back. Only an edit in progress
+// is held here, so a rename made elsewhere shows at once.
 export function BotNameInput({ bot, autoFocus, className, onDone }: {
   bot: Bot
   autoFocus?: boolean
   className: string
   onDone?: () => void
 }) {
-  const [value, setValue] = useState(bot.name)
+  const [draft, setDraft] = useState<string | null>(null)
   const cancelled = useRef(false)
   const update = useUpdateBot(bot.id)
 
   const finish = () => {
-    const next = value.trim()
+    const next = draft?.trim()
     if (!cancelled.current && next && next !== bot.name) update.mutate({ name: next })
-    else setValue(bot.name)
+    setDraft(null)
     onDone?.()
   }
 
   return (
     <input
       autoFocus={autoFocus}
-      value={value}
+      value={draft ?? bot.name}
       aria-label="Name"
       placeholder="Name"
-      onChange={(e) => setValue(e.target.value)}
+      onChange={(e) => setDraft(e.target.value)}
       onFocus={(e) => {
         cancelled.current = false
         e.currentTarget.select()

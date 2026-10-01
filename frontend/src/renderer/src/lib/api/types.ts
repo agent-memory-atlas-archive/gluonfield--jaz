@@ -1,3 +1,4 @@
+import type { BotAvatar } from '@shared/bots'
 // Mirrors of the Go backend's JSON shapes (backend/internal/storage,
 // sessionevents, server). Field names must match exactly.
 import type { CallToolResult } from '@modelcontextprotocol/client'
@@ -696,13 +697,7 @@ export interface MCPAppEvent {
   result: CallToolResult
 }
 
-export type BotShape = 'circle' | 'blob' | 'squircle' | 'pill' | 'triangle' | 'hex' | 'cloud' | 'drop'
-export type BotColor = 'white' | 'brown' | 'red' | 'orange' | 'amber' | 'green' | 'teal' | 'blue' | 'purple' | 'pink' | 'gray'
-
-export interface BotAvatar {
-  shape: BotShape
-  color: BotColor
-}
+export type { BotAvatar, BotColor, BotShape } from '@shared/bots'
 
 // A bot is a thread with a face; a group is a thread whose members are bots.
 // The id is the backing thread's session id.
@@ -721,13 +716,11 @@ export interface Bot {
   model?: string
   reasoning_effort?: string
   members?: string[]
-  routines?: number
 }
 
 export interface BotActivityEvent {
   kind: 'routine' | 'message_sent' | 'message_received' | 'group'
   label: string
-  bot_id?: string
 }
 
 export interface RoomMessageEvent {

@@ -21,6 +21,8 @@ import { isSettingsSection, type SettingsSection } from '@/components/settings/s
 import { MCPApps } from '@/components/apps/MCPAppFrame'
 import { SettingsOverlay } from '@/components/settings/SettingsOverlay'
 import { NavRail, RAIL_WIDTH, railTab } from '@/components/sidebar/NavRail'
+import { BotsPanel } from '@/components/bots/BotsPanel'
+import { ChatPanel } from '@/components/sidebar/ChatPanel'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { TitlebarNavigation } from '@/components/sidebar/TitlebarNavigation'
 import { ToastProvider } from '@/components/ui/toast'
@@ -330,18 +332,21 @@ function RootLayout() {
                   transition={slide}
                 >
                   <Sidebar
-                    open={panelOpen}
                     width={sidebarWidth}
                     mobile={isMobile}
-                    bots={tab === '/bots'}
                     onDismiss={() => setSidebarOpen(false)}
                     resizing={resizing}
                     onResizeStart={startResize}
                     onResizeReset={() => setSidebarWidth(SIDEBAR_DEFAULT_WIDTH)}
-                    onOpenCommandPalette={() => setCommandOpen(true)}
                     onOpenSettings={() => openSettings()}
                     onOpenConnect={() => setConnectOpen(true)}
-                  />
+                  >
+                    {tab === '/bots' ? (
+                      <BotsPanel mobile={isMobile} />
+                    ) : (
+                      <ChatPanel open={panelOpen} mobile={isMobile} onOpenCommandPalette={() => setCommandOpen(true)} />
+                    )}
+                  </Sidebar>
                 </motion.div>
               </motion.div>
 

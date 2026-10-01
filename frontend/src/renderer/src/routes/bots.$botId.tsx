@@ -3,12 +3,12 @@ import { createFileRoute, useLocation } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { BotPill } from '@/components/bots/BotAvatar'
 import { BotDetails } from '@/components/bots/BotDetails'
-import { ChatLog } from '@/components/bots/ChatLog'
+import { BotChat } from '@/components/bots/BotChat'
 import { GroupChat } from '@/components/bots/GroupChat'
 import { ThreadView } from '@/components/session/ThreadView'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { botsQuery } from '@/lib/api/bots'
-import { botChat, rememberBot, subtasksDoing } from '@/lib/bots'
+import { rememberBot } from '@/lib/bots'
 
 declare module '@tanstack/history' {
   interface HistoryState {
@@ -38,12 +38,7 @@ function BotRoute() {
       details={(view) => <BotDetails bot={bot} focusName={newBot} {...view} />}
       openDetails={newBot}
       placeholder={`Message ${bot.name}`}
-      chat={({ messages, events, working, threads }) => {
-        const chat = botChat(messages, events, bot, working)
-        const subtasks = subtasksDoing(threads)
-        const busy = working ? [{ bot, ...chat.work }] : subtasks ? [{ bot, doing: subtasks }] : []
-        return <ChatLog entries={chat.entries} bots={bots.data ?? []} named={false} working={busy} />
-      }}
+      chat={(view) => <BotChat bot={bot} bots={bots.data ?? []} {...view} />}
     />
   )
 }

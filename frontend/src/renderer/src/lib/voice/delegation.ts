@@ -75,7 +75,10 @@ export function voiceTaskUpdate(task: VoiceTask, snapshot: SessionMessages): Tas
     if (terminal?.state === 'cancelled' || (!nextUser && (snapshot.acp_state === 'cancelled' || snapshot.session.status === 'interrupted'))) return { state: 'cancelled', text: 'The agent task was cancelled.' }
     const error = terminal?.error || (!nextUser && (snapshot.acp_error || snapshot.session.error))
     if (error || terminal?.state === 'failed') return { state: 'failed', text: error || 'The agent task failed.' }
-    const answer = voiceReplies(snapshot, events).at(-1)?.text || events.findLast((event) => event.type === 'acp_message')?.content || after.findLast((message) => message.role === 'assistant' && (!nextUser || message.seq < nextUser.seq))?.content
+    // A bot's saved assistant text is its private narration, so only other
+    // agents fall back to it.
+    const written = snapshot.session.source_type === 'bot' ? undefined : after.findLast((message) => message.role === 'assistant' && (!nextUser || message.seq < nextUser.seq))?.content
+    const answer = voiceReplies(snapshot, events).at(-1)?.text || written
     if (answer) return { state: 'completed', text: answer }
     return { state: 'completed', text: 'The agent finished without a written answer. Check the chat for its tool results.' }
   }

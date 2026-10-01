@@ -20,6 +20,12 @@ export const BOT_COLORS: Record<BotColor, string> = {
   gray: '#a3a3ad',
 }
 
+// A bot's colour drawn as text or marks: mixed toward ink, so white and the
+// pale colours stay readable in either theme.
+export function botInk(color: BotColor): string {
+  return `color-mix(in oklab, ${BOT_COLORS[color]} 65%, var(--color-ink))`
+}
+
 const pick = <T>(items: T[]): T => items[Math.floor(Math.random() * items.length)]
 
 // A random face skips the neutral white and gray.
@@ -50,21 +56,17 @@ export function pinOrder(bots: Bot[]): string[] {
     .map((bot) => bot.id)
 }
 
-// Pinned tiles in pin order; the list below moves with activity.
-export function botSections(bots: Bot[], pins = pinOrder(bots)) {
-  return {
-    pinned: pins.flatMap((id) => bots.find((bot) => bot.id === id) ?? []),
-    rest: bots.filter((bot) => !pins.includes(bot.id)).toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
-  }
-}
-
-// The panel mid-drag: every bot where it would land, and the dragged bot also
-// left hidden where it started once its preview moves to the other section,
-// because the element a drag starts from must stay mounted for it to end.
+// Pinned tiles in pin order and the list below by activity. Mid-drag every
+// bot shows where it would land, and the dragged bot is also left hidden where
+// it started once its preview moves to the other section, because the element
+// a drag starts from must stay mounted for it to end.
 export function dragSections(bots: Bot[], pins: string[], drag?: { id: string; pins: string[] }) {
-  const { pinned, rest } = botSections(bots, drag?.pins ?? pins)
-  const tiles = pinned.map((bot) => ({ bot, hidden: false }))
-  const rows = rest.map((bot) => ({ bot, hidden: false }))
+  const shown = drag?.pins ?? pins
+  const tiles = shown.flatMap((id) => bots.find((bot) => bot.id === id) ?? []).map((bot) => ({ bot, hidden: false }))
+  const rows = bots
+    .filter((bot) => !shown.includes(bot.id))
+    .toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
+    .map((bot) => ({ bot, hidden: false }))
   const source = drag && bots.find((bot) => bot.id === drag.id)
   if (source && pins.includes(source.id) !== drag.pins.includes(source.id)) {
     const origin = pins.includes(source.id) ? tiles : rows

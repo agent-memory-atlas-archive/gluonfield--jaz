@@ -1,42 +1,26 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Checkbox } from '@/components/ui/Checkbox'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
-import { useToast } from '@/components/ui/toast'
-import { createGroup } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { keys } from '@/lib/query/keys'
 import { BotAvatar } from './BotAvatar'
+import { useCreateGroup } from './useCreateBot'
 
 export function NewGroupDialog({ open, bots, onClose }: { open: boolean; bots: Bot[]; onClose: () => void }) {
   const [name, setName] = useState('')
   const [members, setMembers] = useState<string[]>([])
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const toast = useToast()
+  const create = useCreateGroup()
   const candidates = bots.filter((bot) => bot.kind === 'bot')
   const close = () => {
     setName('')
     setMembers([])
     onClose()
   }
-  const create = useMutation({
-    mutationFn: () =>
-      createGroup({
-        name: name.trim() || candidates.filter((bot) => members.includes(bot.id)).map((bot) => bot.name).join(', '),
-        members,
-      }),
-    onSuccess: (group) => {
-      queryClient.setQueryData<Bot[]>(keys.bots, (list = []) => [group, ...list])
-      void queryClient.invalidateQueries({ queryKey: keys.bots })
-      close()
-      void navigate({ to: '/bots/$botId', params: { botId: group.id } })
-    },
-    onError: (error) => toast(`Couldn't create the group: ${error.message}`, 'danger'),
-  })
+  const submit = () => create.mutate({
+    name: name.trim() || candidates.filter((bot) => members.includes(bot.id)).map((bot) => bot.name).join(', '),
+    members,
+  }, { onSuccess: close })
 
   return (
     <Modal
@@ -49,7 +33,7 @@ export function NewGroupDialog({ open, bots, onClose }: { open: boolean; bots: B
           <Button variant="ghost" onClick={close}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={members.length < 2 || create.isPending} onClick={() => create.mutate()}>
+          <Button variant="primary" disabled={members.length < 2 || create.isPending} onClick={submit}>
             Create
           </Button>
         </div>

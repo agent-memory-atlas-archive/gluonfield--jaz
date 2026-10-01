@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useBackendChange } from '@/lib/connection'
+import type { Bot } from '@/lib/api/types'
 import { keys } from '@/lib/query/keys'
+import { useVoiceBot, voiceHome } from '@/lib/voice/bot'
 import { initialVoiceState, VoiceSession, type VoiceHandle } from '@/lib/voice/session'
 
-type VoiceContextValue = VoiceHandle & { sessionId: string | null; connect: (sessionId: string) => void }
+// The conversation, the bot it is with if any, and the route it lives on.
+type VoiceContextValue = VoiceHandle & { sessionId: string | null; bot?: Bot; home: string; connect: (sessionId: string) => void }
 const VoiceContext = createContext<VoiceContextValue | null>(null)
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
@@ -38,13 +41,15 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     mute: () => current.current?.mute(),
     muteSpeaker: () => current.current?.muteSpeaker(),
   }), [])
+  const bot = useVoiceBot(sessionId)
+  const home = sessionId ? voiceHome(sessionId, bot) : ''
   useBackendChange(actions.dismiss)
   useEffect(() => () => {
     current.current?.dispose()
     current.current = null
   }, [])
 
-  return <VoiceContext.Provider value={{ ...state, ...actions, sessionId, connect }}>{children}</VoiceContext.Provider>
+  return <VoiceContext.Provider value={{ ...state, ...actions, sessionId, bot, home, connect }}>{children}</VoiceContext.Provider>
 }
 
 export function useGlobalVoice() {

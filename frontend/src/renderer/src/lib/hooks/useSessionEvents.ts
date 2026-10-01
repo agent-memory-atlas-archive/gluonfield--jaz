@@ -43,6 +43,7 @@ export function useSessionEvents(
       // Turn boundaries are when the working tree changes — refresh repo
       // state and the changes summary here instead of polling for them.
       queryClient.invalidateQueries({ queryKey: keys.sessionRepo(sessionId) })
+      queryClient.invalidateQueries({ queryKey: keys.loops })
     }
     let pending: SessionEvent[] = []
     let flushTimer: ReturnType<typeof setTimeout> | null = null

@@ -1,16 +1,17 @@
-import { useRouter, useRouterState } from '@tanstack/react-router'
+import { useRouter } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
+import type { BotAvatar } from '@shared/bots'
 import { VoicePill } from '@/components/session/VoiceMode'
 import { clientRuntime } from '@/lib/clientRuntime'
-import { useVoiceBot, voiceHome } from '@/lib/voice/bot'
+import { useVoiceDocked } from '@/lib/voice/bot'
 import type { VoiceHandle } from '@/lib/voice/session'
 import { useGlobalVoice } from '@/lib/voice/VoiceProvider'
 
 // The voice pill away from its chat: drag it anywhere, click it to go back.
 // Its own buttons keep their clicks.
-export function FloatingVoice({ voice, sessionId, onReturn, level, outputLevel }: {
+export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
   voice: VoiceHandle
-  sessionId: string
+  face: BotAvatar | null
   onReturn: () => void
   level?: number
   outputLevel?: number
@@ -62,7 +63,7 @@ export function FloatingVoice({ voice, sessionId, onReturn, level, outputLevel }
       onPointerCancel={finish}
       onLostPointerCapture={finish}
     >
-      <VoicePill voice={voice} sessionId={sessionId} level={level} outputLevel={outputLevel} onReturn={onReturn} />
+      <VoicePill voice={voice} face={face} level={level} outputLevel={outputLevel} onReturn={onReturn} />
     </div>
   )
 }
@@ -70,18 +71,13 @@ export function FloatingVoice({ voice, sessionId, onReturn, level, outputLevel }
 export function GlobalVoice() {
   const voice = useGlobalVoice()
   const router = useRouter()
-  const bot = useVoiceBot(voice.sessionId)
-  const location = useRouterState({ select: (state) => state.location })
-  if (clientRuntime.voiceOverlay || voice.phase === 'off' || !voice.sessionId) {
-    return null
-  }
-  const home = voiceHome(voice.sessionId, bot)
-  if (location.pathname === home && !location.search.settings) {
+  const docked = useVoiceDocked(voice.home)
+  if (clientRuntime.voiceOverlay || voice.phase === 'off' || !voice.sessionId || docked) {
     return null
   }
   return (
     <div className="fixed right-5 bottom-5 z-[80] max-sm:right-3 max-sm:bottom-3">
-      <FloatingVoice voice={voice} sessionId={voice.sessionId} onReturn={() => router.history.push(home)} />
+      <FloatingVoice voice={voice} face={voice.bot?.avatar ?? null} onReturn={() => router.history.push(voice.home)} />
     </div>
   )
 }

@@ -20,11 +20,11 @@ const poses: Record<VoiceAvatarState, { shape: ShapeId; eyes: EyeId; tilt: numbe
   error: { shape: 'pebble', eyes: 'uneasy', tilt: -4, gaze: 0, duration: 7 },
 }
 
-export function VoiceVisualizer({ voice, level = 0, outputLevel = 0, size = 88 }: {
+export function VoiceVisualizer({ voice, level, outputLevel, size }: {
   voice: VoiceState
-  level?: number
-  outputLevel?: number
-  size?: number
+  level: number
+  outputLevel: number
+  size: number
 }) {
   const reducedMotion = useReducedEffectsMotion()
   const input = useRef({ voice, level, outputLevel })

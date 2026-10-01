@@ -51,7 +51,7 @@ func (s *Service) Message(fromThread, ref, text string) error {
 	if to == fromThread {
 		return errors.New("a bot cannot message itself")
 	}
-	s.announce(fromThread, sessionevents.BotActivityEvent{Kind: "message_sent", Label: session.Title, BotID: to})
+	s.announce(fromThread, sessionevents.BotActivityEvent{Kind: "message_sent", Label: session.Title})
 	go s.deliver(fromThread, sender, to, session.Title, text)
 	return nil
 }
@@ -90,7 +90,7 @@ func (s *Service) Say(threadID, text string) error {
 func (s *Service) deliver(fromThread, sender, to, recipient, text string) {
 	ctx, cancel := context.WithTimeout(context.Background(), turnTimeout)
 	defer cancel()
-	said, err := s.ask(ctx, to, "", messagePrompt(sender, text), sessionevents.BotActivityEvent{Kind: "message_received", Label: sender, BotID: fromThread})
+	said, err := s.ask(ctx, to, "", messagePrompt(sender, text), sessionevents.BotActivityEvent{Kind: "message_received", Label: sender})
 	if err != nil {
 		s.log.Warn("bot message failed", "from", fromThread, "to", to, "error", err)
 		return
@@ -102,7 +102,7 @@ func (s *Service) deliver(fromThread, sender, to, recipient, text string) {
 		s.log.Warn("bot reply delivery failed", "from", to, "to", fromThread, "error", err)
 		return
 	}
-	s.announce(fromThread, sessionevents.BotActivityEvent{Kind: "message_received", Label: recipient, BotID: to})
+	s.announce(fromThread, sessionevents.BotActivityEvent{Kind: "message_received", Label: recipient})
 }
 
 // RunRoutine runs a routine's prompt as a hidden turn in its bot's thread once

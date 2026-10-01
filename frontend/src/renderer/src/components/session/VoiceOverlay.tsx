@@ -13,5 +13,5 @@ export function VoiceOverlay() {
   const voice = { ...state, analyser: null, outputAnalyser: null,
     start: () => command('reconnect'), end: () => command('exit'), dismiss: () => command('exit'),
     mute: () => command('mute'), muteSpeaker: () => command('muteSpeaker') }
-  return <div className="grid h-full place-items-center p-3"><FloatingVoice voice={voice} sessionId={state.sessionId} level={state.level} outputLevel={state.outputLevel} onReturn={() => command('return')} /></div>
+  return <div className="grid h-full place-items-center p-3"><FloatingVoice voice={voice} face={state.face} level={state.level} outputLevel={state.outputLevel} onReturn={() => command('return')} /></div>
 }

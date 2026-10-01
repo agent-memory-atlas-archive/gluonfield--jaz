@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { Plus } from 'lucide-react'
-import { useCreateBot } from '@/components/bots/NewBotPicker'
+import { useCreateBot } from '@/components/bots/useCreateBot'
 import { Button } from '@/components/ui/Button'
 import { botsQuery } from '@/lib/api/bots'
 import { lastBotId } from '@/lib/bots'

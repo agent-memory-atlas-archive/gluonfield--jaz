@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUp } from 'lucide-react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ComposerFrame } from '@/components/session/ComposerFrame'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from '@/components/session/MentionInput'
 import { SidePanelControl } from '@/components/session/SidePanelControl'
+import { panelSpring } from '@/components/session/SidePanelDrawer'
 import { THREAD_COLUMN_CLASS } from '@/components/session/threadLayout'
 import { useThreadAutoScroll } from '@/components/session/useThreadAutoScroll'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -48,8 +49,9 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
   )
   // Members' status comes from the bot list, polled briskly while the room is
   // open so "is working" rows keep up with the round.
-  const fresh = useQuery({ ...botsQuery, refetchInterval: 2_000 }).data ?? bots
-  const working = fresh.filter((bot) => group.members?.includes(bot.id) && bot.status === 'running')
+  useQuery({ ...botsQuery, refetchInterval: 2_000 })
+  const working = bots.filter((bot) => group.members?.includes(bot.id) && bot.status === 'running')
+  const reducedMotion = useReducedMotion()
 
   useEffect(() => {
     void markThreadSeen(group.id).finally(() => invalidateSessionLists(queryClient))
@@ -97,7 +99,7 @@ export function GroupChat({ group, bots }: { group: Bot; bots: Bot[] }) {
       <motion.div
         initial={false}
         animate={{ width: detailsOpen ? OVERVIEW_PANEL_WIDTH : 0 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 36 }}
+        transition={reducedMotion ? { duration: 0 } : { type: 'spring', ...panelSpring }}
         inert={!detailsOpen}
         className="h-full shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:right-0 max-sm:z-shell"
       >

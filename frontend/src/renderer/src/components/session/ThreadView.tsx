@@ -567,7 +567,7 @@ export function ThreadView({
               before={<ScrollToBottomButton visible={showScrollToBottom} onClick={scrollToBottom} />}
               onHeightChange={setBottomDockHeight}
             >
-              <VoiceMode voice={voice} sessionId={sessionId} />
+              <VoiceMode voice={voice} face={voice.bot?.avatar ?? null} />
               {showPlanDecision ? (
                 <PlanDecisionCard
                   pending={planDecisionPending}

@@ -6,30 +6,64 @@ import { agentLabel } from '@/lib/agentLabel'
 import { enabledACPAgents, runtimeModelState } from '@/lib/agentRuntimes'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import type { AgentSessionState, Bot } from '@/lib/api/types'
-import type { ModelSelection } from '@/lib/modelPicker'
 import { useModelReasoningState } from '@/lib/modelReasoning'
 import { useUpdateBot } from './useUpdateBot'
 
 // The bot's agent and model in the composer's picker. A running agent's own
-// options are the truth for the bot; before it starts, the bot's stored pick is.
+// options are the truth for the bot; before it starts, the bot's stored pick
+// is, and then the agent's default. One save at a time, so an agent switch and
+// a model change cannot race.
 export function BotAgentSettings({ bot, agentSession, working }: { bot: Bot; agentSession?: AgentSessionState; working: boolean }) {
-  const settings = useQuery(agentSettingsQuery)
+  const settings = useQuery(agentSettingsQuery).data
   const update = useUpdateBot(bot.id)
-  const agents = enabledACPAgents(settings.data)
+  const disabled = working || update.isPending
+  const agent = bot.agent ?? ''
   const live = (category: string) => agentSession?.config_options?.find((option) => option.category === category)?.current_value
+  const runtime = runtimeModelState(settings, agent)
+  const model = live('model') || bot.model || runtime.defaultModel
+  const reasoning = useModelReasoningState({
+    settings,
+    agent,
+    model,
+    reasoningEffort: live('thought_level') || bot.reasoning_effort || runtime.defaultEffort,
+    usesProvider: runtime.usesProvider,
+    provider: runtime.provider,
+    selectedProvider: runtime.selectedProvider,
+  })
   return (
     <div className="-mx-2.5 flex flex-col">
       <Row label="Agent">
-        <AgentSelect bot={bot} agents={agents} working={working} />
+        <Select
+          aria-label="Agent"
+          variant="plain"
+          value={agent}
+          options={agentOptions(enabledACPAgents(settings), agent)}
+          disabled={disabled}
+          onChange={(next) => {
+            if (next === agent) return
+            // Another agent keeps the bot, its chat and routines, but starts
+            // with no memory of the conversation, so the move asks first.
+            const label = agentLabel(next)
+            if (!window.confirm(`Move ${bot.name} to ${label}? ${label} starts with a fresh memory; the chat and routines stay.`)) return
+            update.mutate({ agent: next })
+          }}
+        />
       </Row>
       <Row label="Model">
-        <AgentModelSelect
-          agent={bot.agent ?? ''}
-          model={live('model') || bot.model}
-          effort={live('thought_level') || bot.reasoning_effort}
-          disabled={working || update.isPending}
-          onChange={(next) => update.mutate({ model: next.model, reasoning_effort: next.effort })}
-        />
+        <div className="-mr-2.5 flex min-w-0 flex-1 justify-end">
+          <ModelSelect
+            key={agent}
+            value={model}
+            effort={reasoning.effectiveReasoningEffort}
+            suggestions={reasoning.modelSuggestions}
+            effortOptions={reasoning.reasoningOptions}
+            loading={reasoning.modelsLoading}
+            disabled={disabled}
+            placement="below"
+            align="end"
+            onChange={(next) => update.mutate({ model: next.model, reasoning_effort: next.effort })}
+          />
+        </div>
       </Row>
     </div>
   )
@@ -44,67 +78,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-// Another agent keeps the bot, its chat and routines, but starts with no
-// memory of the conversation, so the move asks first.
-function AgentSelect({ bot, agents, working }: { bot: Bot; agents: string[]; working: boolean }) {
-  const update = useUpdateBot(bot.id)
-  const current = bot.agent ?? ''
-  return (
-    <Select
-      aria-label="Agent"
-      variant="plain"
-      value={current}
-      options={agentOptions(agents, current)}
-      disabled={working || update.isPending}
-      onChange={(agent) => {
-        if (agent === current) return
-        const label = agentLabel(agent)
-        if (!window.confirm(`Move ${bot.name} to ${label}? ${label} starts with a fresh memory; the chat and routines stay.`)) return
-        update.mutate({ agent })
-      }}
-    />
-  )
-}
-
 // The enabled agents, keeping one still in use after it was turned off.
 function agentOptions(agents: string[], current: string) {
   return (!current || agents.includes(current) ? agents : [current, ...agents]).map((agent) => ({ value: agent, label: agentLabel(agent) }))
-}
-
-// One agent's model and effort from its catalog, defaulting to the agent's own.
-function AgentModelSelect({ agent, model, effort, disabled, onChange }: {
-  agent: string
-  model?: string
-  effort?: string
-  disabled: boolean
-  onChange: (selection: ModelSelection) => void
-}) {
-  const settings = useQuery(agentSettingsQuery).data
-  const runtime = runtimeModelState(settings, agent)
-  const value = model || runtime.defaultModel
-  const reasoning = useModelReasoningState({
-    settings,
-    agent,
-    model: value,
-    reasoningEffort: effort || runtime.defaultEffort,
-    usesProvider: runtime.usesProvider,
-    provider: runtime.provider,
-    selectedProvider: runtime.selectedProvider,
-  })
-  return (
-    <div className="-mr-2.5 flex min-w-0 flex-1 justify-end">
-      <ModelSelect
-        key={agent}
-        value={value}
-        effort={reasoning.effectiveReasoningEffort}
-        suggestions={reasoning.modelSuggestions}
-        effortOptions={reasoning.reasoningOptions}
-        loading={reasoning.modelsLoading}
-        disabled={disabled}
-        placement="below"
-        align="end"
-        onChange={onChange}
-      />
-    </div>
-  )
 }

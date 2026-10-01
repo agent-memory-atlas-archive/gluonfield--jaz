@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from 'react'
 import { SidePanelResizeHandle } from '@/components/session/SidePanelResizeHandle'
 import type { useSidePanelState } from '@/components/session/SidePanelState'
 
-const panelSpring = { stiffness: 400, damping: 36 }
+export const panelSpring = { stiffness: 400, damping: 36 }
 const widthTransition = `width ${spring({ ...panelSpring, keyframes: [0, 1] })}`
 
 export function SidePanelDrawer({ panel, isMobile, children }: {

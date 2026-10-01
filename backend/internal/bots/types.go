@@ -39,7 +39,6 @@ type Bot struct {
 	Model           string    `json:"model,omitempty"`
 	ReasoningEffort string    `json:"reasoning_effort,omitempty"`
 	Members         []string  `json:"members,omitempty"`
-	Routines        int       `json:"routines,omitempty"`
 }
 
 type CreateBot struct {

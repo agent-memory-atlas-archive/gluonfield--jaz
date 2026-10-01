@@ -1,34 +1,14 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, Users } from 'lucide-react'
 import { type KeyboardEvent, type ReactNode, useState } from 'react'
 import { PANEL_ICON_BUTTON_CLASS } from '@/components/sidebar/SidebarScroll'
 import { KeyboardShortcut } from '@/components/ui/KeyboardShortcut'
 import { Popover } from '@/components/ui/Popover'
-import { useToast } from '@/components/ui/toast'
-import { createBot } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
-import { botAvatars, randomAvatar } from '@/lib/bots'
-import { keys } from '@/lib/query/keys'
+import { botAvatars } from '@/lib/bots'
 import { BotIcon } from './BotAvatar'
 import { NewGroupDialog } from './NewGroupDialog'
-
-// A bot exists as soon as it is created; it opens with its details showing so
-// the placeholder name gets replaced first.
-export function useCreateBot() {
-  const queryClient = useQueryClient()
-  const navigate = useNavigate()
-  const toast = useToast()
-  return useMutation({
-    mutationFn: () => createBot({ name: 'New bot', avatar: randomAvatar() }),
-    onSuccess: (bot) => {
-      queryClient.setQueryData<Bot[]>(keys.bots, (bots = []) => [bot, ...bots])
-      void queryClient.invalidateQueries({ queryKey: keys.bots })
-      void navigate({ to: '/bots/$botId', params: { botId: bot.id }, state: { newBot: true } })
-    },
-    onError: (error) => toast(`Couldn't create a bot: ${error.message}`, 'danger'),
-  })
-}
+import { useCreateBot } from './useCreateBot'
 
 type Row = { key: string; label: string; icon: ReactNode; run: () => void }
 

@@ -40,6 +40,16 @@ export default tseslint.config(
     },
   },
   {
+    // Tests run in Bun, which has both Node's and the browser's globals.
+    files: ['**/*.test.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+  },
+  {
     files: ['src/renderer/**/*.{ts,tsx}'],
     plugins: {
       'react-hooks': reactHooks,

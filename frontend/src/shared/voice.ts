@@ -1,3 +1,5 @@
+import type { BotAvatar } from './bots'
+
 export type VoiceWorkActivity = 'thinking' | 'working' | null
 
 export type VoiceStatus = {
@@ -9,7 +11,9 @@ export type VoiceStatus = {
 }
 
 export type VoiceOverlayState = VoiceStatus & {
-  sessionId: string
+  // The face of the bot the conversation is with, sent so the overlay never
+  // has to look the bot up; null for Jaz.
+  face: BotAvatar | null
   // The route the conversation lives on: its thread, or its bot's chat.
   home: string
   docked: boolean

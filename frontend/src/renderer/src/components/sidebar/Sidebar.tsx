@@ -1,38 +1,29 @@
-import { Link } from '@tanstack/react-router'
-import { Search, Settings, SquarePen } from 'lucide-react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
-import { BotsPanel } from '@/components/bots/BotsPanel'
+import { Settings } from 'lucide-react'
+import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react'
 import { ConnectionFooterButton } from '@/components/connection/ConnectionFooterButton'
 import { UpdatePanel } from '@/components/update/UpdatePanel'
-import { NAV_LINK_CLASS, PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from './SidebarScroll'
-import { SidebarSessions } from './SidebarSessions'
 
-// The thread panel beside the content: Chat's threads, or the Bots list on
-// the Bots tab.
+// The panel beside the content, holding the current tab's list.
 export function Sidebar({
-  open,
   width,
   mobile = false,
-  bots = false,
   onDismiss,
   resizing,
   onResizeStart,
   onResizeReset,
-  onOpenCommandPalette,
   onOpenSettings,
   onOpenConnect,
+  children,
 }: {
-  open: boolean
   width: number
   mobile?: boolean
-  bots?: boolean
   onDismiss?: () => void
   resizing?: boolean
   onResizeStart: (e: ReactPointerEvent) => void
   onResizeReset: () => void
-  onOpenCommandPalette: () => void
   onOpenSettings: () => void
   onOpenConnect: () => void
+  children: ReactNode
 }) {
   return (
     <aside
@@ -46,31 +37,7 @@ export function Sidebar({
       className="relative flex h-full shrink-0 flex-col border-r border-border bg-panel max-sm:w-full!"
       style={{ width }}
     >
-      {bots ? (
-        <BotsPanel mobile={mobile} />
-      ) : (
-        <>
-          <SidebarHeader>
-            <Link to="/new" className={`${NAV_LINK_CLASS} min-w-0 flex-1`}>
-              <span className="grid size-[18px] shrink-0 place-items-center">
-                <SquarePen size={15} className="text-ink-2 max-sm:size-[18px]" />
-              </span>
-              <span className="flex-1">New task</span>
-            </Link>
-            <button
-              type="button"
-              onClick={onOpenCommandPalette}
-              aria-label="Open search"
-              className={PANEL_ICON_BUTTON_CLASS}
-            >
-              <Search size={15} className="max-sm:size-[18px]" />
-            </button>
-          </SidebarHeader>
-          <SidebarScroll mobile={mobile}>
-            <SidebarSessions open={open} />
-          </SidebarScroll>
-        </>
-      )}
+      {children}
 
       <div className="flex shrink-0 flex-col gap-0.5 border-t border-border pl-1.5 pr-3 py-1.5 empty:hidden max-sm:pl-3">
         <UpdatePanel />

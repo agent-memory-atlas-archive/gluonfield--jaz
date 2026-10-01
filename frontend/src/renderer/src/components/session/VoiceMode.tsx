@@ -1,19 +1,19 @@
 import { Mic, MicOff, RotateCcw, Volume2, VolumeX, X } from 'lucide-react'
 import { type HTMLMotionProps, motion } from 'motion/react'
 import { useEffect, useRef } from 'react'
+import type { BotAvatar as Face } from '@shared/bots'
 import { BotAvatar } from '@/components/bots/BotAvatar'
 import { VOICE_COLOR, VoiceVisualizer } from '@/components/session/VoiceVisualizer'
-import { BOT_COLORS } from '@/lib/bots'
+import { botInk } from '@/lib/bots'
 import { useReducedEffectsMotion } from '@/lib/effectsMotion'
 import { VoiceLevels } from '@/lib/voice/audioLevel'
-import { useVoiceBot } from '@/lib/voice/bot'
 import type { VoiceHandle } from '@/lib/voice/session'
 
 const WAVE_DOTS = 12
 
 // Voice mode in a thread: the voice pill over the composer, and what the
 // connection is doing when it is not simply live.
-export function VoiceMode({ voice, sessionId }: { voice: VoiceHandle; sessionId: string }) {
+export function VoiceMode({ voice, face }: { voice: VoiceHandle; face: Face | null }) {
   if (voice.phase === 'off') {
     return voice.error ? <p role="alert" className="mb-3 text-center text-xs text-danger">{voice.error}</p> : null
   }
@@ -24,7 +24,7 @@ export function VoiceMode({ voice, sessionId }: { voice: VoiceHandle; sessionId:
 
   return (
     <div className="mb-3 flex flex-col items-center" aria-label="Voice conversation">
-      <VoicePill voice={voice} sessionId={sessionId} />
+      <VoicePill voice={voice} face={face} />
       {status ? <p role="status" aria-atomic="true" className="mt-1.5 text-xs text-ink-2">{status}</p> : null}
       {voice.error ? <p role="alert" className="mt-1 max-w-sm text-center text-xs text-danger">{voice.error}</p> : null}
     </div>
@@ -33,18 +33,16 @@ export function VoiceMode({ voice, sessionId }: { voice: VoiceHandle; sessionId:
 
 // Voice as one pill: the face of whoever is talking (a bot's own, or Jaz's), a
 // dotted line in its colour that moves with the sound, and the controls,
-// ending in red. With `onReturn` the face is a button back to the chat; a
-// pointer click reaches the floating pill's drag gesture, so it answers keys.
-export function VoicePill({ voice, sessionId, level = 0, outputLevel = 0, onReturn }: {
+// ending in red.
+export function VoicePill({ voice, face, level = 0, outputLevel = 0, onReturn }: {
   voice: VoiceHandle
-  sessionId: string
+  face: Face | null
   level?: number
   outputLevel?: number
   onReturn?: () => void
 }) {
-  const bot = useVoiceBot(sessionId)
-  const face = bot
-    ? <BotAvatar avatar={bot.avatar} size={34} working={voice.phase === 'connecting' || Boolean(voice.activity)} />
+  const avatar = face
+    ? <BotAvatar avatar={face} size={34} working={voice.phase === 'connecting' || Boolean(voice.activity)} />
     : <VoiceVisualizer voice={voice} size={44} level={level} outputLevel={outputLevel} />
   return (
     <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
@@ -53,6 +51,8 @@ export function VoicePill({ voice, sessionId, level = 0, outputLevel = 0, onRetu
           type="button"
           aria-label="Return to voice chat"
           title={voice.error || 'Open voice chat · Drag to move'}
+          // A pointer click belongs to the floating pill's drag gesture, so the
+          // button itself answers only the keyboard.
           onClick={(event) => {
             if (event.detail === 0) {
               onReturn()
@@ -60,13 +60,13 @@ export function VoicePill({ voice, sessionId, level = 0, outputLevel = 0, onRetu
           }}
           className="grid size-10 shrink-0 place-items-center rounded-full"
         >
-          {face}
+          {avatar}
         </button>
       ) : (
-        <span className="grid size-10 shrink-0 place-items-center">{face}</span>
+        <span className="grid size-10 shrink-0 place-items-center">{avatar}</span>
       )}
-      <VoiceWave voice={voice} color={bot ? BOT_COLORS[bot.avatar.color] : VOICE_COLOR} level={level} outputLevel={outputLevel} />
-      <div data-voice-control className="flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+      <VoiceWave voice={voice} color={face ? botInk(face.color) : VOICE_COLOR} level={level} outputLevel={outputLevel} />
+      <div data-voice-control className="flex items-center gap-1.5">
         {voice.phase === 'error' ? (
           <PillButton label="Reconnect voice" onClick={voice.start}>
             <RotateCcw size={17} />

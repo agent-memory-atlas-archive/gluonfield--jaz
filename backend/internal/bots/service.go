@@ -56,10 +56,6 @@ func (s *Service) List() ([]Bot, error) {
 	if err != nil {
 		return nil, err
 	}
-	routines, err := s.routineCounts()
-	if err != nil {
-		return nil, err
-	}
 	byThread := make(map[string]storage.BotRecord, len(records))
 	for _, record := range records {
 		byThread[record.ThreadID] = record
@@ -67,7 +63,7 @@ func (s *Service) List() ([]Bot, error) {
 	out := make([]Bot, 0, len(sessions))
 	for _, session := range sessions {
 		if record, ok := byThread[session.ID]; ok {
-			out = append(out, s.view(record, session, routines[session.ID]))
+			out = append(out, s.view(record, session))
 		}
 	}
 	return out, nil
@@ -78,11 +74,7 @@ func (s *Service) Load(id string) (Bot, error) {
 	if err != nil {
 		return Bot{}, err
 	}
-	routines, err := s.routineCounts()
-	if err != nil {
-		return Bot{}, err
-	}
-	return s.view(record, session, routines[id]), nil
+	return s.view(record, session), nil
 }
 
 func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
@@ -298,7 +290,7 @@ func (s *Service) isBot(id string) bool {
 	return err == nil && record.Kind == KindBot
 }
 
-func (s *Service) view(record storage.BotRecord, session storage.Session, routines int) Bot {
+func (s *Service) view(record storage.BotRecord, session storage.Session) Bot {
 	bot := Bot{
 		ID:        session.ID,
 		Kind:      record.Kind,
@@ -309,7 +301,6 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 		Status:    session.Status,
 		UpdatedAt: session.UpdatedAt,
 		Members:   record.Members,
-		Routines:  routines,
 		Preview:   s.preview(session.ID, record.Kind == KindGroup),
 	}
 	if record.Kind == KindGroup {
@@ -339,18 +330,6 @@ func (s *Service) preview(threadID string, group bool) string {
 		return string(runes[:140]) + "…"
 	}
 	return text
-}
-
-func (s *Service) routineCounts() (map[string]int, error) {
-	routines, err := s.routines.List()
-	if err != nil {
-		return nil, err
-	}
-	counts := make(map[string]int)
-	for _, routine := range routines {
-		counts[routine.BotID]++
-	}
-	return counts, nil
 }
 
 func (s *Service) memberBots(ids []string) ([]string, error) {

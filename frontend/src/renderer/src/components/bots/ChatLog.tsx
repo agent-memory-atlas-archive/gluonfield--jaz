@@ -5,7 +5,7 @@ import { PermissionCard } from '@/components/session/TranscriptPermissions'
 import { UserMessageMarkdown } from '@/components/session/MessageMarkdown'
 import { SystemEventRow } from '@/components/session/SystemEventRow'
 import type { Bot, BotAvatar as Avatar } from '@/lib/api/types'
-import { BOT_COLORS, type BotWork, type ChatEntry } from '@/lib/bots'
+import { botInk, type BotWork, type ChatEntry } from '@/lib/bots'
 import { formatDuration, messageTime } from '@/lib/format/time'
 import { BotAvatar } from './BotAvatar'
 
@@ -59,7 +59,7 @@ export function ChatLog({
                   {named && opensRun ? (
                     <span
                       className="px-1 text-[12px] font-medium"
-                      style={{ color: `color-mix(in oklab, ${BOT_COLORS[avatar(entry.botId).color]} 65%, var(--color-ink))` }}
+                      style={{ color: botInk(avatar(entry.botId).color) }}
                     >
                       {entry.name}
                     </span>

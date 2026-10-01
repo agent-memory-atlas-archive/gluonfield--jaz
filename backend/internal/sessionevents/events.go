@@ -126,7 +126,6 @@ type LoopCreatedEvent struct {
 type BotActivityEvent struct {
 	Kind  string `json:"kind"`
 	Label string `json:"label"`
-	BotID string `json:"bot_id,omitempty"`
 }
 
 // RoomMessageEvent is one message in a group chat, spoken by the user or a
