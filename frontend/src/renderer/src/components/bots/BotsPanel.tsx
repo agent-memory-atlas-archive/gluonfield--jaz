@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { type DragEvent, type Ref, useMemo, useState } from 'react'
 import { stateDot } from '@/components/sidebar/SessionRow'
 import { PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
+import { MarkdownText } from '@/components/session/MessageMarkdown'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
@@ -200,7 +201,11 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, onDrag }: {
               {name}
               {dot}
             </span>
-            {bot.preview ? <span className="truncate text-[12px] text-ink-3">{bot.preview}</span> : null}
+            {bot.preview ? (
+              <span className="truncate text-[12px] text-ink-3">
+                <MarkdownText text={bot.preview} />
+              </span>
+            ) : null}
           </span>
         )}
       </Link>
