@@ -161,7 +161,7 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, hidden, onDrag }: {
         }}
         className={`select-none rounded-lg text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${
           tile
-            ? 'flex h-full min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
+            ? 'flex h-full min-w-0 flex-col items-center gap-1 px-1.5 pt-2 pb-1.5 text-[12px] max-sm:text-[14px]'
             : 'flex h-13 items-center gap-2.5 px-2.5 text-[13px] max-sm:h-16 max-sm:text-[15px]'
         }`}
       >
