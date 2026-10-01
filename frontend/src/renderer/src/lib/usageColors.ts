@@ -9,6 +9,7 @@ export const USAGE_SHARE_PALETTE = [
   'oklch(0.6 0.15 305)',
   'oklch(0.66 0.12 200)',
   'oklch(0.62 0.17 350)',
+  'oklch(0.7 0.13 95)',
 ]
 
 // Color for grouped "other"/uncategorized segments.

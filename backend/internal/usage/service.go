@@ -39,14 +39,12 @@ type ModelUsage struct {
 	SessionCount  int
 }
 
-// CategoryUsage splits usage by the originating session's activity, and bot
-// usage by bot, with Bot naming the bot's thread. Categories partition the
-// daily total: every turn event lands in exactly one. Unlike ModelUsage there
-// is no per-category session count: nothing consumes one, and categories have
-// no dedicated endpoint where it would be a contract.
+// CategoryUsage splits usage by the originating session's activity. Categories
+// partition the daily total: every turn event lands in exactly one. Unlike
+// ModelUsage there is no per-category session count: nothing consumes one, and
+// categories have no dedicated endpoint where it would be a contract.
 type CategoryUsage struct {
 	Category string
-	Bot      string
 	Usage    UsageTotals
 }
 
@@ -54,19 +52,11 @@ type CategoryUsage struct {
 // type. Worker categories reuse their storage source-type keys verbatim.
 const CategoryChat = "chat"
 
-type categoryKey struct {
-	category string
-	bot      string
-}
-
-func usageCategory(event storage.UsageEvent) categoryKey {
-	switch event.SourceType {
-	case "":
-		return categoryKey{category: CategoryChat}
-	case storage.SourceBot:
-		return categoryKey{category: event.SourceType, bot: event.SessionID}
+func usageCategory(sourceType string) string {
+	if sourceType == "" {
+		return CategoryChat
 	}
-	return categoryKey{category: event.SourceType}
+	return sourceType
 }
 
 func (u UsageTotals) InputOutputTokens() int64 {
@@ -114,7 +104,7 @@ func (s Service) Daily(query DailyQuery) ([]DailyBucket, error) {
 		}
 		acc := accs[i]
 		AddDaily(&out[i].Usage, event.Usage)
-		addUsageGroup(acc.categories, usageCategory(event), event)
+		addUsageGroup(acc.categories, usageCategory(event.SourceType), event)
 		if event.Runtime == storage.RuntimeACP {
 			addUsageGroup(acc.models, modelKey(event), event)
 		}
@@ -184,12 +174,11 @@ func modelUsageFromGroups(groups map[modelUsageKey]*usageGroup) []ModelUsage {
 	return out
 }
 
-func categoryUsageFromGroups(groups map[categoryKey]*usageGroup) []CategoryUsage {
+func categoryUsageFromGroups(groups map[string]*usageGroup) []CategoryUsage {
 	out := make([]CategoryUsage, 0, len(groups))
 	for key, group := range groups {
 		out = append(out, CategoryUsage{
-			Category: key.category,
-			Bot:      key.bot,
+			Category: key,
 			Usage:    group.usage,
 		})
 	}
@@ -199,10 +188,7 @@ func categoryUsageFromGroups(groups map[categoryKey]*usageGroup) []CategoryUsage
 		if left != right {
 			return left > right
 		}
-		if out[i].Category != out[j].Category {
-			return out[i].Category < out[j].Category
-		}
-		return out[i].Bot < out[j].Bot
+		return out[i].Category < out[j].Category
 	})
 	return out
 }
@@ -227,14 +213,14 @@ func AddDaily(total *UsageTotals, event storage.Usage) {
 type dayAccumulator struct {
 	sessions   map[string]struct{}
 	models     map[modelUsageKey]*usageGroup
-	categories map[categoryKey]*usageGroup
+	categories map[string]*usageGroup
 }
 
 func newDayAccumulator() dayAccumulator {
 	return dayAccumulator{
 		sessions:   map[string]struct{}{},
 		models:     map[modelUsageKey]*usageGroup{},
-		categories: map[categoryKey]*usageGroup{},
+		categories: map[string]*usageGroup{},
 	}
 }
 

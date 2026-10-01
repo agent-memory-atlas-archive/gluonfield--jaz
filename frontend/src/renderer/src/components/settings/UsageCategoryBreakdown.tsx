@@ -1,7 +1,4 @@
 import { useMemo } from 'react'
-import { BotAvatar } from '@/components/bots/BotAvatar'
-import type { Bot } from '@/lib/api/types'
-import { BOT_COLORS } from '@/lib/bots'
 import { formatTokens } from '@/lib/format/tokens'
 import { USAGE_SHARE_OTHER_COLOR, USAGE_SHARE_PALETTE } from '@/lib/usageColors'
 import { totalUsageTokens, type UsageCategoryTotals } from '@/lib/usageDaily'
@@ -15,6 +12,7 @@ const CATEGORY_META: Record<string, { label: string; color: string }> = {
   memory_search: { label: 'Memory Search', color: USAGE_SHARE_PALETTE[3] },
   browser_task: { label: 'Legacy Browser Agent', color: USAGE_SHARE_PALETTE[4] },
   memory_source: { label: 'Memory Capture', color: USAGE_SHARE_PALETTE[5] },
+  bot: { label: 'Bot', color: USAGE_SHARE_PALETTE[6] },
 }
 const CATEGORY_FALLBACK_COLOR = USAGE_SHARE_OTHER_COLOR
 
@@ -22,24 +20,17 @@ function categoryMeta(category: string): { label: string; color: string } {
   return CATEGORY_META[category] ?? { label: category.charAt(0).toUpperCase() + category.slice(1), color: CATEGORY_FALLBACK_COLOR }
 }
 
-// Each bot is its own activity, named and colored like its face.
-function rowMeta(row: UsageCategoryTotals, bots: Bot[]): { label: string; color: string; bot?: Bot } {
-  if (!row.bot_id) return categoryMeta(row.category)
-  const bot = bots.find((item) => item.id === row.bot_id)
-  return bot ? { label: bot.name, color: BOT_COLORS[bot.avatar.color], bot } : { label: 'Deleted bot', color: CATEGORY_FALLBACK_COLOR }
-}
-
-export function CategoryBreakdown({ categories, bots }: { categories: UsageCategoryTotals[]; bots: Bot[] }) {
+export function CategoryBreakdown({ categories }: { categories: UsageCategoryTotals[] }) {
   const segments = useMemo(
     () =>
       categories
         .map((category) => ({
-          key: `${category.category}:${category.bot_id ?? ''}`,
-          ...rowMeta(category, bots),
+          category: category.category,
+          ...categoryMeta(category.category),
           total: totalUsageTokens(category.usage),
         }))
         .filter((segment) => segment.total > 0),
-    [categories, bots],
+    [categories],
   )
   const grand = segments.reduce((sum, segment) => sum + segment.total, 0)
   if (segments.length === 0 || grand === 0) return null
@@ -54,7 +45,7 @@ export function CategoryBreakdown({ categories, bots }: { categories: UsageCateg
       <div className="mt-3 flex h-2.5 w-full overflow-hidden rounded-full ring-1 ring-border/60">
         {segments.map((segment) => (
           <div
-            key={segment.key}
+            key={segment.category}
             style={{ width: `${(segment.total / grand) * 100}%`, background: segment.color }}
             title={`${segment.label}: ${formatTokens(segment.total)}`}
           />
@@ -65,12 +56,8 @@ export function CategoryBreakdown({ categories, bots }: { categories: UsageCateg
         {segments.map((segment) => {
           const pct = (segment.total / grand) * 100
           return (
-            <li key={segment.key} className="flex items-center gap-2 text-[12px]">
-              {segment.bot ? (
-                <BotAvatar avatar={segment.bot.avatar} size={12} />
-              ) : (
-                <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: segment.color }} />
-              )}
+            <li key={segment.category} className="flex items-center gap-2 text-[12px]">
+              <span className="size-2.5 shrink-0 rounded-[3px]" style={{ background: segment.color }} />
               <span className="min-w-0 flex-1 truncate text-ink">{segment.label}</span>
               <span className="shrink-0 font-mono text-[11px] text-ink-2 tabular-nums">
                 {formatTokens(segment.total)}

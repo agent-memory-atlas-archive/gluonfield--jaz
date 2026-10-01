@@ -7,7 +7,6 @@ import { CategoryBreakdown } from '@/components/settings/UsageCategoryBreakdown'
 import { ModelBreakdown, UsageShareCharts } from '@/components/settings/UsageModelBreakdown'
 import { SettingsCard } from '@/components/settings/SettingsCard'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { botsQuery } from '@/lib/api/bots'
 import { agentSettingsQuery } from '@/lib/api/settings'
 import { dailyUsageQuery } from '@/lib/api/sessions'
 import type { AgentSettings, DailyUsage } from '@/lib/api/types'
@@ -102,7 +101,6 @@ function UsagePanel({
   const total = sumUsage(days)
   const models = useMemo(() => sumModelUsage(days), [days])
   const categories = useMemo(() => sumCategoryUsage(days), [days])
-  const bots = useQuery(botsQuery)
   const peak = peakDay(days)
   const activeDays = days.filter((day) => totalUsageTokens(day.usage) > 0).length
   const maxTotal = Math.max(1, ...days.map((day) => totalUsageTokens(day.usage)))
@@ -233,7 +231,7 @@ function UsagePanel({
         </div>
       </div>
 
-      <CategoryBreakdown categories={categories} bots={bots.data ?? []} />
+      <CategoryBreakdown categories={categories} />
 
       <UsageShareCharts rows={pricedModels} />
 
