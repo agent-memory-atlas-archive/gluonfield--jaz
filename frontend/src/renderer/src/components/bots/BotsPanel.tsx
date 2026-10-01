@@ -1,10 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type DragEvent, type Ref, useMemo, useState } from 'react'
 import { stateDot } from '@/components/sidebar/SessionRow'
-import { PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
+import { SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
 import { MarkdownText } from '@/components/session/MessageMarkdown'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
@@ -28,50 +27,20 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
     ...botsQuery,
     refetchInterval: (query) => (query.state.data?.some((bot) => bot.status === 'running') ? 3_000 : 15_000),
   })
-  const [query, setQuery] = useState<string | null>(null)
   const list = useMemo(() => bots.data ?? [], [bots.data])
-  const { pins, pinned, rest } = useMemo(() => botSections(list, query ?? ''), [list, query])
+  const { pinned, rest } = useMemo(() => botSections(list), [list])
+  const pins = pinned.map((bot) => bot.id)
   const pin = usePins()
   const [drag, setDrag] = useState<PinDrag | null>(null)
-  const shown = [...pinned, ...rest]
-  const tiles = drag ? drag.pins.flatMap((id) => shown.find((bot) => bot.id === id) ?? []) : pinned
+  const tiles = drag ? drag.pins.flatMap((id) => list.find((bot) => bot.id === id) ?? []) : pinned
   const startDrag = (id: string) => setDrag({ id, pins })
 
   return (
     <>
       <SidebarHeader>
-        {query === null ? (
-          <>
-            <p className="flex h-[30px] min-w-0 flex-1 items-center px-2.5 text-[13px] font-medium text-ink max-sm:h-11 max-sm:px-3 max-sm:text-[15px]">
-              Bots
-            </p>
-            <button
-              type="button"
-              aria-label="Search bots"
-              title="Search bots"
-              onClick={() => setQuery('')}
-              className={PANEL_ICON_BUTTON_CLASS}
-            >
-              <Search size={15} className="max-sm:size-[18px]" />
-            </button>
-          </>
-        ) : (
-          <input
-            autoFocus
-            value={query}
-            aria-label="Search bots"
-            placeholder="Search bots"
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setQuery(null)
-            }}
-            onBlur={() => {
-              if (!query.trim()) setQuery(null)
-            }}
-            className="mr-px h-[30px] min-w-0 flex-1 rounded-lg bg-list-hover px-2.5 text-[13px] text-ink outline-none placeholder:text-ink-3 max-sm:h-11 max-sm:text-[15px]"
-          />
-        )}
-        <NewBotPicker bots={list} />
+        <div className="ml-auto">
+          <NewBotPicker bots={list} />
+        </div>
       </SidebarHeader>
       <SidebarScroll mobile={mobile}>
         {bots.isPending ? (

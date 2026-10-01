@@ -9,7 +9,7 @@ import { keys } from '@/lib/query/keys'
 export function usePins() {
   const queryClient = useQueryClient()
   return (update: (pins: string[]) => string[]) => {
-    const pins = botSections(queryClient.getQueryData<Bot[]>(keys.bots) ?? [], '').pins
+    const pins = botSections(queryClient.getQueryData<Bot[]>(keys.bots) ?? []).pinned.map((bot) => bot.id)
     const next = update(pins)
     if (next.join() === pins.join()) return
     queryClient.setQueryData<Bot[]>(keys.bots, (bots) => bots?.map((bot) => ({ ...bot, pinned: next.indexOf(bot.id) + 1 || undefined })))

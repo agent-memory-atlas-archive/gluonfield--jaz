@@ -43,18 +43,10 @@ export function botIdFromTarget(target: string): string | undefined {
 }
 
 // Pinned tiles keep a stable order; the list below moves with activity.
-// `pins` is every pinned id in order; `pinned` and `rest` are what matches
-// the search.
-export function botSections(bots: Bot[], query: string) {
-  const needle = query.trim().toLowerCase()
-  const matches = (bot: Bot) => bot.name.toLowerCase().includes(needle)
-  const pinned = bots.filter((bot) => bot.pinned).toSorted((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0) || a.name.localeCompare(b.name))
+export function botSections(bots: Bot[]) {
   return {
-    pins: pinned.map((bot) => bot.id),
-    pinned: pinned.filter(matches),
-    rest: bots
-      .filter((bot) => !bot.pinned && matches(bot))
-      .toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
+    pinned: bots.filter((bot) => bot.pinned).toSorted((a, b) => (a.pinned ?? 0) - (b.pinned ?? 0) || a.name.localeCompare(b.name)),
+    rest: bots.filter((bot) => !bot.pinned).toSorted((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)),
   }
 }
 
