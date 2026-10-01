@@ -10,11 +10,7 @@ import (
 )
 
 const getBot = `-- name: GetBot :one
-<<<<<<< HEAD
-SELECT thread_id, kind, shape, color, members, worker_agent, worker_model, worker_effort
-=======
-SELECT thread_id, kind, shape, color, members, pinned
->>>>>>> main
+SELECT thread_id, kind, shape, color, members, pinned, worker_agent, worker_model, worker_effort
 FROM bots
 WHERE thread_id = ?1
 LIMIT 1
@@ -29,23 +25,16 @@ func (q *Queries) GetBot(ctx context.Context, threadID string) (Bot, error) {
 		&i.Shape,
 		&i.Color,
 		&i.Members,
-<<<<<<< HEAD
+		&i.Pinned,
 		&i.WorkerAgent,
 		&i.WorkerModel,
 		&i.WorkerEffort,
-=======
-		&i.Pinned,
->>>>>>> main
 	)
 	return i, err
 }
 
 const listBots = `-- name: ListBots :many
-<<<<<<< HEAD
-SELECT thread_id, kind, shape, color, members, worker_agent, worker_model, worker_effort
-=======
-SELECT thread_id, kind, shape, color, members, pinned
->>>>>>> main
+SELECT thread_id, kind, shape, color, members, pinned, worker_agent, worker_model, worker_effort
 FROM bots
 `
 
@@ -64,13 +53,10 @@ func (q *Queries) ListBots(ctx context.Context) ([]Bot, error) {
 			&i.Shape,
 			&i.Color,
 			&i.Members,
-<<<<<<< HEAD
+			&i.Pinned,
 			&i.WorkerAgent,
 			&i.WorkerModel,
 			&i.WorkerEffort,
-=======
-			&i.Pinned,
->>>>>>> main
 		); err != nil {
 			return nil, err
 		}

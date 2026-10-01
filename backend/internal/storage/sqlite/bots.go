@@ -80,12 +80,8 @@ func (s *Store) PinBots(ids []string) error {
 func botFromDB(row botdb.Bot) storage.BotRecord {
 	var members []string
 	_ = json.Unmarshal([]byte(row.Members), &members)
-<<<<<<< HEAD
 	return storage.BotRecord{
-		ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Members: members,
+		ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Pinned: int(row.Pinned), Members: members,
 		Worker: storage.BotWorker{Agent: row.WorkerAgent, Model: row.WorkerModel, ReasoningEffort: row.WorkerEffort},
 	}
-=======
-	return storage.BotRecord{ThreadID: row.ThreadID, Kind: row.Kind, Shape: row.Shape, Color: row.Color, Pinned: int(row.Pinned), Members: members}
->>>>>>> main
 }

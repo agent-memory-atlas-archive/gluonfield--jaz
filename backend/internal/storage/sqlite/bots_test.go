@@ -26,9 +26,17 @@ func TestBotRecordAndRoutineOwnershipRoundTrip(t *testing.T) {
 	if err := store.SaveBot(record); err != nil {
 		t.Fatal(err)
 	}
+	if err := store.PinBots([]string{thread.ID}); err != nil {
+		t.Fatal(err)
+	}
+	record.Pinned = 1
 	loaded, err := store.LoadBot(thread.ID)
 	if err != nil || !reflect.DeepEqual(loaded, record) {
 		t.Fatalf("loaded bot = %+v, %v", loaded, err)
+	}
+	listed, err := store.ListBots()
+	if err != nil || !reflect.DeepEqual(listed, []storage.BotRecord{record}) {
+		t.Fatalf("listed bots = %+v, %v", listed, err)
 	}
 	if _, err := store.LoadBot("missing"); !errors.Is(err, storage.ErrBotNotFound) {
 		t.Fatalf("missing bot = %v", err)
