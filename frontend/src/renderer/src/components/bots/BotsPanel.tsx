@@ -63,7 +63,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
             className="flex flex-1 shrink-0 flex-col gap-3"
           >
             {tiles.length ? (
-              <div data-pins className="grid grid-cols-[repeat(auto-fill,80px)] gap-px">
+              <div data-pins className="grid auto-rows-fr grid-cols-[repeat(auto-fill,80px)] gap-px">
                 <AnimatePresence initial={false} mode="popLayout">
                   {tiles.map(({ bot, hidden }) => (
                     <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} hidden={hidden} onDrag={startDrag} />
@@ -118,7 +118,8 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, hidden, onDrag }: {
   const [renaming, setRenaming] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const menuTriggers = useContextMenuTrigger(setMenu)
-  // A working bot shows it on its face; the dot is for unread and failed.
+  // A working bot shows it on its face. Unread and failed show as a dot: on a
+  // tile's face, so its name keeps the full width, and beside a row's name.
   const working = bot.status === 'running'
   const state = working ? null : stateDot(bot)
   const dot = state ? <span title={state.title} className={`size-1.5 shrink-0 rounded-full ${state.className}`} /> : null
@@ -130,7 +131,7 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, hidden, onDrag }: {
       className={`w-full rounded bg-surface-1 px-1.5 py-0.5 text-[13px] ring-1 ring-primary ${tile ? 'text-center' : ''}`}
     />
   ) : (
-    <span className="min-w-0 truncate">{bot.name}</span>
+    <span className={`min-w-0 ${tile ? 'line-clamp-2 max-w-full text-center leading-tight break-words' : 'truncate'}`}>{bot.name}</span>
   )
 
   return (
@@ -160,16 +161,13 @@ function BotEntry({ ref, bot, bots, tile = false, dragged, hidden, onDrag }: {
         }}
         className={`select-none rounded-lg text-ink transition-colors duration-150 [-webkit-touch-callout:none] hover:bg-list-hover ${
           tile
-            ? 'flex min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
+            ? 'flex h-full min-w-0 flex-col items-center gap-1.5 px-2 pt-3 pb-2 text-[12px] max-sm:text-[14px]'
             : 'flex h-13 items-center gap-2.5 px-2.5 text-[13px] max-sm:h-16 max-sm:text-[15px]'
         }`}
       >
-        <BotIcon avatars={botAvatars(bot, bots)} size={tile ? 44 : 28} working={working} />
+        <BotIcon avatars={botAvatars(bot, bots)} size={tile ? 44 : 28} working={working} badge={tile ? state : null} />
         {tile ? (
-          <span className="flex max-w-full items-center gap-1">
-            {name}
-            {dot}
-          </span>
+          name
         ) : (
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex items-center justify-between gap-2">

@@ -79,9 +79,15 @@ export function BotAvatar({
 }
 
 // One face for a bot; a group overlaps its first two members. A working bot
-// wears a green dot, like someone online.
-export function BotIcon({ avatars, size, working = false }: { avatars: Avatar[]; size: number; working?: boolean }) {
+// wears a green dot, like someone online; otherwise `badge` may mark it.
+export function BotIcon({ avatars, size, working = false, badge }: {
+  avatars: Avatar[]
+  size: number
+  working?: boolean
+  badge?: { title: string; className: string } | null
+}) {
   const member = Math.round(size * 0.72)
+  const dot = working ? { title: 'Working', className: 'bg-ok' } : badge
   return (
     <span className="relative shrink-0" style={{ width: size, height: size }}>
       {avatars.length < 2 ? (
@@ -92,10 +98,10 @@ export function BotIcon({ avatars, size, working = false }: { avatars: Avatar[];
           <BotAvatar avatar={avatars[1]} size={member} className="absolute right-0 bottom-0" />
         </>
       )}
-      {working ? (
+      {dot ? (
         <span
-          title="Working"
-          className="absolute -top-px -right-px rounded-full bg-ok ring-2 ring-panel"
+          title={dot.title}
+          className={`absolute -top-px -right-px rounded-full ring-2 ring-panel ${dot.className}`}
           style={{ width: Math.max(7, Math.round(size * 0.24)), height: Math.max(7, Math.round(size * 0.24)) }}
         />
       ) : null}
