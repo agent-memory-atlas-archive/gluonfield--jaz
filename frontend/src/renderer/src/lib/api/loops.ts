@@ -55,6 +55,22 @@ export const loopsQuery = queryOptions({
   refetchInterval: runPoll,
 })
 
+export interface LoopDetail {
+  loop: Loop
+  runs: LoopRun[]
+  boardIds: string[]
+}
+
+export const loopDetailQuery = (id: string) =>
+  queryOptions({
+    queryKey: keys.loopDetail(id),
+    queryFn: async () => {
+      const data = await get<{ loop: Loop; runs: LoopRun[] | null; board_ids?: string[] }>(`/v1/loops/${id}`)
+      return { loop: data.loop, runs: data.runs ?? [], boardIds: data.board_ids ?? [] } satisfies LoopDetail
+    },
+    refetchInterval: (query) => (activeRunStatus(query.state.data?.runs[0]?.status) ? 2_000 : false),
+  })
+
 // A bot's routines are the loops it owns.
 export const botRoutinesQuery = (botId: string) =>
   queryOptions({

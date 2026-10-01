@@ -1,9 +1,15 @@
 import type { LoopInput } from '@/lib/api/loops'
-import type { AgentSettings } from '@/lib/api/types'
+import type { AgentSettings, Loop } from '@/lib/api/types'
 import { acpUsesModelProvider } from '@/lib/agentRuntimes'
-import { type ScheduleDraft, cronFromDraft, defaultScheduleDraft, localTimezone } from './schedule'
+import {
+  type ScheduleDraft,
+  cronFromDraft,
+  defaultScheduleDraft,
+  draftFromLoop,
+  localTimezone,
+} from './schedule'
 
-// The editable shape behind the create modal. `runtime` is an ACP agent
+// The editable shape behind the create/edit modal. `runtime` is an ACP agent
 // name, matching the RuntimeSelect contract used by the new-thread composer.
 export interface LoopDraft {
   name: string
@@ -30,6 +36,20 @@ export function emptyLoopDraft(boardIds: string[] = []): LoopDraft {
     model: '',
     reasoningEffort: '',
     schedule: defaultScheduleDraft(),
+    boardIds,
+  }
+}
+
+export function loopDraftFromLoop(loop: Loop, boardIds: string[] = []): LoopDraft {
+  return {
+    name: loop.name ?? '',
+    prompt: loop.prompt ?? '',
+    runtime: loop.acp_agent || '',
+    directory: loop.directory ?? '',
+    provider: loop.model_provider ?? '',
+    model: loop.model ?? '',
+    reasoningEffort: loop.reasoning_effort ?? '',
+    schedule: draftFromLoop(loop.schedule?.expr ?? '', loop.status === 'paused'),
     boardIds,
   }
 }

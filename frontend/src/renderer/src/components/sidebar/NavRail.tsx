@@ -22,7 +22,9 @@ export function railTab(pathname: string, settingsOpen: boolean): RailTab {
   if (settingsOpen) return 'settings'
   const app = /^\/apps\/([^/]+\/[^/]+)/.exec(pathname)?.[1]
   if (app) return `/apps/${app}` as RailTab
-  return SECTIONS.find(({ to }) => pathname.startsWith(to))?.to ?? 'chat'
+  // Loops open from the Bots panel, so they keep it.
+  const section = pathname.startsWith('/loops') ? '/bots' : pathname
+  return SECTIONS.find(({ to }) => section.startsWith(to))?.to ?? 'chat'
 }
 
 // Everything beside Chat takes the whole content card: the built-in sections,

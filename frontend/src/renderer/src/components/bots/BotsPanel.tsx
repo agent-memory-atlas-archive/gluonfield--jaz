@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { Repeat } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { type DragEvent, type Ref, useMemo, useState } from 'react'
 import { stateDot } from '@/components/sidebar/SessionRow'
-import { SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
+import { PANEL_ICON_BUTTON_CLASS, SidebarHeader, SidebarScroll } from '@/components/sidebar/SidebarScroll'
 import { MarkdownText } from '@/components/session/MessageMarkdown'
 import { SkeletonRows } from '@/components/ui/Skeleton'
 import { botsQuery } from '@/lib/api/bots'
@@ -36,9 +37,10 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
   return (
     <>
       <SidebarHeader>
-        <div className="ml-auto">
-          <NewBotPicker bots={list} />
-        </div>
+        <Link to="/loops" aria-label="Loops" title="Loops" activeProps={{ className: 'bg-list-active! text-ink!' }} className={`ml-auto ${PANEL_ICON_BUTTON_CLASS}`}>
+          <Repeat size={15} className="max-sm:size-[18px]" />
+        </Link>
+        <NewBotPicker bots={list} />
       </SidebarHeader>
       <SidebarScroll mobile={mobile} tight>
         {bots.isPending ? (

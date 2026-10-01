@@ -50,6 +50,7 @@ export const keys = {
   workspaceFiles: (root: string) => ['workspace', 'files', root] as const,
   skills: (root?: string) => ['skills', root ?? null] as const,
   loops: ['loops'] as const,
+  loopDetail: (id: string) => ['loops', id] as const,
   // Under loops so a routine change refreshes every loop view with one prefix.
   botRoutines: (botId: string) => ['loops', 'bot', botId] as const,
   bots: ['bots'] as const,

@@ -1,3 +1,5 @@
+import type { Loop, LoopTrigger } from '@/lib/api/types'
+
 // Maps the user-friendly schedule presets to 5-field cron expressions and back.
 // "Manual" is not a cron shape — it is represented by a paused loop that only
 // runs on demand, so it preserves whatever expression the loop already had.
@@ -61,6 +63,13 @@ export function cronFromDraft(draft: ScheduleDraft): string {
     case 'custom':
       return draft.expr.trim()
   }
+}
+
+// Rebuilds the editable draft from a stored loop. A paused loop is shown as
+// Manual; otherwise the preset is inferred from the cron shape.
+export function draftFromLoop(expr: string, paused: boolean): ScheduleDraft {
+  const parsed = parseExpr(expr)
+  return paused ? { ...parsed, preset: 'manual' } : parsed
 }
 
 function parseExpr(expr: string): ScheduleDraft {
@@ -190,4 +199,19 @@ function formatTime(time: string): string {
   const period = h < 12 ? 'AM' : 'PM'
   const hour12 = h % 12 === 0 ? 12 : h % 12
   return `${hour12}:${pad(m)} ${period}`
+}
+
+const SOURCES: Record<Exclude<LoopTrigger['kind'], 'webhook'>, string> = {
+  gmail: 'Gmail',
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+  slack: 'Slack',
+}
+
+// When a loop runs: on what triggers it, or on its schedule.
+export function loopWhen({ trigger, schedule }: Loop, paused = false): string {
+  if (!trigger) return compactSchedule(schedule.expr, paused)
+  if (trigger.kind === 'webhook') return 'Webhook'
+  const where = trigger.kind === 'slack' && trigger.subject ? ` in ${trigger.subject}` : ''
+  return `New ${SOURCES[trigger.kind]}${trigger.from ? ` from ${trigger.from}` : ''}${where}`
 }

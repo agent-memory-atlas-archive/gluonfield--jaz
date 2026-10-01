@@ -1,31 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link2, MoreHorizontal, Play, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { compactSchedule } from '@/components/loops/schedule'
+import { loopWhen } from '@/components/loops/schedule'
 import { IconButton } from '@/components/ui/IconButton'
 import { MenuRow, Popover } from '@/components/ui/Popover'
 import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/components/ui/toast'
 import { apiUrl } from '@/lib/api/client'
 import { botRoutinesQuery, deleteLoop, loopTone, runLoopNow, TONE_DOT, updateLoop } from '@/lib/api/loops'
-import type { Bot, Loop, LoopTrigger } from '@/lib/api/types'
+import type { Bot, Loop } from '@/lib/api/types'
 import { writeClipboard } from '@/lib/clipboard'
 import { hasTime, messageTime } from '@/lib/format/time'
 import { keys } from '@/lib/query/keys'
-
-const SOURCES: Record<Exclude<LoopTrigger['kind'], 'webhook'>, string> = {
-  gmail: 'Gmail',
-  whatsapp: 'WhatsApp',
-  telegram: 'Telegram',
-  slack: 'Slack',
-}
-
-function routineWhen({ trigger, schedule }: Loop): string {
-  if (!trigger) return compactSchedule(schedule.expr, false)
-  if (trigger.kind === 'webhook') return 'Webhook'
-  const where = trigger.kind === 'slack' && trigger.subject ? ` in ${trigger.subject}` : ''
-  return `New ${SOURCES[trigger.kind]}${trigger.from ? ` from ${trigger.from}` : ''}${where}`
-}
 
 export function BotRoutines({ bot }: { bot: Bot }) {
   const routines = useQuery(botRoutinesQuery(bot.id))
@@ -70,7 +56,7 @@ function RoutineRow({ loop }: { loop: Loop }) {
       <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[loopTone(loop.last_run_status, loop.status)]}`} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] text-ink">{loop.name}</p>
-        <p className="truncate text-[12px] text-ink-3">{[routineWhen(loop), when].filter(Boolean).join(' · ')}</p>
+        <p className="truncate text-[12px] text-ink-3">{[loopWhen(loop), when].filter(Boolean).join(' · ')}</p>
       </div>
       <Switch
         checked={!paused}
