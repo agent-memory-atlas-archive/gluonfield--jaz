@@ -19,7 +19,9 @@ export function SidebarHeader({ children }: { children: ReactNode }) {
 
 // The panel's scrolling body. A hairline and fade appear once content slides
 // under the header.
-export function SidebarScroll({ mobile, children }: { mobile: boolean; children: ReactNode }) {
+// `tight` starts the content right under a header of icons, with no title to
+// set it apart.
+export function SidebarScroll({ mobile, tight = false, children }: { mobile: boolean; tight?: boolean; children: ReactNode }) {
   const navRef = useRef<HTMLElement | null>(null)
   const sections = useRailSections()
   const [navEdge, setNavEdge] = useState({ scrollable: false, scrolled: false })
@@ -71,7 +73,7 @@ export function SidebarScroll({ mobile, children }: { mobile: boolean; children:
       <nav
         ref={navRef}
         onScroll={updateNavEdge}
-        className="scrollbar-quiet flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pl-1.5 pr-3 pt-4 max-sm:gap-6 max-sm:px-4"
+        className={`scrollbar-quiet flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pl-1.5 pr-3 max-sm:gap-6 max-sm:px-4 ${tight ? 'pt-1' : 'pt-4'}`}
       >
         {/* Phones have no rail, so its tabs ride at the top of the drawer. */}
         {mobile && (

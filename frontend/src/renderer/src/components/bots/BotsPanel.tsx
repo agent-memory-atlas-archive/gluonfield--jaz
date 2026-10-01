@@ -40,7 +40,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
           <NewBotPicker bots={list} />
         </div>
       </SidebarHeader>
-      <SidebarScroll mobile={mobile}>
+      <SidebarScroll mobile={mobile} tight>
         {bots.isPending ? (
           <SkeletonRows count={4} />
         ) : bots.isError && !bots.data ? (
@@ -60,7 +60,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
               pin(() => drag.pins)
             }}
             onDragEnd={() => setDrag(null)}
-            className="flex flex-1 shrink-0 flex-col gap-3"
+            className="flex flex-1 shrink-0 flex-col gap-1.5"
           >
             {tiles.length ? (
               <div data-pins className="grid auto-rows-fr grid-cols-[repeat(auto-fill,80px)] gap-px">
