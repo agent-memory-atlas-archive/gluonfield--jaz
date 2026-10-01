@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/wins/jaz/backend/internal/mcpsession"
-	"github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 	jsonstore "github.com/wins/jaz/backend/internal/storage/json"
@@ -187,25 +185,9 @@ func testAskUserMCPRoundTrip(t *testing.T, steered bool, mode string) {
 	case <-ctx.Done():
 		t.Fatal(ctx.Err())
 	}
-	messages, err := store.LoadMessages(session.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantMessages := 0
-	if len(want) > 0 {
-		wantMessages = 1
-	}
-	if len(messages) != wantMessages {
-		t.Fatalf("persisted messages = %d, want %d", len(messages), wantMessages)
-	}
-	for _, message := range messages {
-		for _, answer := range want {
-			for _, value := range answer.Answers {
-				if !strings.Contains(provider.MessageContent(message), value) {
-					t.Fatalf("answer was not persisted: %#v", message)
-				}
-			}
-		}
+	// The answered question is the record; no message repeats it in the chat.
+	if messages, err := store.LoadMessages(session.ID); err != nil || len(messages) != 0 {
+		t.Fatalf("answers also persisted as messages: %#v, %v", messages, err)
 	}
 	storedEvents, err := store.LoadSessionEvents(session.ID)
 	if err != nil {
@@ -286,16 +268,20 @@ func TestAskUserRejectsInvalidRequestsBeforePublishing(t *testing.T) {
 	}
 }
 
+// heldAnswerStore holds the write of an answered question, the moment after
+// the answer is claimed and before the asker receives it.
 type heldAnswerStore struct {
 	Store
 	claimed chan struct{}
 	release chan struct{}
 }
 
-func (s *heldAnswerStore) AppendMessages(id string, messages ...provider.Message) error {
-	close(s.claimed)
-	<-s.release
-	return s.Store.AppendMessages(id, messages...)
+func (s *heldAnswerStore) AppendSessionEvents(id string, events ...sessionevents.Event) error {
+	if len(events) > 0 && events[0].Type == "permission_response" {
+		close(s.claimed)
+		<-s.release
+	}
+	return s.Store.AppendSessionEvents(id, events...)
 }
 
 func TestAskUserAcceptedAnswerWinsConcurrentCancellation(t *testing.T) {

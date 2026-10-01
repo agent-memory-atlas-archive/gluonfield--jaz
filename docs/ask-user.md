@@ -26,6 +26,7 @@
 - [x] Keep Submit enabled for partial answers and allow questions to be skipped.
 - [x] Render questions inline at their chronological position, preserving their position after submission.
 - [x] Show submitted choices and custom text as visible, read-only history; persist structured answers for reopening the conversation.
+- [x] Keep answers only on the answered question: the card shows them, and the agent receives them as the tool result, so no `Answers:` user message repeats them in the chat.
 
 `ask_user` accepts ordered `questions`, each with `id`, `question`, optional plain-text `options`, and optional `multi_select`. Options use radio buttons by default; `multi_select: true` uses checkboxes and requires options. The agent should provide concrete options whenever useful. Free text remains available alongside choices, and multi-select answers can combine choices with custom text. It uses the caller's thread binding, waits for submission, and returns only answered questions in `answers` keyed by question id. Interruption returns `cancelled: true`. Replies use the existing transcript and permission lifecycle, without entering plan mode.
 

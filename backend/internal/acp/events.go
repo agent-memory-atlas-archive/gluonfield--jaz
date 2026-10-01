@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	acpschema "github.com/gluonfield/acp-transport/acp"
 	"github.com/gluonfield/acp-transport/jsonrpc"
 	"github.com/google/uuid"
-	"github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 )
 
@@ -95,7 +93,6 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 				return err
 			}
 		}
-		answerText := formatPermissionAnswers(pending.request, answers)
 		delete(m.pendingPermission, req.RequestID)
 		m.permissionMu.Unlock()
 		<-pending.published
@@ -108,7 +105,6 @@ func (m *Manager) AnswerInteractive(ctx context.Context, req InteractiveAnswer) 
 			resolved.Answers[question.ID] = trimmedAnswers(answers[question.ID].Answers)
 		}
 		m.removeJobPermission(job, req.RequestID)
-		m.appendUserAnswerMessage(job, answerText, parentVisible)
 		m.publishPermission(job, resolved, "permission_response")
 
 		pending.answer <- permissionAnswer{Answers: answers}
@@ -254,42 +250,6 @@ func permissionOption(options []sessionevents.ACPPermissionOption, optionID stri
 	return sessionevents.ACPPermissionOption{}, false
 }
 
-func formatPermissionAnswers(permission sessionevents.ACPPermission, answers map[string]InteractiveAnswerValue) string {
-	if len(answers) == 0 {
-		return ""
-	}
-	questionByID := make(map[string]sessionevents.ACPQuestion, len(permission.Questions))
-	for _, question := range permission.Questions {
-		questionByID[question.ID] = question
-	}
-	ids := make([]string, 0, len(answers))
-	for id := range answers {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	var out strings.Builder
-	out.WriteString("Answers:")
-	for _, id := range ids {
-		values := trimmedAnswers(answers[id].Answers)
-		if len(values) == 0 {
-			continue
-		}
-		label := id
-		if question, ok := questionByID[id]; ok {
-			label = firstNonEmpty(question.Header, question.Question, id)
-		}
-		out.WriteString("\n- ")
-		out.WriteString(label)
-		out.WriteString(": ")
-		out.WriteString(strings.Join(values, ", "))
-	}
-	if out.String() == "Answers:" {
-		return ""
-	}
-	return out.String()
-}
-
 func trimmedAnswers(values []string) []string {
 	out := make([]string, 0, len(values))
 	for _, value := range values {
@@ -298,21 +258,6 @@ func trimmedAnswers(values []string) []string {
 		}
 	}
 	return out
-}
-
-func (m *Manager) appendUserAnswerMessage(job *jobState, text string, parentVisible bool) {
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return
-	}
-	sessionIDs := []string{job.ID}
-	if parentVisible && job.ParentID != "" && job.ParentID != job.ID {
-		sessionIDs = append(sessionIDs, job.ParentID)
-	}
-	for _, sessionID := range sessionIDs {
-		_ = m.store.AppendMessages(sessionID, provider.UserMessage(text))
-	}
-	m.touchAttention(sessionIDs...)
 }
 
 func (m *Manager) setJobPermission(job *jobState, permission sessionevents.ACPPermission) {
