@@ -11,6 +11,8 @@ import (
 type Querier interface {
 	GetBot(ctx context.Context, threadID string) (Bot, error)
 	ListBots(ctx context.Context) ([]Bot, error)
+	PinBot(ctx context.Context, arg PinBotParams) error
+	UnpinBots(ctx context.Context) error
 	UpsertBot(ctx context.Context, arg UpsertBotParams) error
 }
 

@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query'
 import { keys } from '@/lib/query/keys'
-import { del, get, patch, post } from './client'
+import { del, get, patch, post, put } from './client'
 import type { Bot, BotAvatar } from './types'
 
 // Polling belongs to the list on screen; other readers take the shared cache.
@@ -22,6 +22,11 @@ export type BotPatch = Partial<Pick<Bot, 'name' | 'avatar' | 'members' | 'agent'
 
 export function updateBot(id: string, input: BotPatch): Promise<Bot> {
   return patch<Bot>(`/v1/bots/${id}`, input)
+}
+
+// Pins exactly ids, in that order, and unpins every other bot and group.
+export function pinBots(ids: string[]): Promise<void> {
+  return put<void>('/v1/bots/pins', { ids })
 }
 
 export function deleteBot(id: string): Promise<void> {

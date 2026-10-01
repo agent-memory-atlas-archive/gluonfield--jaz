@@ -332,6 +332,14 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text }: { text: s
   return <BaseMarkdown text={prepared} className="chat-prose" Link={MessageMarkdownLink} />
 })
 
+const TEXT_REMARK_PLUGINS = [remarkGfm]
+
+// Markdown read as plain text for one-line previews: every element is
+// unwrapped to its text, so `**Deal**` reads Deal and a mention reads @Name.
+export const MarkdownText = memo(function MarkdownText({ text }: { text: string }) {
+  return <Markdown remarkPlugins={TEXT_REMARK_PLUGINS} allowedElements={[]} unwrapDisallowed>{text}</Markdown>
+})
+
 // The markdown pipeline percent-encodes hrefs; show the filesystem path.
 function decodeMentionHref(href: string): string {
   try {

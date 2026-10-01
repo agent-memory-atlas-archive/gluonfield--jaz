@@ -27,10 +27,9 @@ export function SidePanelControl({ open, mode, modes = ['tabs', 'overview'], ove
             aria-pressed={active}
             title={`${active ? 'Hide' : 'Open'} ${label} (${option === 'tabs' ? '⌘⇧S' : '⌘O'})`}
             onClick={() => onToggle(option)}
-            className={`flex h-7 cursor-pointer items-center justify-center rounded-lg px-2.5 text-xs pointer-coarse:h-10 pointer-coarse:min-w-10 font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface hover:text-ink'}`}
+            className={`flex h-7 cursor-pointer items-center justify-center rounded-lg px-[7px] text-xs pointer-coarse:h-10 pointer-coarse:min-w-10 font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.96] ${active ? 'bg-surface text-ink' : 'text-ink-2 hover:bg-surface hover:text-ink'}`}
           >
             <Icon size={14} aria-hidden className="shrink-0" />
-            <span className="ml-1 max-sm:hidden">{label}</span>
             <span aria-hidden={!metaHeld} className={`inline-flex max-w-0 overflow-hidden transition-[max-width,margin-left,opacity] duration-200 ease-out motion-reduce:transition-none ${metaHeld ? 'ml-1 max-w-12 opacity-100' : 'opacity-0'}`}>
               <KeyboardShortcut value={option === 'tabs' ? '⇧S' : 'O'} />
             </span>

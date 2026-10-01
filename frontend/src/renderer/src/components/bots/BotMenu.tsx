@@ -7,7 +7,7 @@ import { deleteBot } from '@/lib/api/bots'
 import type { Bot } from '@/lib/api/types'
 import { invalidateSessionLists } from '@/lib/query/invalidate'
 import { keys } from '@/lib/query/keys'
-import { usePinBot } from './usePinBot'
+import { usePins } from './usePins'
 
 // Right-click / press-and-hold actions for a bot or group in the panel.
 export function BotMenu({ bot, point, onClose, onRename }: {
@@ -20,7 +20,7 @@ export function BotMenu({ bot, point, onClose, onRename }: {
   const navigate = useNavigate()
   const openBotId = useParams({ strict: false }).botId
   const toast = useToast()
-  const pin = usePinBot()
+  const pin = usePins()
 
   const run = (action: () => void) => () => {
     onClose()
@@ -40,7 +40,7 @@ export function BotMenu({ bot, point, onClose, onRename }: {
 
   return (
     <ContextMenu point={point} onClose={onClose}>
-      <MenuRow onClick={run(() => pin(bot.id, !bot.pinned))}>
+      <MenuRow onClick={run(() => pin((pins) => (bot.pinned ? pins.filter((id) => id !== bot.id) : [...pins, bot.id])))}>
         <span className="flex items-center gap-2">
           <Pin size={13} className={bot.pinned ? 'fill-current' : ''} />
           {bot.pinned ? 'Unpin' : 'Pin'}

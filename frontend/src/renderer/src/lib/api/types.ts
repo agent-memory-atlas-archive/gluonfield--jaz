@@ -708,7 +708,8 @@ export interface Bot {
   kind: 'bot' | 'group'
   name: string
   avatar: BotAvatar
-  pinned: boolean
+  // The bot's place among the pins, from 1; absent when it is not pinned.
+  pinned?: number
   unread: boolean
   status: Session['status']
   preview?: string

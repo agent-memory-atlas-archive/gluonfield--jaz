@@ -30,7 +30,7 @@ type Bot struct {
 	Kind            string    `json:"kind"`
 	Name            string    `json:"name"`
 	Avatar          Avatar    `json:"avatar"`
-	Pinned          bool      `json:"pinned"`
+	Pinned          int       `json:"pinned,omitempty"`
 	Unread          bool      `json:"unread"`
 	Status          string    `json:"status"`
 	Preview         string    `json:"preview,omitempty"`
@@ -87,6 +87,7 @@ type Store interface {
 	BotLoader
 	SaveBot(storage.BotRecord) error
 	ListBots() ([]storage.BotRecord, error)
+	PinBots(ids []string) error
 	CreateSession(storage.CreateSession) (storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	ListSessions(storage.SessionFilter) ([]storage.Session, error)

@@ -11,11 +11,25 @@ ON CONFLICT(thread_id) DO UPDATE SET
   worker_effort = excluded.worker_effort;
 
 -- name: GetBot :one
+<<<<<<< HEAD
 SELECT thread_id, kind, shape, color, members, worker_agent, worker_model, worker_effort
+=======
+SELECT thread_id, kind, shape, color, members, pinned
+>>>>>>> main
 FROM bots
 WHERE thread_id = sqlc.arg(thread_id)
 LIMIT 1;
 
 -- name: ListBots :many
+<<<<<<< HEAD
 SELECT thread_id, kind, shape, color, members, worker_agent, worker_model, worker_effort
+=======
+SELECT thread_id, kind, shape, color, members, pinned
+>>>>>>> main
 FROM bots;
+
+-- name: UnpinBots :exec
+UPDATE bots SET pinned = 0;
+
+-- name: PinBot :exec
+UPDATE bots SET pinned = sqlc.arg(pinned) WHERE thread_id = sqlc.arg(thread_id);
