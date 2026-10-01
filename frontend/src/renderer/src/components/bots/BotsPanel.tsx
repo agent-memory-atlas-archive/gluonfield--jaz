@@ -20,7 +20,6 @@ import { usePins } from './usePins'
 type PinDrag = { id: string; pins: string[] }
 
 const SPRING = { type: 'spring', duration: 0.3, bounce: 0 } as const
-const TILE_COLUMNS = 3
 
 export function BotsPanel({ mobile }: { mobile: boolean }) {
   const bots = useQuery({
@@ -70,7 +69,7 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
             className="flex flex-1 shrink-0 flex-col gap-3"
           >
             {tiles.length ? (
-              <div data-pins className="grid grid-cols-3 gap-px">
+              <div data-pins className="grid grid-cols-[repeat(auto-fill,80px)] gap-px">
                 <AnimatePresence initial={false} mode="popLayout">
                   {tiles.map((bot) => (
                     <BotEntry key={bot.id} bot={bot} bots={list} tile dragged={drag?.id === bot.id} hidden={moved && !pinned.includes(bot)} onDrag={startDrag} />
@@ -95,17 +94,19 @@ export function BotsPanel({ mobile }: { mobile: boolean }) {
 
 // Where a dragged bot lands among the pins: beside the tile in the grid cell
 // under the pointer, last past the tiles, or out of the pins anywhere else.
-// Cells come from the grid, not the tiles, so a tile still sliding cannot
-// bounce the drop back.
+// Cells come from the grid's tracks, not the tiles, so a tile still sliding
+// cannot bounce the drop back, and the columns follow the panel's width.
 function landing(e: DragEvent, drag: PinDrag, tiles: string[]): string[] {
   const grid = (e.target as Element).closest('[data-pins]')
   if (!grid) return drag.pins.filter((id) => id !== drag.id)
   const box = grid.getBoundingClientRect()
-  const width = box.width / TILE_COLUMNS
-  const height = box.height / Math.ceil(tiles.length / TILE_COLUMNS)
+  const style = getComputedStyle(grid)
+  const columns = style.gridTemplateColumns.split(' ').length
+  const width = parseFloat(style.gridTemplateColumns) + parseFloat(style.columnGap)
+  const height = parseFloat(style.gridTemplateRows) + parseFloat(style.rowGap)
   const x = e.clientX - box.left
-  const column = Math.min(TILE_COLUMNS - 1, Math.floor(x / width))
-  const cell = Math.floor((e.clientY - box.top) / height) * TILE_COLUMNS + column
+  const column = Math.min(columns - 1, Math.floor(x / width))
+  const cell = Math.floor((e.clientY - box.top) / height) * columns + column
   return placePin(drag.pins, drag.id, tiles[cell], x - column * width > width / 2)
 }
 
