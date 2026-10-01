@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MCPAppFrame } from '@/components/apps/MCPAppFrame'
 import { UserBubble } from '@/components/session/Bubble'
+import { PermissionCard } from '@/components/session/TranscriptPermissions'
 import { UserMessageMarkdown } from '@/components/session/MessageMarkdown'
 import { SystemEventRow } from '@/components/session/SystemEventRow'
 import type { Bot, BotAvatar as Avatar } from '@/lib/api/types'
@@ -47,6 +48,8 @@ export function ChatLog({
               <SystemEventRow event={entry.event} />
             ) : entry.kind === 'app' ? (
               <MCPAppFrame app={entry.app} call={entry.app} active />
+            ) : entry.kind === 'question' ? (
+              <PermissionCard event={entry.event} resolution={entry.answer} />
             ) : (
               <div className="flex items-end gap-2.5">
                 {named ? (

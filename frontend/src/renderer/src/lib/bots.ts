@@ -1,5 +1,6 @@
-import type { Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, MCPAppEvent, SessionEvent } from '@/lib/api/types'
+import type { ACPPermission, Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, MCPAppEvent, SessionEvent } from '@/lib/api/types'
 import { messageText } from '@/lib/messageText'
+import { hasPermissionSurface } from '@/lib/sessionPermissions'
 import { type SpawnedThreadView, threadRunning } from '@/lib/spawnedThreads'
 
 export const BOT_SHAPES: BotShape[] = ['circle', 'blob', 'squircle', 'pill', 'triangle', 'hex', 'cloud', 'drop']
@@ -95,6 +96,7 @@ export type ChatEntry =
   | { kind: 'bot'; key: string; at: string; botId?: string; name: string; text: string }
   | { kind: 'activity'; key: string; at: string; event: SessionEvent }
   | { kind: 'app'; key: string; at: string; app: MCPAppEvent }
+  | { kind: 'question'; key: string; at: string; event: SessionEvent; answer?: ACPPermission }
 
 type ChatTurn = {
   at: string
@@ -107,8 +109,8 @@ type ChatTurn = {
 export type BotWork = { doing?: string; since?: string; note?: string }
 
 // A bot's chat, read from its thread in one pass: what people typed, what bots
-// sent with send_message, apps opened in user turns and activity rows. Everything
-// else is private work. A finished user turn without public output shows its
+// sent with send_message, apps opened in user turns, questions the bot asks
+// with their answers, and activity rows. Everything else is private work. A finished user turn without public output shows its
 // last written reply, so an answer is never lost. `doing`
 // names what the bot is busy with when a group, another bot or a routine
 // opened its latest turn, whose output lands elsewhere; `since` and `note` are
@@ -126,6 +128,8 @@ export function botChat(
     ...events.map((event) => ({ at: event.at, message: undefined, event })),
   ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
   const entries: ChatEntry[] = []
+  const questions = new Map<string, Extract<ChatEntry, { kind: 'question' }>>()
+  const answers = new Map<string, ACPPermission>()
   let turn: ChatTurn | undefined
   const close = () => {
     if (turn?.user && !turn.spoke && turn.reply) entries.push({ kind: 'bot', name: self.name, botId: self.id, ...turn.reply })
@@ -153,6 +157,19 @@ export function botChat(
     } else if (event.type === 'mcp_app' && event.mcp_app && turn?.user) {
       entries.push({ kind: 'app', key, at, app: event.mcp_app })
       turn.spoke = true
+    } else if (event.type === 'permission_request' && event.permission && hasPermissionSurface(event.permission)) {
+      // A question asked again replaces its card; the latest one is answered.
+      const asked = questions.get(event.permission.id)
+      if (asked) {
+        asked.event = event
+      } else {
+        const entry = { kind: 'question' as const, key: `question:${event.permission.id}`, at, event }
+        questions.set(event.permission.id, entry)
+        entries.push(entry)
+      }
+      if (turn) turn.spoke = true
+    } else if (event.type === 'permission_response' && event.permission) {
+      answers.set(event.permission.id, event.permission)
     } else if (event.loop_created || event.type === 'agent_switch') {
       entries.push({ kind: 'activity', key, at, event })
     } else if (turn && (event.type === 'acp_message' || event.type === 'acp') && event.acp?.id === self.id && event.content?.trim()) {
@@ -160,6 +177,7 @@ export function botChat(
     }
   }
   if (!working) close()
+  for (const [id, entry] of questions) entry.answer = answers.get(id)
   return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) } }
 }
 
