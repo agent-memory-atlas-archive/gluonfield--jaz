@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
-import { AgentAvatar } from '@/components/acp/AgentAvatar'
 import { agentLabel } from '@/lib/agentLabel'
 import { looksLikeOpaqueToolID, type ProviderSubagentView } from '@/lib/providerSubagents'
 import type { SpawnedThreadView } from '@/lib/spawnedThreads'
@@ -112,7 +111,7 @@ function ThreadsSection({ threads }: { threads: SpawnedThreadView[] }) {
       open={open}
       onToggle={() => setOpen((value) => !value)}
     >
-      <ul className="mt-2 flex flex-col gap-1.5">
+      <ul className="mt-2 flex flex-col">
         {threads.map((thread) => (
           <ThreadRow key={thread.key} thread={thread} />
         ))}
@@ -131,10 +130,9 @@ function ThreadRow({ thread }: { thread: SpawnedThreadView }) {
         to="/sessions/$sessionId"
         params={{ sessionId: thread.id }}
         title={`Open ${title}`}
-        className="flex min-h-10 w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-150 hover:bg-surface-2"
+        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 hover:bg-surface-2"
       >
         <RunRowContent
-          agent={thread.agent}
           title={title}
           detail={detail}
           status={status}
@@ -174,14 +172,14 @@ function withReasoningEffort(model: string, effort?: string): string {
   return effort ? `${model}/${effort}` : model
 }
 
+// One line: where the run stands, then what it is. Its agent, model or task
+// shows on hover.
 function RunRowContent({
-  agent,
   title,
   detail,
   status,
   trailing,
 }: {
-  agent?: string
   title: string
   detail?: string
   status: RunStatus
@@ -189,23 +187,15 @@ function RunRowContent({
 }) {
   return (
     <>
-      <AgentAvatar agent={agent} size={17} />
-      <span className="flex min-w-0 flex-1 flex-col justify-center">
-        <span className="block truncate text-[13px] font-medium leading-5 text-ink" title={title}>
-          {title}
-        </span>
-        {detail ? (
-          <span className="mt-0.5 block truncate text-[12px] leading-snug text-ink-3" title={detail}>
-            {detail}
-          </span>
-        ) : null}
-      </span>
       <span
-        className={`inline-flex h-5 w-5 shrink-0 items-center justify-center ${status.className}`}
+        className={`inline-flex size-5 shrink-0 items-center justify-center ${status.className}`}
         title={status.label}
         aria-label={status.label}
       >
-        <status.Icon size={13} className={status.spin ? 'animate-spin' : ''} aria-hidden />
+        <status.Icon size={14} className={status.spin ? 'animate-spin' : ''} aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] text-ink" title={detail ? `${title}\n${detail}` : title}>
+        {title}
       </span>
       {trailing}
     </>
@@ -221,7 +211,7 @@ function SubagentsSection({ subagents }: { subagents: ProviderSubagentView[] }) 
       open={open}
       onToggle={() => setOpen((value) => !value)}
     >
-      <ul className="mt-2 flex flex-col gap-1.5">
+      <ul className="mt-2 flex flex-col">
         {subagents.map((subagent) => (
           <SubagentRow key={subagent.key} subagent={subagent} />
         ))}
@@ -243,10 +233,9 @@ function SubagentRow({ subagent }: { subagent: ProviderSubagentView }) {
         disabled={!prompt}
         title={prompt ? (expanded ? 'Hide prompt' : 'Show prompt') : undefined}
         onClick={() => setExpanded((open) => !open)}
-        className="flex min-h-10 w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors duration-150 enabled:cursor-pointer enabled:hover:bg-surface-2 disabled:cursor-default"
+        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 enabled:cursor-pointer enabled:hover:bg-surface-2 disabled:cursor-default"
       >
         <RunRowContent
-          agent={subagent.provider}
           title={title}
           detail={detail && detail !== title ? detail : undefined}
           status={status}
@@ -262,7 +251,7 @@ function SubagentRow({ subagent }: { subagent: ProviderSubagentView }) {
         />
       </button>
       {expanded && prompt ? (
-        <p className="ml-[25px] max-h-28 overflow-y-auto whitespace-pre-wrap px-1 pb-1 text-[11px] leading-snug text-ink-3">
+        <p className="ml-7 max-h-28 overflow-y-auto whitespace-pre-wrap px-1 pb-1 text-[11px] leading-snug text-ink-3">
           {prompt}
         </p>
       ) : null}
