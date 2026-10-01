@@ -58,10 +58,6 @@ func (w *fakeWorld) LoadBot(id string) (storage.BotRecord, error) {
 	return record, nil
 }
 
-func (w *fakeWorld) BotsDir() string {
-	return "/bots"
-}
-
 func (w *fakeWorld) ListBots() ([]storage.BotRecord, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -239,7 +235,7 @@ func (fakeThreads) SwitchAgent(context.Context, string, string) error {
 }
 
 func newTestService(world *fakeWorld) *Service {
-	world.service = NewService(world, fakeThreads{world: world}, world, world, log.New(nil))
+	world.service = NewService(world, "/bots", fakeThreads{world: world}, world, world, log.New(nil))
 	return world.service
 }
 

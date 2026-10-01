@@ -34,6 +34,7 @@ import (
 	"github.com/wins/jaz/backend/internal/modelcatalog"
 	"github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/runtimeauth"
+	"github.com/wins/jaz/backend/internal/runtimefiles"
 	"github.com/wins/jaz/backend/internal/server"
 	"github.com/wins/jaz/backend/internal/serverconfig"
 	"github.com/wins/jaz/backend/internal/sessionevents"
@@ -226,6 +227,7 @@ func conciseError(err error) error {
 func startServer(
 	lc fx.Lifecycle,
 	a *agent.Agent,
+	layout runtimefiles.Layout,
 	store *sqlitestore.Store,
 	manager *acp.Manager,
 	adapters *acpadapter.Manager,
@@ -306,7 +308,7 @@ func startServer(
 		loops.WithPromptExtra(widgetService.LoopPromptExtra),
 		loops.WithArtifactSurface(widgetService.LoopArtifactSurface),
 	)
-	botService := bots.NewService(store, manager, loopService, events, logger)
+	botService := bots.NewService(store, layout.Bots, manager, loopService, events, logger)
 	jazTools.SetLoops(loopService,
 		loops.WithBoards(widgetService.LoopBoards()),
 		loops.WithAgentNames(manager.Agents),

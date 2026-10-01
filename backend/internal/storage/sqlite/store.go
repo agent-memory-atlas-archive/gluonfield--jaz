@@ -117,11 +117,6 @@ func (s *Store) WorkspacesDir() string {
 	return filepath.Join(s.root, "workspaces")
 }
 
-// BotsDir holds each bot's own permanent directory, named after its id.
-func (s *Store) BotsDir() string {
-	return filepath.Join(s.root, "bots")
-}
-
 func (s *Store) DefaultWorkspace() string {
 	return filepath.Join(s.WorkspacesDir(), "default")
 }

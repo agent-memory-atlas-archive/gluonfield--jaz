@@ -17,7 +17,9 @@ import (
 )
 
 type Service struct {
-	Store    Store
+	Store Store
+	// Homes is where each bot's own directory lives, named after its id.
+	Homes    string
 	Threads  Threads
 	Routines Routines
 	Events   Publisher
@@ -31,8 +33,8 @@ type Service struct {
 	waking map[string]bool
 }
 
-func NewService(store Store, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {
-	return &Service{Store: store, Threads: threads, Routines: routines, Events: events, Log: logger.WithPrefix("bots")}
+func NewService(store Store, homes string, threads Threads, routines Routines, events Publisher, logger *log.Logger) *Service {
+	return &Service{Store: store, Homes: homes, Threads: threads, Routines: routines, Events: events, Log: logger.WithPrefix("bots")}
 }
 
 func (s *Service) List() ([]Bot, error) {
@@ -86,7 +88,7 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 		ACPAgent:   strings.TrimSpace(input.Agent),
 		Slug:       "bot " + name,
 		Title:      name,
-		Home:       s.Store.BotsDir(),
+		Home:       s.Homes,
 		Model:      strings.TrimSpace(input.Model),
 		SourceType: storage.SourceBot,
 	})

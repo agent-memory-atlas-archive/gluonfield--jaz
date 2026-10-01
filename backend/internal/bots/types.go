@@ -87,7 +87,6 @@ type Store interface {
 	SaveBot(storage.BotRecord) error
 	ListBots() ([]storage.BotRecord, error)
 	PinBots(ids []string) error
-	BotsDir() string
 	CreateSession(storage.CreateSession) (storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	ListSessions(storage.SessionFilter) ([]storage.Session, error)

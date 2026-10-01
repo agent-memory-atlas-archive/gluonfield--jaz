@@ -8,10 +8,12 @@ import (
 )
 
 type Layout struct {
-	Root              string
-	Sessions          string
-	Workspaces        string
-	DefaultWorkspace  string
+	Root             string
+	Sessions         string
+	Workspaces       string
+	DefaultWorkspace string
+	// Bots holds each bot's own permanent directory, named after its id.
+	Bots              string
 	UserSkills        string
 	Automations       string
 	Connections       string
@@ -29,6 +31,7 @@ func New(root string) Layout {
 		Sessions:          filepath.Join(root, "sessions"),
 		Workspaces:        filepath.Join(root, "workspaces"),
 		DefaultWorkspace:  filepath.Join(root, "workspaces", "default"),
+		Bots:              filepath.Join(root, "bots"),
 		UserSkills:        filepath.Join(root, "skills"),
 		Automations:       filepath.Join(root, "automations"),
 		Connections:       filepath.Join(root, "connections"),

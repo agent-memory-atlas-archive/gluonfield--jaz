@@ -11,11 +11,12 @@ import (
 	"github.com/wins/jaz/backend/internal/pathsafe"
 )
 
-// prepareSessionDir resolves where a spawned session works. A relative
-// explicit directory is workspace-confined and created if missing; an absolute
-// one is an existing server-side project directory. Without one each session
-// gets a fresh directory named after its slug. worktree=true swaps the
-// directory for a disposable git worktree on a session branch.
+// prepareSessionDir resolves where a spawned session works. A home gives it a
+// permanent directory under that root named after its id. A relative explicit
+// directory is workspace-confined and created if missing; an absolute one is
+// an existing server-side project directory. Without one each session gets a
+// fresh directory named after its slug. worktree=true swaps the directory for
+// a disposable git worktree on a session branch.
 func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg AgentConfig, slug, id string) (string, string, error) {
 	directory := strings.TrimSpace(req.Directory)
 	branch := strings.TrimSpace(req.Branch)
