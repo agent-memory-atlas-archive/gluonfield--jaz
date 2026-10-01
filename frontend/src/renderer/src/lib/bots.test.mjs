@@ -70,20 +70,18 @@ describe('bot chat log', () => {
 test('a question the bot asks shows in its chat, carries its answer and stands in for a written reply', () => {
   const at = (minute) => `2026-09-30T21:${String(minute).padStart(2, '0')}:00Z`
   const asked = (minute, type, extra = {}) => ({ session_id: 'gimli', seq: minute, at: at(minute), type, permission: { id: 'q1', title: 'Which account?', questions: [{ id: 'a', question: 'Which account?' }], ...extra } })
-  const { entries } = botChat(
-    [{ seq: 1, role: 'user', content: 'post it', blocks: [], created_at: at(1) }],
-    [
-      { session_id: 'gimli', seq: 2, at: at(2), type: 'acp_message', content: 'Checking accounts.', acp: { id: 'gimli' } },
-      asked(3, 'permission_request'),
-      asked(4, 'permission_request'),
-      asked(5, 'permission_response', { status: 'resolved' }),
-    ],
-    { id: 'gimli', name: 'Gimli' },
-    false,
-  )
+  const messages = [{ seq: 1, role: 'user', content: 'post it', blocks: [], created_at: at(1) }]
+  const events = [
+    { session_id: 'gimli', seq: 2, at: at(2), type: 'acp_message', content: 'Checking accounts.', acp: { id: 'gimli' } },
+    asked(3, 'permission_request'),
+    asked(4, 'permission_request'),
+  ]
+  expect(botChat(messages, events, { id: 'gimli', name: 'Gimli' }, true).waiting).toBe(true)
+  const { entries, waiting } = botChat(messages, [...events, asked(5, 'permission_response', { status: 'resolved' })], { id: 'gimli', name: 'Gimli' }, false)
   expect(entries.map((entry) => entry.kind)).toEqual(['user', 'question'])
   expect(entries[1].event.seq).toBe(4)
   expect(entries[1].answer?.status).toBe('resolved')
+  expect(waiting).toBe(false)
 })
 
 test('a dragged pin lands beside the tile under it, and holds still over itself or empty space', () => {

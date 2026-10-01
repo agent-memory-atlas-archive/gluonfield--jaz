@@ -9,6 +9,6 @@ import { ChatLog } from './ChatLog'
 export const BotChat = memo(function BotChat({ bot, bots, messages, events, working, threads }: ThreadChatView & { bot: Bot; bots: Bot[] }) {
   const chat = useMemo(() => botChat(messages, events, bot, working), [messages, events, bot, working])
   const subtasks = subtasksDoing(threads)
-  const busy = working ? [{ bot, ...chat.work }] : subtasks ? [{ bot, doing: subtasks }] : []
+  const busy = working && !chat.waiting ? [{ bot, ...chat.work }] : subtasks ? [{ bot, doing: subtasks }] : []
   return <ChatLog entries={chat.entries} bots={bots} named={false} working={busy} />
 })

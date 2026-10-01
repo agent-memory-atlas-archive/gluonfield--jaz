@@ -122,7 +122,7 @@ export function botChat(
   events: SessionEvent[],
   self: { id: string; name: string },
   working: boolean,
-): { entries: ChatEntry[]; work: BotWork } {
+): { entries: ChatEntry[]; work: BotWork; waiting: boolean } {
   const items = [
     ...messages.flatMap((message) =>
       message.role === 'user' ? [{ at: message.created_at, message, event: undefined }] : [],
@@ -180,7 +180,9 @@ export function botChat(
   }
   if (!working) close()
   for (const [id, entry] of questions) entry.answer = answers.get(id)
-  return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) } }
+  // A bot held on the user's answer to its question is waiting, not working.
+  const waiting = [...questions.values()].some((entry) => !entry.answer)
+  return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) }, waiting }
 }
 
 // What a bot's running subtasks have it doing, said as one person doing
