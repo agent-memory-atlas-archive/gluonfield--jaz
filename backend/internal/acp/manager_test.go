@@ -2075,6 +2075,19 @@ func TestSpawnSessionDirectories(t *testing.T) {
 		t.Fatalf("absolute project path not persisted: %#v", session.RuntimeRef)
 	}
 
+	// Home: a permanent directory of its own, named after the session, never a project.
+	homes := t.TempDir()
+	home, err := manager.CreateSession(ctx, acp.SpawnRequest{ACPAgent: "fake", Slug: "bot home", Home: homes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(homes, home.ID); home.RuntimeRef == nil || home.RuntimeRef.Cwd != want || home.RuntimeRef.ProjectPath != "" {
+		t.Fatalf("home = %#v, want cwd %q and no project", home.RuntimeRef, want)
+	}
+	if info, err := os.Stat(home.RuntimeRef.Cwd); err != nil || !info.IsDir() {
+		t.Fatalf("home was not created: %v", err)
+	}
+
 	// No directory: a fresh per-session directory named after the slug.
 	spawned, err = manager.Spawn(ctx, acp.SpawnRequest{ACPAgent: "fake", Slug: "adhoc-task"})
 	if err != nil {

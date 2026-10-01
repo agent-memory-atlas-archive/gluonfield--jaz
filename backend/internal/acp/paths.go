@@ -16,7 +16,7 @@ import (
 // one is an existing server-side project directory. Without one each session
 // gets a fresh directory named after its slug. worktree=true swaps the
 // directory for a disposable git worktree on a session branch.
-func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg AgentConfig, slug string) (string, string, error) {
+func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg AgentConfig, slug, id string) (string, string, error) {
 	directory := strings.TrimSpace(req.Directory)
 	branch := strings.TrimSpace(req.Branch)
 	if branch != "" && !req.Worktree {
@@ -29,6 +29,11 @@ func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg A
 	var abs string
 	var projectPath string
 	switch {
+	case req.Home != "":
+		abs = filepath.Join(req.Home, id)
+		if err := os.MkdirAll(abs, 0o755); err != nil {
+			return "", "", err
+		}
 	case directory != "":
 		if filepath.IsAbs(directory) {
 			abs = filepath.Clean(directory)

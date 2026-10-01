@@ -52,11 +52,10 @@ type Worker struct {
 }
 
 type CreateBot struct {
-	Name      string  `json:"name"`
-	Avatar    *Avatar `json:"avatar,omitempty"`
-	Agent     string  `json:"agent,omitempty"`
-	Model     string  `json:"model,omitempty"`
-	Directory string  `json:"directory,omitempty"`
+	Name   string  `json:"name"`
+	Avatar *Avatar `json:"avatar,omitempty"`
+	Agent  string  `json:"agent,omitempty"`
+	Model  string  `json:"model,omitempty"`
 }
 
 type UpdateBot struct {
@@ -88,6 +87,7 @@ type Store interface {
 	SaveBot(storage.BotRecord) error
 	ListBots() ([]storage.BotRecord, error)
 	PinBots(ids []string) error
+	BotsDir() string
 	CreateSession(storage.CreateSession) (storage.Session, error)
 	LoadSession(string) (storage.Session, error)
 	ListSessions(storage.SessionFilter) ([]storage.Session, error)

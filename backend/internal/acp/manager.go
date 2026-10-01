@@ -102,6 +102,9 @@ type SpawnRequest struct {
 	// (absolute paths must stay inside it); created if missing. Empty means
 	// a fresh per-session directory named after the slug.
 	Directory string
+	// Home gives the session a permanent directory of its own instead: one
+	// under this root named after the session's id, created if missing.
+	Home string
 	// Worktree runs the session on a disposable git worktree of Directory.
 	Worktree bool
 	// Branch selects the base branch/ref for Worktree. Empty means Directory's HEAD.
@@ -442,7 +445,7 @@ func (m *Manager) createSession(ctx context.Context, req SpawnRequest) (createdS
 		_ = m.store.SaveSession(session)
 		return createdSession{}, err
 	}
-	absCwd, projectPath, err := m.prepareSessionDir(ctx, req, cfg, session.Slug)
+	absCwd, projectPath, err := m.prepareSessionDir(ctx, req, cfg, session.Slug, session.ID)
 	if err != nil {
 		return fail(err)
 	}

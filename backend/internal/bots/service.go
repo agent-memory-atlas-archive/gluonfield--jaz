@@ -86,7 +86,7 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 		ACPAgent:   strings.TrimSpace(input.Agent),
 		Slug:       "bot " + name,
 		Title:      name,
-		Directory:  strings.TrimSpace(input.Directory),
+		Home:       s.Store.BotsDir(),
 		Model:      strings.TrimSpace(input.Model),
 		SourceType: storage.SourceBot,
 	})
@@ -237,7 +237,7 @@ func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, er
 	if name == "" {
 		name = "Routine bot"
 	}
-	bot, err := s.Create(context.Background(), CreateBot{Name: name, Agent: in.ACPAgent, Model: in.Model, Directory: in.Directory})
+	bot, err := s.Create(context.Background(), CreateBot{Name: name, Agent: in.ACPAgent, Model: in.Model})
 	return bot.ID, err
 }
 
@@ -252,7 +252,7 @@ func (s *Service) AdoptLoops(ctx context.Context) error {
 		if routine.BotID != "" || s.Routines.OnBoard(routine) {
 			continue
 		}
-		bot, err := s.Create(ctx, CreateBot{Name: routine.Name, Agent: routine.ACPAgent, Model: routine.Model, Directory: routine.Directory})
+		bot, err := s.Create(ctx, CreateBot{Name: routine.Name, Agent: routine.ACPAgent, Model: routine.Model})
 		if err != nil {
 			return fmt.Errorf("adopt loop %s: %w", routine.ID, err)
 		}

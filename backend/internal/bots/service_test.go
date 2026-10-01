@@ -58,6 +58,10 @@ func (w *fakeWorld) LoadBot(id string) (storage.BotRecord, error) {
 	return record, nil
 }
 
+func (w *fakeWorld) BotsDir() string {
+	return "/bots"
+}
+
 func (w *fakeWorld) ListBots() ([]storage.BotRecord, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -502,7 +506,7 @@ func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBotExceptBoardWidgets(t *testing.
 	if err != nil || record.Kind != KindBot || world.sessions[adopted].Title != "Morning triage" {
 		t.Fatalf("adopted by %q: %+v, %v", adopted, record, err)
 	}
-	if len(world.created) != 1 || world.created[0].ACPAgent != "codex" || world.created[0].Directory != "triage" {
+	if len(world.created) != 1 || world.created[0].ACPAgent != "codex" || world.created[0].Home != "/bots" || world.created[0].Directory != "" {
 		t.Fatalf("created bots = %+v", world.created)
 	}
 	if world.loops[1].BotID != "gimli" {
