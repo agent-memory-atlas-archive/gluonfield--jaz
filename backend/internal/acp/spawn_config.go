@@ -12,6 +12,7 @@ import (
 
 func (m *Manager) spawnConfig(req SpawnRequest) (SpawnRequest, AgentConfig, string, error) {
 	req.ACPAgent = CanonicalAgentName(req.ACPAgent)
+	req.Directory = strings.TrimSpace(req.Directory)
 	if req.ACPAgent == "" {
 		agent, err := m.defaultSpawnAgent()
 		if err != nil {

@@ -49,9 +49,6 @@ func (s *Server) createACPSession(w http.ResponseWriter, req createSessionReques
 		writeError(w, http.StatusBadRequest, fmt.Errorf("worktree requires a directory pointing at a git repository"))
 		return
 	}
-	if directory == "" {
-		directory = "."
-	}
 	ctx, cancel := serverACPBootstrapContext()
 	defer cancel()
 	session, err := s.ACP.CreateSession(ctx, acp.SpawnRequest{

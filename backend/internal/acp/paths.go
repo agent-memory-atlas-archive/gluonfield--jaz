@@ -11,14 +11,10 @@ import (
 	"github.com/wins/jaz/backend/internal/pathsafe"
 )
 
-// prepareSessionDir resolves where a spawned session works. A home gives it a
-// permanent directory under that root named after its id. A relative explicit
-// directory is workspace-confined and created if missing; an absolute one is
-// an existing server-side project directory. Without one each session gets a
-// fresh directory named after its slug. worktree=true swaps the directory for
-// a disposable git worktree on a session branch.
+// prepareSessionDir resolves server-side projects, permanent homes and utility
+// directories, optionally creating a Git worktree.
 func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg AgentConfig, slug, id string) (string, string, error) {
-	directory := strings.TrimSpace(req.Directory)
+	directory := req.Directory
 	branch := strings.TrimSpace(req.Branch)
 	if branch != "" && !req.Worktree {
 		return "", "", fmt.Errorf("branch requires worktree=true")
@@ -34,7 +30,9 @@ func (m *Manager) prepareSessionDir(ctx context.Context, req SpawnRequest, cfg A
 	var projectPath string
 	switch {
 	case req.Home != "":
-		abs = filepath.Join(req.Home, id)
+		if abs, err = pathsafe.Resolve(req.Home, id); err != nil {
+			return "", "", err
+		}
 		if err := os.MkdirAll(abs, 0o755); err != nil {
 			return "", "", err
 		}

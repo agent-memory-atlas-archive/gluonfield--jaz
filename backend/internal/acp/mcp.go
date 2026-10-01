@@ -58,7 +58,7 @@ type MCPCreateInput struct {
 	Agent         string `json:"agent,omitempty" jsonschema:"Agent harness to use. Omit to use the configured default."`
 	Slug          string `json:"slug,omitempty" jsonschema:"Optional human-readable thread handle."`
 	Title         string `json:"title,omitempty" jsonschema:"Optional thread title."`
-	Directory     string `json:"directory,omitempty" jsonschema:"Working directory relative to the Jaz workspace. Omit for a new task directory."`
+	Directory     string `json:"directory,omitempty" jsonschema:"Project directory on the server; relative paths resolve inside the Jaz workspace. Omit for a permanent directory named by thread ID."`
 	Worktree      bool   `json:"worktree,omitempty" jsonschema:"Use a disposable Git worktree of directory."`
 	Branch        string `json:"branch,omitempty" jsonschema:"Base ref for worktree. Omit to use the current HEAD."`
 	ModelProvider string `json:"modelProvider,omitempty" jsonschema:"Optional provider override."`
