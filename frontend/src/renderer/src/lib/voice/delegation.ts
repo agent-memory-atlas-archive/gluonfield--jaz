@@ -1,5 +1,5 @@
 import type { ChatMessage, SessionMessages } from '@/lib/api/types'
-import { voiceThreadEvents } from '@/lib/voice/transcript'
+import { voiceReplies, voiceThreadEvents } from '@/lib/voice/transcript'
 import type { VoiceWorkActivity } from '@shared/voice'
 
 export interface VoiceTask {
@@ -33,12 +33,11 @@ export function voiceTaskActivity(task: VoiceTask, snapshot: SessionMessages): V
 }
 
 export function voiceReplyChunks(task: VoiceTask, snapshot: SessionMessages): string[] {
-  const replies = task.user ? voiceTaskWindow(task.user, snapshot).events.filter((event) => event.type === 'acp_message' && event.content) : []
+  const replies = task.user ? voiceReplies(snapshot, voiceTaskWindow(task.user, snapshot).events) : []
   const output = task.output ??= new Map()
   const chunks: string[] = []
-  for (const reply of replies) {
+  for (const { event: reply, text } of replies) {
     const key = reply.projection_key || reply.acp?.text_run_id || String(reply.seq)
-    const text = reply.content!
     const sent = output.get(key) ?? ''
     if (!sent && (reply.seq ?? 0) < (task.outputSeq ?? 0)) {
       continue
@@ -76,7 +75,7 @@ export function voiceTaskUpdate(task: VoiceTask, snapshot: SessionMessages): Tas
     if (terminal?.state === 'cancelled' || (!nextUser && (snapshot.acp_state === 'cancelled' || snapshot.session.status === 'interrupted'))) return { state: 'cancelled', text: 'The agent task was cancelled.' }
     const error = terminal?.error || (!nextUser && (snapshot.acp_error || snapshot.session.error))
     if (error || terminal?.state === 'failed') return { state: 'failed', text: error || 'The agent task failed.' }
-    const answer = events.findLast((event) => event.type === 'acp_message')?.content || after.findLast((message) => message.role === 'assistant' && (!nextUser || message.seq < nextUser.seq))?.content
+    const answer = voiceReplies(snapshot, events).at(-1)?.text || events.findLast((event) => event.type === 'acp_message')?.content || after.findLast((message) => message.role === 'assistant' && (!nextUser || message.seq < nextUser.seq))?.content
     if (answer) return { state: 'completed', text: answer }
     return { state: 'completed', text: 'The agent finished without a written answer. Check the chat for its tool results.' }
   }

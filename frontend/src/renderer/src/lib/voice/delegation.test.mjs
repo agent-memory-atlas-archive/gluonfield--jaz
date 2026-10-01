@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { voiceChatContext } from './transcript'
-import { taskFinished, voiceTaskUpdate } from './delegation'
+import { taskFinished, voiceReplyChunks, voiceTaskUpdate } from './delegation'
 
 const user = (seq, content, requestId = 'delegation') => ({ seq, role: 'user', content, blocks: [{ type: 'voice_context', id: 'call', request_id: requestId }], created_at: new Date(seq * 1000).toISOString() })
 const answer = (seq, content) => ({ seq, role: 'assistant', content, created_at: new Date(seq * 1000).toISOString() })
@@ -115,4 +115,16 @@ test('identical spoken requests keep separate request identities', () => {
   const typed = { ...second, blocks: [], content: 'Check files' }
   expect(voiceTaskUpdate({ id: 'second', callId: 'call' }, snapshot([first, typed])).state).toBe('running')
   expect(voiceTaskUpdate({ id: 'first', callId: 'different-call' }, snapshot([first])).state).toBe('running')
+})
+
+test('a bot is heard through the messages it sends, and its narration stays private', () => {
+  const sent = (seq, text) => ({ seq, session_id: 'thread', type: 'room_message', at: new Date(seq * 1000).toISOString(), room_message: { speaker: 'bot', bot_id: 'thread', name: 'Lead Generator', text } })
+  const bot = (events) => snapshot([user(11, 'Check my CRM')], { events, session: { status: 'idle', source_type: 'bot' } })
+  const events = [event(12, 'I’ll check your CRM now.', 'narration', 'idle'), sent(13, 'One deal: Park Place, at Lead.')]
+  const request = task()
+  expect(voiceTaskUpdate(request, bot(events))).toEqual({ state: 'completed', text: 'One deal: Park Place, at Lead.' })
+  expect(voiceReplyChunks(request, bot(events))).toEqual(['One deal: Park Place, at Lead.'])
+  expect(voiceChatContext(bot(events))).toContain('assistant: One deal: Park Place, at Lead.')
+  expect(voiceChatContext(bot(events))).not.toContain('I’ll check')
+  expect(voiceTaskUpdate(task(), bot(events.slice(0, 1))).text).toBe('I’ll check your CRM now.')
 })

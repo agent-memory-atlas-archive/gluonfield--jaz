@@ -319,4 +319,22 @@ describe('voice consumes the existing agent event stream', () => {
     expect(spoken).toBe('Disk check: 42 GB free. ')
     f.stream.stop()
   })
+
+  test('a bot is heard the moment it sends its answer, not through its narration', async () => {
+    const f = fixture()
+    const bot = { ...structuredClone(disk), session: { ...disk.session, source_type: 'bot' }, events: [], latest_event_seq: 0 }
+    f.setRead(async () => structuredClone(bot))
+    await f.stream.context()
+    f.stream.start()
+    f.stream.follow(f.task())
+    await f.stream.refresh()
+    const narration = disk.events.findLast((event) => event.type === 'acp_message')
+    f.emit({ ...narration, seq: 100, content: 'I’ll check your CRM now.' })
+    await delay(250)
+    expect(f.sent.filter((item) => item.speak)).toEqual([])
+    f.emit({ seq: 101, session_id: disk.session.id, type: 'room_message', at: narration.at,
+      room_message: { speaker: 'bot', bot_id: disk.session.id, name: 'Lead Generator', text: 'One deal: Park Place, at Lead.' } })
+    expect(f.sent.filter((item) => item.speak).map((item) => item.text)).toEqual(['One deal: Park Place, at Lead.'])
+    f.stream.stop()
+  })
 })

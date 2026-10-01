@@ -1,8 +1,21 @@
-import type { SessionMessages } from '@/lib/api/types'
+import type { SessionEvent, SessionMessages } from '@/lib/api/types'
 import { coalesceSessionEvents } from '@/lib/sessionEvents'
 
 export function voiceThreadEvents(snapshot: SessionMessages) {
   return coalesceSessionEvents(snapshot.events.filter((event) => event.session_id === snapshot.session.id && (!event.acp?.id || event.acp.id === snapshot.session.id)))
+}
+
+// What the agent says, as its chat shows it: a bot speaks only through the
+// messages it sends, so its narration stays private; any other agent through
+// its written text.
+export function voiceReplies(snapshot: SessionMessages, events: SessionEvent[]): { event: SessionEvent; text: string }[] {
+  const bot = snapshot.session.source_type === 'bot'
+  return events.flatMap((event) => {
+    const text = bot
+      ? event.room_message?.speaker === 'bot' && event.room_message.bot_id === snapshot.session.id ? event.room_message.text : ''
+      : event.type === 'acp_message' ? event.content : ''
+    return text ? [{ event, text }] : []
+  })
 }
 
 export function voiceChatContext(snapshot: SessionMessages, activeCallId?: string): string {
@@ -11,8 +24,7 @@ export function voiceChatContext(snapshot: SessionMessages, activeCallId?: strin
   const entries = [
     ...snapshot.messages.filter((message) => message.role === 'user' || message.role === 'assistant')
       .map((message) => ({ role: message.role, text: message.content, at: message.created_at })),
-    ...events.filter((event) => event.type === 'acp_message' && event.content)
-      .map((event) => ({ role: 'assistant', text: event.content!, at: event.at })),
+    ...voiceReplies(snapshot, events).map(({ event, text }) => ({ role: 'assistant', text, at: event.at })),
     ...events.filter((event) => event.voice && event.voice.call_id !== activeCallId)
       .map((event) => ({ role: event.voice!.role, text: event.voice!.text, at: event.voice!.at })),
   ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)).slice(-12)

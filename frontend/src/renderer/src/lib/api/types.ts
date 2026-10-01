@@ -64,6 +64,8 @@ export interface Session {
   slug: string
   title?: string
   parent_id?: string
+  // What started the thread, such as 'bot'; absent for an interactive chat.
+  source_type?: string
   status: 'idle' | 'running' | 'error' | 'interrupted'
   error?: string
   archived?: boolean

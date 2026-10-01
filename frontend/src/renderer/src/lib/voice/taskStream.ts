@@ -47,7 +47,7 @@ export class VoiceTaskStream {
         void this.refresh()
         return
       }
-      if (!event.type.startsWith('acp')) {
+      if (!event.type.startsWith('acp') && !event.room_message) {
         return
       }
       this.apply(this.snapshot, event)
