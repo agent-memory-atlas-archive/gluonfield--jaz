@@ -17,6 +17,7 @@ export function ModelSelect({
   loading,
   disabled,
   placement,
+  align,
   onChange,
 }: {
   value: string
@@ -26,6 +27,7 @@ export function ModelSelect({
   loading?: boolean
   disabled?: boolean
   placement?: 'above' | 'below'
+  align?: 'start' | 'end'
   onChange: (selection: ModelSelection) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -60,6 +62,7 @@ export function ModelSelect({
         triggerRef.current?.focus()
       }}
       placement={placement}
+      align={align}
       trigger={
         <Button
           ref={triggerRef}

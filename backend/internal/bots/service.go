@@ -132,11 +132,16 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	if err != nil {
 		return Bot{}, err
 	}
+	if (input.Agent != nil || input.Model != nil) && record.Kind != KindBot {
+		return Bot{}, errors.New("only a bot has an agent")
+	}
 	if input.Agent != nil {
-		if record.Kind != KindBot {
-			return Bot{}, errors.New("only a bot has an agent")
-		}
 		if err := s.Threads.SwitchAgent(ctx, id, strings.TrimSpace(*input.Agent)); err != nil {
+			return Bot{}, err
+		}
+	}
+	if input.Model != nil {
+		if err := s.Threads.SetModel(ctx, id, strings.TrimSpace(*input.Model), strings.TrimSpace(input.ReasoningEffort)); err != nil {
 			return Bot{}, err
 		}
 	}
@@ -285,6 +290,7 @@ func (s *Service) view(record storage.BotRecord, session storage.Session, routin
 		return bot
 	}
 	bot.Model = session.Model
+	bot.ReasoningEffort = session.ReasoningEffort
 	if ref := session.RuntimeRef; ref != nil {
 		bot.Agent = ref.Agent
 	}

@@ -1,35 +1,25 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { ModelSelect } from '@/components/session/ModelSelect'
 import { Select } from '@/components/ui/Select'
-import { useToast } from '@/components/ui/toast'
 import { agentLabel } from '@/lib/agentLabel'
-import { enabledACPAgents } from '@/lib/agentRuntimes'
-import { setSessionAgentConfig } from '@/lib/api/sessions'
+import { enabledACPAgents, runtimeModelState } from '@/lib/agentRuntimes'
 import { agentSettingsQuery } from '@/lib/api/settings'
-import type { AgentSessionConfigOption, AgentSessionState, Bot } from '@/lib/api/types'
-import { keys } from '@/lib/query/keys'
+import type { AgentSessionState, Bot } from '@/lib/api/types'
+import { useModelReasoningState } from '@/lib/modelReasoning'
 import { useUpdateBot } from './useUpdateBot'
 
-// The bot's agent and that agent's own model and reasoning options.
+// The bot's agent, and the model and effort it runs with in the composer's
+// picker.
 export function BotAgentSettings({ bot, agentSession, working }: { bot: Bot; agentSession?: AgentSessionState; working: boolean }) {
-  const options = agentSession?.config_options ?? []
-  const model = options.find((option) => option.category === 'model')
-  const reasoning = options.find((option) => option.category === 'thought_level')
   return (
     <div className="-mx-2.5 flex flex-col">
       <Row label="Agent">
         <AgentSelect bot={bot} working={working} />
       </Row>
-      {model ? (
-        <Row label="Model">
-          <OptionSelect sessionId={bot.id} option={model} working={working} />
-        </Row>
-      ) : null}
-      {reasoning ? (
-        <Row label="Reasoning">
-          <OptionSelect sessionId={bot.id} option={reasoning} working={working} />
-        </Row>
-      ) : null}
+      <Row label="Model">
+        <BotModelSelect bot={bot} agentSession={agentSession} working={working} />
+      </Row>
     </div>
   )
 }
@@ -68,25 +58,38 @@ function AgentSelect({ bot, working }: { bot: Bot; working: boolean }) {
   )
 }
 
-function OptionSelect({ sessionId, option, working }: { sessionId: string; option: AgentSessionConfigOption; working: boolean }) {
-  const queryClient = useQueryClient()
-  const toast = useToast()
-  const update = useMutation({
-    mutationFn: (value: string) => setSessionAgentConfig(sessionId, option.id, value),
-    onError: (error) => toast(error.message, 'danger'),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: keys.sessionOverview(sessionId) })
-      queryClient.invalidateQueries({ queryKey: keys.bots })
-    },
+// A running agent's own options are the truth; before it starts, the bot's
+// stored pick is.
+function BotModelSelect({ bot, agentSession, working }: { bot: Bot; agentSession?: AgentSessionState; working: boolean }) {
+  const settings = useQuery(agentSettingsQuery).data
+  const update = useUpdateBot(bot.id)
+  const agent = bot.agent ?? ''
+  const runtime = runtimeModelState(settings, agent)
+  const live = (category: string) => agentSession?.config_options?.find((option) => option.category === category)?.current_value
+  const model = live('model') || bot.model || runtime.defaultModel
+  const reasoning = useModelReasoningState({
+    settings,
+    agent,
+    model,
+    reasoningEffort: live('thought_level') || bot.reasoning_effort || runtime.defaultEffort,
+    usesProvider: runtime.usesProvider,
+    provider: runtime.provider,
+    selectedProvider: runtime.selectedProvider,
   })
   return (
-    <Select
-      aria-label={option.name}
-      variant="plain"
-      value={option.current_value}
-      options={option.options.map((value) => ({ value: value.value, label: value.name }))}
-      disabled={working || update.isPending}
-      onChange={(value) => update.mutate(value)}
-    />
+    <div className="-mr-2.5 flex min-w-0 flex-1 justify-end">
+      <ModelSelect
+        key={agent}
+        value={model}
+        effort={reasoning.effectiveReasoningEffort}
+        suggestions={reasoning.modelSuggestions}
+        effortOptions={reasoning.reasoningOptions}
+        loading={reasoning.modelsLoading}
+        disabled={working || update.isPending}
+        placement="below"
+        align="end"
+        onChange={(next) => update.mutate({ model: next.model, reasoning_effort: next.effort })}
+      />
+    </div>
   )
 }

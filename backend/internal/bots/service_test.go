@@ -208,6 +208,10 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
 }
 
+func (fakeThreads) SetModel(context.Context, string, string, string) error {
+	return nil
+}
+
 func (fakeThreads) SwitchAgent(context.Context, string, string) error {
 	return nil
 }
