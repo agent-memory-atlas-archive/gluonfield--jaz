@@ -1,5 +1,6 @@
 import type { Bot, BotActivityEvent, BotAvatar, BotColor, BotShape, ChatMessage, SessionEvent } from '@/lib/api/types'
 import { messageText } from '@/lib/messageText'
+import { type SpawnedThreadView, threadRunning } from '@/lib/spawnedThreads'
 
 export const BOT_SHAPES: BotShape[] = ['circle', 'blob', 'squircle', 'pill', 'triangle', 'hex', 'cloud', 'drop']
 
@@ -129,6 +130,13 @@ export function botChat(
   }
   if (!working) close()
   return { entries, work: { doing: busyWith(turn?.activity), since: turn?.at, note: turn?.reply?.text.split('\n').at(-1) } }
+}
+
+// What a bot's running workers have it doing, said as one person doing
+// several things at once.
+export function workersDoing(threads: SpawnedThreadView[]): string | undefined {
+  const titles = threads.filter(threadRunning).map((thread) => thread.title || thread.slug)
+  return titles.length ? `working on ${titles.join(', ')}` : undefined
 }
 
 function busyWith(activity?: BotActivityEvent): string | undefined {

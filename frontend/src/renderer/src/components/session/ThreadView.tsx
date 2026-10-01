@@ -58,6 +58,8 @@ import { keys } from '@/lib/query/keys'
 import { type PlanApprovalAction } from '@/lib/taskSurface'
 import { preparedSendMessage, type SendMessageOptions } from '@/lib/sendMessage'
 import { latestEventTimeISO } from '@/lib/sessionLiveness'
+import type { ProviderSubagentView } from '@/lib/providerSubagents'
+import type { SpawnedThreadView } from '@/lib/spawnedThreads'
 import {
   type OptimisticUserMessage,
   optimisticTranscriptMessages,
@@ -99,11 +101,14 @@ export interface ThreadChatView {
   messages: ChatMessage[]
   events: SessionEvent[]
   working: boolean
+  threads: SpawnedThreadView[]
 }
 
 export interface ThreadDetailsView {
   agentSession?: AgentSessionState
   working: boolean
+  threads: SpawnedThreadView[]
+  subagents: ProviderSubagentView[]
 }
 
 // One thread's full view: transcript, composer, and side panel. `header` and
@@ -466,7 +471,7 @@ export function ThreadView({
               >
                 {chat ? (
                   <>
-                    {chat({ messages: transcriptMessages, events: displayEvents, working: sessionRunning })}
+                    {chat({ messages: transcriptMessages, events: displayEvents, working: sessionRunning, threads: spawnedThreads })}
                     {errorNotice}
                   </>
                 ) : empty ? (
@@ -633,7 +638,7 @@ export function ThreadView({
               panel={sidePanel}
               sideChatAvailable={sideChatAvailable}
               sideChatEvents={sideChatEvents}
-              overview={details?.({ agentSession: derived.agentSession, working: sessionRunning })}
+              overview={details?.({ agentSession: derived.agentSession, working: sessionRunning, threads: spawnedThreads, subagents: providerSubagents })}
               onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
               onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
               onSend={handleSend}

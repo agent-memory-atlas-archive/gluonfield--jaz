@@ -63,44 +63,55 @@ func (m *Manager) SwitchAgent(_ context.Context, sessionID, agent string) error 
 	return nil
 }
 
-// SetModel picks the model and reasoning effort an ACP thread runs with.
-// Before the current agent's first turn the choice is stored and applied when
-// its native session starts, as a new thread's is. After that it goes through
-// the agent's own model and effort options.
+// SetModel picks the model and reasoning effort an ACP thread runs with and
+// stores them on the thread. Before the current agent's first turn the stored
+// choice is applied when its native session starts, as a new thread's is.
+// After that it goes through the agent's own model and effort options first.
 func (m *Manager) SetModel(ctx context.Context, sessionID, model, effort string) error {
-	live, cfg, effort, err := m.storeModel(sessionID, model, effort)
+	m.resumeMu.Lock()
+	session, cfg, effort, live, err := m.modelChoice(sessionID, model, effort)
+	if err == nil && !live {
+		err = m.saveModel(session, cfg, effort)
+	}
+	m.resumeMu.Unlock()
 	if err != nil || !live {
 		return err
 	}
-	return m.setLiveModel(ctx, sessionID, cfg, effort)
-}
-
-// storeModel saves the choice on a thread whose agent has neither a native
-// session nor a process yet, and reports whether one already exists instead.
-func (m *Manager) storeModel(sessionID, model, effort string) (bool, AgentConfig, string, error) {
+	if err := m.setLiveModel(ctx, sessionID, cfg, effort); err != nil {
+		return err
+	}
 	m.resumeMu.Lock()
 	defer m.resumeMu.Unlock()
+	if session, err = m.store.LoadSession(sessionID); err != nil {
+		return err
+	}
+	return m.saveModel(session, cfg, effort)
+}
+
+// modelChoice validates a pick for a thread's current agent and reports
+// whether the agent already has a native session or a process to apply it to.
+func (m *Manager) modelChoice(sessionID, model, effort string) (storage.Session, AgentConfig, string, bool, error) {
 	session, err := m.store.LoadSession(sessionID)
 	if err != nil {
-		return false, AgentConfig{}, "", err
+		return storage.Session{}, AgentConfig{}, "", false, err
 	}
 	if session.Runtime != storage.RuntimeACP || session.RuntimeRef == nil {
-		return false, AgentConfig{}, "", fmt.Errorf("session %s is not acp-backed", sessionID)
+		return storage.Session{}, AgentConfig{}, "", false, fmt.Errorf("session %s is not acp-backed", sessionID)
 	}
-	agent := CanonicalAgentName(session.RuntimeRef.Agent)
-	_, cfg, effort, err := m.spawnConfig(SpawnRequest{ACPAgent: agent, Model: model, ReasoningEffort: effort})
+	_, cfg, effort, err := m.spawnConfig(SpawnRequest{ACPAgent: session.RuntimeRef.Agent, Model: model, ReasoningEffort: effort})
 	job, _ := m.job(sessionID)
-	if err != nil || session.RuntimeRef.SessionID != "" || job != nil {
-		return err == nil, cfg, effort, err
-	}
-	session.ModelProvider = sessionModelProvider(agent, cfg)
+	return session, cfg, effort, session.RuntimeRef.SessionID != "" || job != nil, err
+}
+
+func (m *Manager) saveModel(session storage.Session, cfg AgentConfig, effort string) error {
+	session.ModelProvider = sessionModelProvider(CanonicalAgentName(session.RuntimeRef.Agent), cfg)
 	session.Model = strings.TrimSpace(cfg.Model)
 	session.ReasoningEffort = effort
 	if err := m.store.SaveSession(session); err != nil {
-		return false, AgentConfig{}, "", err
+		return err
 	}
-	m.publishSessionChanged(sessionID)
-	return false, cfg, effort, nil
+	m.publishSessionChanged(session.ID)
+	return nil
 }
 
 func (m *Manager) setLiveModel(ctx context.Context, sessionID string, cfg AgentConfig, effort string) error {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { OverviewRuns } from '@/components/session/OverviewRuns'
 import { SidePanelShell } from '@/components/session/SidePanelShell'
 import type { ThreadDetailsView } from '@/components/session/ThreadView'
 import { Popover } from '@/components/ui/Popover'
@@ -12,14 +13,15 @@ import { BotNameInput } from './BotNameInput'
 import { BotRoutines } from './BotRoutines'
 import { useUpdateBot } from './useUpdateBot'
 
-type Tab = 'routines' | 'agent'
+type Tab = 'routines' | 'workers' | 'agent'
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'routines', label: 'Routines' },
+  { value: 'workers', label: 'Workers' },
   { value: 'agent', label: 'Agent' },
 ]
 
-export function BotDetails({ bot, focusName, agentSession, working }: { bot: Bot; focusName: boolean } & ThreadDetailsView) {
+export function BotDetails({ bot, focusName, agentSession, working, threads, subagents }: { bot: Bot; focusName: boolean } & ThreadDetailsView) {
   const [tab, setTab] = useState<Tab>('routines')
   return (
     <SidePanelShell width={OVERVIEW_PANEL_WIDTH} variant="hug" className="gap-4 px-4 py-4">
@@ -33,7 +35,17 @@ export function BotDetails({ bot, focusName, agentSession, working }: { bot: Bot
         />
       </div>
       <Segmented value={tab} options={TABS} onChange={setTab} layoutId={`bot-details-${bot.id}`} />
-      {tab === 'routines' ? <BotRoutines bot={bot} /> : <BotAgentSettings bot={bot} agentSession={agentSession} working={working} />}
+      {tab === 'routines' ? (
+        <BotRoutines bot={bot} />
+      ) : tab === 'workers' ? (
+        threads.length || subagents.length ? (
+          <OverviewRuns threads={threads} subagents={subagents} />
+        ) : (
+          <p className="text-[13px] text-ink-3">{bot.name} hands heavy work to workers that run in the background.</p>
+        )
+      ) : (
+        <BotAgentSettings bot={bot} agentSession={agentSession} working={working} />
+      )}
     </SidePanelShell>
   )
 }

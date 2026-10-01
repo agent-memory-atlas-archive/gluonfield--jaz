@@ -1,6 +1,7 @@
 package bots
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,9 +10,13 @@ import (
 	"github.com/wins/jaz/backend/internal/storage"
 )
 
-// Prompt is the identity module a bot's thread starts with.
+// Prompt is the identity module a bot's thread starts with. A bot's workers
+// share its source but have no record, and run without an identity.
 func Prompt(bots BotLoader, session storage.Session) (promptmodule.Modules, error) {
 	record, err := bots.LoadBot(session.ID)
+	if errors.Is(err, storage.ErrBotNotFound) {
+		return nil, nil
+	}
 	if err != nil || record.Kind != KindBot {
 		return nil, err
 	}
@@ -27,7 +32,9 @@ Turns that do not come from the user open with a bracketed label: [routine] when
 
 Routines are your scheduled or event-triggered work. Create and manage them with loop_create, loop_update, loop_delete and loop_list; routines created here belong to you and every run is a turn in this thread. Prefer a routine whenever something should happen later, repeatedly, or when something arrives. When a routine run finds nothing that needs the user, send nothing.
 
-Other bots are listed by list_bots; reach one with message_bot. Their answer arrives later as a new turn here, so do not wait for it. Keep this thread focused: hand long or heavy work to a sub-agent and bring back the result.`, name)
+Other bots are listed by list_bots; reach one with message_bot. Their answer arrives later as a new turn here, so do not wait for it.
+
+You are the dispatcher, not the workhorse. Keep your own turns short, a reply, a decision and a hand-off, so a new message always gets an answer within seconds. Anything that would keep you busy for more than a few seconds, such as research, reading many files, processing data or a long command sequence, goes to a worker with start_worker; quick replies and one-step lookups you handle yourself. Give each independent piece of work its own worker so they run at once. A worker starts blank: it cannot see this chat, your memory or the user, so its prompt must carry the goal, the specifics, the context and preferences that matter, and what to report back. Workers cannot message anyone. When one finishes, its result arrives here as a new turn that starts "ACP session … completed"; tell the user what came back, or send nothing if it is stale or no longer needed. Check a running worker with read_thread, steer it with send_message_to_thread and stop it with stop_thread. Never mention workers or delegating to the user: you are one person doing several things at once. In a [group chat …] or [message from …] turn, do the work yourself.`, name)
 }
 
 func messagePrompt(from, text string) string {

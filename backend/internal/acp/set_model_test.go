@@ -82,4 +82,7 @@ func TestSetModelAppliesBeforeAndAfterTheAgentStarts(t *testing.T) {
 	if writes := configWrites(); !slices.Equal(writes, []string{"model=fake-small", "reasoning_effort=medium"}) {
 		t.Fatalf("running agent config writes = %v", writes)
 	}
+	if stored, err = store.LoadSession(session.ID); err != nil || stored.Model != "fake-small" || stored.ReasoningEffort != "medium" {
+		t.Fatalf("stored live pick = %q/%q, %v", stored.Model, stored.ReasoningEffort, err)
+	}
 }

@@ -87,9 +87,13 @@ function mergeSpawnedThread(prev: SpawnedThreadView, next: SpawnedThreadView): S
   }
 }
 
-function threadActiveRank(thread: SpawnedThreadView): number {
+export function threadRunning(thread: SpawnedThreadView): boolean {
   const state = thread.state.toLowerCase()
-  return !state || state === 'running' || state === 'starting' ? 0 : 1
+  return !state || state === 'running' || state === 'starting'
+}
+
+function threadActiveRank(thread: SpawnedThreadView): number {
+  return threadRunning(thread) ? 0 : 1
 }
 
 function eventTime(value: string): number {

@@ -23,6 +23,7 @@ type fakeWorld struct {
 	prompts   map[string][]string
 	replies   map[string][]string
 	created   []acp.SpawnRequest
+	sent      []acp.SendRequest
 	loops     []loops.Loop
 	published []sessionevents.Event
 	held      map[string]chan struct{}
@@ -206,6 +207,13 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 		}
 	}
 	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
+}
+
+func (t fakeThreads) Send(_ context.Context, req acp.SendRequest) (acp.Job, error) {
+	t.world.mu.Lock()
+	defer t.world.mu.Unlock()
+	t.world.sent = append(t.world.sent, req)
+	return acp.Job{ID: req.Session}, nil
 }
 
 func (fakeThreads) SetModel(context.Context, string, string, string) error {
@@ -492,5 +500,40 @@ func TestAdoptLoopsGivesEachOwnerlessLoopItsOwnBotExceptBoardWidgets(t *testing.
 	}
 	if world.loops[2].BotID != "" {
 		t.Fatal("a board widget was given a bot")
+	}
+}
+
+func TestWorkersRunAsChildrenOnTheWorkerSetup(t *testing.T) {
+	world := newFakeWorld()
+	service := newTestService(world)
+	world.addBot("scout", "Scout")
+	world.sessions["scout"] = storage.Session{ID: "scout", Title: "Scout", Model: "sonnet", ReasoningEffort: "low", RuntimeRef: &storage.RuntimeRef{Agent: acp.AgentClaude, Cwd: "/work/scout"}}
+
+	inherited, err := service.StartWorker(t.Context(), "scout", "Find flights", "Find flights to Oslo.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Update(t.Context(), "scout", UpdateBot{Worker: &Worker{Agent: acp.AgentCodex, Model: "gpt-6.1-sol", ReasoningEffort: "xhigh"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.StartWorker(t.Context(), "scout", "Build the deck", "Build the deck."); err != nil {
+		t.Fatal(err)
+	}
+
+	setups := make([]string, 0, len(world.created))
+	for _, req := range world.created {
+		if req.ParentID != "scout" || req.SourceType != storage.SourceBot || req.Directory != "/work/scout" {
+			t.Fatalf("worker spawn = %#v", req)
+		}
+		setups = append(setups, req.ACPAgent+"/"+req.Model+"/"+req.ReasoningEffort)
+	}
+	if !slices.Equal(setups, []string{"claude/sonnet/low", "codex/gpt-6.1-sol/xhigh"}) {
+		t.Fatalf("worker setups = %v", setups)
+	}
+	if first := world.sent[0]; first.Session != inherited || first.Message != "Find flights to Oslo." || first.Completion != acp.CompletionAsync || !first.ParentVisible {
+		t.Fatalf("worker prompt = %#v", first)
+	}
+	if modules, err := Prompt(world, world.sessions[inherited]); err != nil || modules != nil {
+		t.Fatalf("worker identity = %v, %v", modules, err)
 	}
 }

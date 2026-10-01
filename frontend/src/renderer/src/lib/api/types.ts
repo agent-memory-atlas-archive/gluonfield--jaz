@@ -716,8 +716,16 @@ export interface Bot {
   agent?: string
   model?: string
   reasoning_effort?: string
+  /** what the bot's background workers run on; absent means the bot's own */
+  worker?: BotWorker
   members?: string[]
   routines?: number
+}
+
+export interface BotWorker {
+  agent: string
+  model?: string
+  reasoning_effort?: string
 }
 
 export interface BotActivityEvent {
