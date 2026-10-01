@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowUp } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ComposerFrame } from '@/components/session/ComposerFrame'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from '@/components/session/MentionInput'
 import { SidePanelControl } from '@/components/session/SidePanelControl'
 import { THREAD_COLUMN_CLASS } from '@/components/session/threadLayout'
@@ -125,7 +126,7 @@ function GroupComposer({ group, onSent }: { group: Bot; onSent: () => void }) {
   return (
     <div className="relative">
       <MentionSuggestions mention={mention} placement="above" />
-      <div className="flex items-end gap-2 rounded-[12px] bg-surface p-2.5 ring-1 ring-border focus-within:ring-2 focus-within:ring-primary">
+      <ComposerFrame className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
           <MentionTextarea
             mention={mention}
@@ -147,7 +148,7 @@ function GroupComposer({ group, onSent }: { group: Bot; onSent: () => void }) {
         >
           <ArrowUp size={16} />
         </IconButton>
-      </div>
+      </ComposerFrame>
     </div>
   )
 }

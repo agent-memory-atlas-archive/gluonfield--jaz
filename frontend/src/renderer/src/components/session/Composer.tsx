@@ -1,5 +1,5 @@
 import { ArrowUp, AudioLines, ListChecks, LoaderCircle, Mic, Plus, Square, X } from 'lucide-react'
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { type ClipboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { FileDropOverlay, useFileDropTarget } from '@/components/ui/FileDrop'
 import { IconButton } from '@/components/ui/IconButton'
@@ -7,14 +7,13 @@ import { composerPasteFiles } from '@/components/session/composerPasteFiles'
 import type { AgentSessionCommand, Attachment, QueuedMessage } from '@/lib/api/types'
 import type { ComposerContext, SendMessageHandler } from '@/lib/sendMessage'
 import { Popover } from '@/components/ui/Popover'
-import { RAINBOW_BEAM } from '@/components/ui/rainbow'
-import { useEffectsEnabled } from '@/lib/appearance'
 import { useDictation } from '@/lib/hooks/useDictation'
 import { dictationText } from '@/lib/dictationText'
 import { DictationControls } from '@/components/session/DictationControls'
 import { ComposerAttachmentInput, ComposerAttachmentList, ComposerAttachmentMenuRow } from './ComposerAttachments'
 import { MentionSuggestions, MentionTextarea, useMentionInput } from './MentionInput'
 import { QueuedPromptList } from './QueuedPromptList'
+import { ComposerFrame } from './ComposerFrame'
 import { ContextChip } from './ContextChip'
 import { GoalChip, GoalMenuToggle, GoalUnsupportedRow } from './GoalControls'
 import { useComposerAttachments } from './useComposerAttachments'
@@ -131,7 +130,6 @@ export function ComposerCard({
   onTextChange?: (text: string) => void
 }) {
   const voiceActive = Boolean(voiceControls)
-  const [focused, setFocused] = useState(false)
   const [optionsOpen, setOptionsOpen] = useState(false)
   const [planModeOverride, setPlanModeOverride] = useState<boolean | null>(null)
   const [goalRequested, setGoalRequestedState] = useState(false)
@@ -140,10 +138,6 @@ export function ComposerCard({
   const clearGenerationRef = useRef(0)
   contextsRef.current = contexts
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const reducedMotion = useReducedMotion()
-  // With effects off, drop the rainbow focus comet for a calm static border that
-  // never animates (see the card className below).
-  const effectsEnabled = useEffectsEnabled()
   const planToggleDisabled = disabled || !planAvailable
   const goalToggleDisabled = disabled || !goalAvailable
   const planModeOn = planAvailable && (planModeOverride ?? planModeActive)
@@ -192,11 +186,6 @@ export function ComposerCard({
     goalRequestedRef.current = next
     setGoalRequestedState(next)
   }, [])
-
-  // autoFocus lands before React's focus listeners attach; sync the ring state.
-  useEffect(() => {
-    if (document.activeElement === mention.textareaRef.current) setFocused(true)
-  }, [mention.textareaRef])
 
   useEffect(() => {
     if (!planAvailable) setPlanModeOverride(null)
@@ -339,51 +328,12 @@ export function ComposerCard({
           dictation.cancel()
         }
       }}
-      onFocusCapture={() => setFocused(true)}
-      onBlurCapture={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocused(false)
-      }}
     >
       <FileDropOverlay visible={draggingFiles} />
       {!dictation.phase ? <MentionSuggestions mention={mention} placement="above" /> : null}
-      <AnimatePresence>
-        {focused && effectsEnabled ? (
-          <motion.div
-            key="ring"
-            aria-hidden
-            className="pointer-events-none absolute -inset-[2px]"
-            initial={{ opacity: 0 }}
-            animate={{
-              opacity: 1,
-              ...(reducedMotion ? {} : { '--ring-angle': ['0deg', '360deg'] }),
-            }}
-            exit={{ opacity: 0 }}
-            transition={{
-              opacity: { duration: 0.25, ease: 'easeOut' },
-              '--ring-angle': { duration: 2.6, ease: 'linear', repeat: Infinity },
-            }}
-          >
-            {/* glow trailing the comet, bleeding softly outside the card */}
-            <div
-              className="absolute -inset-[4px] rounded-[18px] opacity-50 blur-[10px]"
-              style={{ background: RAINBOW_BEAM }}
-            />
-            {/* the comet itself; the card's opaque surface covers the center */}
-            <div className="absolute inset-0 rounded-[14px]" style={{ background: RAINBOW_BEAM }} />
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      {/* borderless card, agent-council style: the surface tone IS the card.
-          The whole card is a click target for the textarea. */}
-      <div
-        className={`relative flex cursor-text flex-col gap-1.5 rounded-[12px] bg-surface p-2.5 transition-shadow ${
-          !effectsEnabled
-            ? focused
-              ? 'ring-2 ring-primary'
-              : 'ring-1 ring-border'
-            : ''
-        } ${draggingFiles ? 'shadow-[0_0_0_1px_var(--color-primary),0_10px_35px_rgba(0,0,0,0.16)]' : ''}`}
+      {/* The whole card is a click target for the textarea. */}
+      <ComposerFrame
+        className={`flex cursor-text flex-col gap-1.5 ${draggingFiles ? 'shadow-[0_0_0_1px_var(--color-primary),0_10px_35px_rgba(0,0,0,0.16)]' : ''}`}
         onClick={(e) => {
           if ((e.target as HTMLElement).closest('button, textarea, input')) return
           mention.textareaRef.current?.focus()
@@ -606,7 +556,7 @@ export function ComposerCard({
             </div>
           ) : null}
         </div>
-      </div>
+      </ComposerFrame>
     </div>
   )
 }
