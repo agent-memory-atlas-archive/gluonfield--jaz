@@ -68,7 +68,6 @@ type Threads interface {
 	Wait(context.Context, acp.WaitRequest) (acp.Job, error)
 	SwitchAgent(ctx context.Context, sessionID, agent string) error
 	SetModel(ctx context.Context, sessionID, model, effort string) error
-	Send(context.Context, acp.SendRequest) (acp.Job, error)
 }
 
 // Store keeps bot records and the threads they live in.

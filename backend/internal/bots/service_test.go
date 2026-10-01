@@ -23,7 +23,6 @@ type fakeWorld struct {
 	prompts   map[string][]string
 	replies   map[string][]string
 	created   []acp.SpawnRequest
-	sent      []acp.SendRequest
 	loops     []loops.Loop
 	published []sessionevents.Event
 	held      map[string]chan struct{}
@@ -217,13 +216,6 @@ func (t fakeThreads) Wait(_ context.Context, req acp.WaitRequest) (acp.Job, erro
 		}
 	}
 	return acp.Job{ID: req.Session, State: acp.StateIdle, Assistant: "private notes"}, nil
-}
-
-func (t fakeThreads) Send(_ context.Context, req acp.SendRequest) (acp.Job, error) {
-	t.world.mu.Lock()
-	defer t.world.mu.Unlock()
-	t.world.sent = append(t.world.sent, req)
-	return acp.Job{ID: req.Session}, nil
 }
 
 func (fakeThreads) SetModel(context.Context, string, string, string) error {

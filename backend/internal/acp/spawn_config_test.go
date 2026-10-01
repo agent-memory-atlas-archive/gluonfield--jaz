@@ -1,12 +1,16 @@
 package acp
 
 import (
+	"context"
+	"io"
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/modelcatalog"
 	modelprovider "github.com/wins/jaz/backend/internal/provider"
 	"github.com/wins/jaz/backend/internal/storage"
+	jsonstore "github.com/wins/jaz/backend/internal/storage/json"
 )
 
 func TestSpawnConfigDefaultsWidgetSurfaceToWidgetMCPPolicy(t *testing.T) {
@@ -300,5 +304,55 @@ func TestSpawnConfigRejectsModelSpecificUnsupportedReasoning(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), `reasoning effort "minimal" is not supported for `+input.agent+` model "`+input.model+`"`) {
 			t.Fatalf("err = %v", err)
 		}
+	}
+}
+
+func TestThreadsABotStartsAreItsSubtasks(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := AgentConfig{Command: "fake"}
+	manager := NewManager(store, Config{
+		Root:      t.TempDir(),
+		Workspace: t.TempDir(),
+		Agents:    map[string]AgentConfig{"alpha": fake, "fake": fake},
+	}, log.New(io.Discard))
+	ctx := context.Background()
+	bot, err := manager.CreateSession(ctx, SpawnRequest{ACPAgent: "fake", Slug: "scout", Model: "scout-model", ReasoningEffort: "low", Home: t.TempDir(), SourceType: storage.SourceBot})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := manager.CreateSession(ctx, SpawnRequest{Slug: "chat"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.RuntimeRef.Agent != "alpha" {
+		t.Fatalf("default agent = %q, want alpha so inheritance is observable", plain.RuntimeRef.Agent)
+	}
+
+	subtask, err := manager.CreateSession(ctx, SpawnRequest{ParentID: bot.ID, Slug: "research"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if subtask.SourceType != storage.SourceBotWorker || subtask.SourceID != bot.ID || subtask.RuntimeRef.Cwd != bot.RuntimeRef.Cwd {
+		t.Fatalf("subtask = %+v, want a bot_worker of %s in %s", subtask, bot.ID, bot.RuntimeRef.Cwd)
+	}
+	if subtask.RuntimeRef.Agent != "fake" || subtask.Model != bot.Model || subtask.ReasoningEffort != bot.ReasoningEffort {
+		t.Fatalf("subtask runs %s/%s/%s, want the bot's fake/%s/%s", subtask.RuntimeRef.Agent, subtask.Model, subtask.ReasoningEffort, bot.Model, bot.ReasoningEffort)
+	}
+	other, err := manager.CreateSession(ctx, SpawnRequest{ParentID: bot.ID, Slug: "elsewhere", ACPAgent: "alpha"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.SourceType != storage.SourceBotWorker || other.RuntimeRef.Agent != "alpha" || other.Model == bot.Model {
+		t.Fatalf("subtask on another agent = %+v", other)
+	}
+	child, err := manager.CreateSession(ctx, SpawnRequest{ParentID: plain.ID, Slug: "child"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if child.SourceType != "" || child.RuntimeRef.Cwd == plain.RuntimeRef.Cwd {
+		t.Fatalf("a chat's child became a subtask: %+v", child)
 	}
 }
