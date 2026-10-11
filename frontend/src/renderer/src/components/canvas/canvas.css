@@ -268,7 +268,7 @@
   color: var(--color-ink-2);
 }
 
-/* Figma's section: slightly rounded, its name tagged inside the top-left corner. */
+/* Figma's frame: slightly rounded, its name in small text above the top-left corner. */
 .canvas-section {
   position: absolute;
   inset: 0;
@@ -290,16 +290,13 @@
 
 .canvas-section-label {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 1;
-  padding: 3px 8px;
-  border-radius: 5px;
-  font-size: 12.5px;
+  bottom: 100%;
+  left: 0;
+  padding-bottom: 6px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  color: var(--color-ink);
-  background: color-mix(in oklab, var(--color-ink) 7%, var(--canvas-section));
+  color: var(--color-ink-2);
   cursor: grab;
 }
 
