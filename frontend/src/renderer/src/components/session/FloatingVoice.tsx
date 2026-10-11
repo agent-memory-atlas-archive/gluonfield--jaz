@@ -1,14 +1,17 @@
 import { useRouter } from '@tanstack/react-router'
 import { useRef, useState } from 'react'
 import type { BotAvatar } from '@shared/bots'
+import type { VoiceLine } from '@shared/voice'
 import { VoicePill } from '@/components/session/VoiceMode'
 import { clientRuntime } from '@/lib/clientRuntime'
 import { useVoiceDocked } from '@/lib/voice/bot'
 import type { VoiceHandle } from '@/lib/voice/session'
 import { useGlobalVoice } from '@/lib/voice/VoiceProvider'
 
+const TRANSCRIPT_KEY = 'jaz.voice.transcript'
+
 // The voice pill away from its chat: drag it anywhere, click it to go back.
-// Its own buttons keep their clicks.
+// Its own buttons and transcript keep their clicks.
 export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
   voice: VoiceHandle
   face: BotAvatar | null
@@ -17,6 +20,7 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
   outputLevel?: number
 }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const [transcriptShown, setTranscriptShown] = useState(() => localStorage.getItem(TRANSCRIPT_KEY) === 'true')
   const gesture = useRef<{ x: number; y: number; moved: boolean; origin: typeof offset } | null>(null)
   const finish = () => {
     clientRuntime.voiceOverlay?.drag(null)
@@ -26,7 +30,7 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
     <div
       style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
       aria-label="Floating voice conversation"
-      className="touch-none cursor-grab drop-shadow-[0_6px_14px_rgba(0,0,0,0.28)] active:cursor-grabbing [-webkit-app-region:no-drag]"
+      className="flex touch-none cursor-grab flex-col gap-2 drop-shadow-[0_6px_14px_rgba(0,0,0,0.28)] active:cursor-grabbing [-webkit-app-region:no-drag]"
       onPointerDown={(event) => {
         if (event.button !== 0 || (event.target as Element).closest('[data-voice-control]')) {
           return
@@ -63,7 +67,38 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
       onPointerCancel={finish}
       onLostPointerCapture={finish}
     >
-      <VoicePill voice={voice} face={face} level={level} outputLevel={outputLevel} onReturn={onReturn} />
+      {transcriptShown && voice.transcript.length ? <VoiceTranscript lines={voice.transcript} /> : null}
+      <VoicePill
+        voice={voice}
+        face={face}
+        level={level}
+        outputLevel={outputLevel}
+        onReturn={onReturn}
+        transcriptShown={transcriptShown}
+        onTranscript={() => {
+          localStorage.setItem(TRANSCRIPT_KEY, String(!transcriptShown))
+          setTranscriptShown(!transcriptShown)
+        }}
+      />
+    </div>
+  )
+}
+
+// The call as text, newest at the bottom; it stays pinned there while words
+// stream in, unless scrolled back.
+function VoiceTranscript({ lines }: { lines: VoiceLine[] }) {
+  return (
+    <div data-voice-control className="flex max-h-72 w-0 min-w-full cursor-auto flex-col-reverse overflow-y-auto rounded-3xl border border-border bg-surface p-2 text-sm select-text">
+      <div className="flex flex-col gap-1.5">
+        {lines.map((line) => (
+          <p
+            key={line.id}
+            className={`max-w-[85%] px-3 py-2 [overflow-wrap:anywhere] ${line.role === 'user' ? 'self-end rounded-2xl bg-ink/8' : 'self-start'}`}
+          >
+            {line.text.trim()}
+          </p>
+        ))}
+      </div>
     </div>
   )
 }

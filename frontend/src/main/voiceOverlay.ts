@@ -16,7 +16,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     }
     if (!overlay) {
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-      const size = { width: 340, height: 88 }
+      const size = { width: 380, height: 78 }
       overlay = new BrowserWindow({
         title: 'Jaz Voice',
         ...size,
@@ -115,6 +115,19 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
       overlay.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), Math.round(dragOrigin.windowY + point.y - dragOrigin.y))
     }
   }
+  // Grows and shrinks upwards, keeping the pill where it sits.
+  const resize = (event: IpcMainEvent, height: number) => {
+    if (!overlay || event.sender !== overlay.webContents || event.senderFrame !== overlay.webContents.mainFrame || !Number.isFinite(height) || height <= 0) {
+      return
+    }
+    const bounds = overlay.getBounds()
+    const next = Math.round(height)
+    const y = Math.max(screen.getDisplayMatching(bounds).workArea.y, bounds.y + bounds.height - next)
+    if (dragOrigin) {
+      dragOrigin.windowY += y - bounds.y
+    }
+    overlay.setBounds({ ...bounds, y, height: next })
+  }
   const navigate = (_event: Electron.Event, _url: string, sameDocument: boolean, mainFrame: boolean) => {
     if (mainFrame && !sameDocument) {
       clear()
@@ -124,6 +137,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
   ipcMain.on('jaz:voice:ready', ready)
   ipcMain.on('jaz:voice:command', command)
   ipcMain.on('jaz:voice:drag', drag)
+  ipcMain.on('jaz:voice:resize', resize)
   owner.on('focus', present)
   owner.on('blur', present)
   owner.on('hide', present)
@@ -134,6 +148,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     ipcMain.removeListener('jaz:voice:ready', ready)
     ipcMain.removeListener('jaz:voice:command', command)
     ipcMain.removeListener('jaz:voice:drag', drag)
+    ipcMain.removeListener('jaz:voice:resize', resize)
     overlay?.destroy()
   })
 }

@@ -2,12 +2,16 @@ import type { BotAvatar } from './bots'
 
 export type VoiceWorkActivity = 'thinking' | 'working' | null
 
+// A turn of the call as it is said aloud.
+export type VoiceLine = { id: string; role: 'user' | 'assistant'; text: string }
+
 export type VoiceStatus = {
   phase: 'off' | 'connecting' | 'listening' | 'ending' | 'error'
   muted: boolean
   speakerMuted: boolean
   activity: VoiceWorkActivity
   error: string
+  transcript: VoiceLine[]
 }
 
 export type VoiceOverlayState = VoiceStatus & {
@@ -25,6 +29,7 @@ export type VoiceCommand = 'mute' | 'muteSpeaker' | 'exit' | 'reconnect' | 'retu
 
 export interface VoiceOverlayAPI {
   drag: (point: { x: number; y: number } | null) => void
+  resize: (height: number) => void
   publish: (state: VoiceOverlayState | null) => void
   subscribe: (handler: (state: VoiceOverlayState | null) => void) => () => void
   command: (command: VoiceCommand) => void

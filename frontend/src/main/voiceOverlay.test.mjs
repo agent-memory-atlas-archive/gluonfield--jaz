@@ -9,6 +9,7 @@ class Window extends EventEmitter {
   throttled = true
   sent = []
   position = [100, 200]
+  height = 78
   webContents = Object.assign(new EventEmitter(), {
     mainFrame: {},
     getBackgroundThrottling: () => this.throttled,
@@ -55,6 +56,13 @@ class Window extends EventEmitter {
   setPosition(x, y) {
     this.position = [x, y]
   }
+  getBounds() {
+    return { x: this.position[0], y: this.position[1], width: 380, height: this.height }
+  }
+  setBounds(bounds) {
+    this.position = [bounds.x, bounds.y]
+    this.height = bounds.height
+  }
   setAlwaysOnTop() {}
   setVisibleOnAllWorkspaces() {}
   loadFile() {}
@@ -67,6 +75,7 @@ mock.module('electron', () => ({
   screen: {
     getCursorScreenPoint: () => ({ x: 0, y: 0 }),
     getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1280, height: 800 } }),
+    getDisplayMatching: () => ({ workArea: { x: 0, y: 25, width: 1280, height: 775 } }),
   },
 }))
 const { attachVoiceOverlay } = await import('./voiceOverlay')
@@ -151,4 +160,31 @@ test('only the owning frames control a call; document loss clears the overlay', 
   } finally {
     owner.destroy()
   }
+})
+
+test('the transcript grows the overlay upwards from where the pill sits', () => {
+  const owner = new Window()
+  attachVoiceOverlay(owner)
+  try {
+    ipcMain.emit('jaz:voice:publish', sender(owner), { ...state, docked: false })
+    const overlay = windows.at(-1)
+    ipcMain.emit('jaz:voice:resize', sender(owner), 300)
+    ipcMain.emit('jaz:voice:resize', { ...sender(overlay), senderFrame: {} }, 300)
+    ipcMain.emit('jaz:voice:resize', sender(overlay), Number.NaN)
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 200, width: 380, height: 78 })
+
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 177.6)
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 100, width: 380, height: 178 })
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 400)
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 25, width: 380, height: 400 })
+
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 0, y: 500 })
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 78)
+    expect(overlay.position).toEqual([100, 347])
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 10, y: 490 })
+    expect(overlay.position).toEqual([110, 337])
+  } finally {
+    owner.destroy()
+  }
+  expect(ipcMain.eventNames()).toEqual([])
 })

@@ -51,6 +51,7 @@ if (process.argv.includes(BROWSER_PRELOAD_ARGUMENT)) {
     } satisfies PermissionGuideAPI,
     voiceOverlay: {
       drag: (point) => ipcRenderer.send('jaz:voice:drag', point),
+      resize: (height) => ipcRenderer.send('jaz:voice:resize', height),
       publish: (state) => ipcRenderer.send('jaz:voice:publish', state),
       subscribe: (handler) => {
         const listener = (_event: unknown, state: VoiceOverlayState | null) => handler(state)

@@ -14,20 +14,20 @@ export type VoiceState = VoiceStatus & {
   outputAnalyser: AnalyserNode | null
 }
 
-export const initialVoiceState: VoiceState = { phase: 'off', muted: false, speakerMuted: false, activity: null, error: '', analyser: null, outputAnalyser: null }
+export const initialVoiceState: VoiceState = { phase: 'off', muted: false, speakerMuted: false, activity: null, error: '', transcript: [], analyser: null, outputAnalyser: null }
 
 export class VoiceSession {
   private state = initialVoiceState
   private connection?: VoiceConnection
   private stop = () => {}
-  private transcript: VoiceTranscriptWriter
+  private writer: VoiceTranscriptWriter
 
   get phase() {
     return this.state.phase
   }
 
   constructor(private sessionId: string, private onState: (state: VoiceState) => void, private refresh: () => void) {
-    this.transcript = new VoiceTranscriptWriter(
+    this.writer = new VoiceTranscriptWriter(
       (messages) => saveVoiceTranscript(sessionId, messages),
       () => {
         this.update({})
@@ -38,7 +38,7 @@ export class VoiceSession {
 
   private update(change: Partial<VoiceState>) {
     this.state = { ...this.state, ...change }
-    this.onState({ ...this.state, error: [this.state.error, this.transcript.error].filter(Boolean).join(' ') })
+    this.onState({ ...this.state, error: [this.state.error, this.writer.error].filter(Boolean).join(' ') })
   }
 
   start = () => {
@@ -60,7 +60,7 @@ export class VoiceSession {
       followError = error
     })
     this.stop = () => {
-      void this.transcript.flush()
+      void this.writer.flush()
       abort.abort()
       stream.stop()
     }
@@ -119,7 +119,9 @@ export class VoiceSession {
         if (event.type === 'transcript' || event.type === 'transcript_done') {
           const message = recorder.accept(event)
           if (message) {
-            this.transcript.append(message, event.type === 'transcript_done')
+            this.writer.append(message, event.type === 'transcript_done')
+            const index = this.state.transcript.findIndex((line) => line.id === message.id)
+            this.update({ transcript: index < 0 ? [...this.state.transcript, message].slice(-20) : this.state.transcript.with(index, message) })
           }
         }
         if (abort.signal.aborted) {

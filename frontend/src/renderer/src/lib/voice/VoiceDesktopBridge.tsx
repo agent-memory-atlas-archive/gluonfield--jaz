@@ -6,7 +6,7 @@ import { useGlobalVoice } from '@/lib/voice/VoiceProvider'
 
 export function VoiceDesktopBridge() {
   const voice = useGlobalVoice()
-  const { sessionId, bot, home, phase, muted, speakerMuted, activity, error, analyser, outputAnalyser, start, end, mute, muteSpeaker } = voice
+  const { sessionId, bot, home, phase, muted, speakerMuted, activity, error, transcript, analyser, outputAnalyser, start, end, mute, muteSpeaker } = voice
   const face = bot?.avatar ?? null
   const docked = useVoiceDocked(home)
   useEffect(() => clientRuntime.voiceOverlay?.onCommand((command) => {
@@ -27,7 +27,7 @@ export function VoiceDesktopBridge() {
     }
     const samples = new Uint8Array(analyser?.fftSize ?? 0)
     const outputSamples = new Uint8Array(outputAnalyser?.fftSize ?? 0)
-    const publish = () => bridge.publish({ face, home, phase, muted, speakerMuted, activity, error, docked,
+    const publish = () => bridge.publish({ face, home, phase, muted, speakerMuted, activity, error, transcript, docked,
       level: analyser && !muted ? audioLevel(analyser, samples) : 0,
       outputLevel: outputAnalyser ? audioLevel(outputAnalyser, outputSamples) : 0 })
     publish()
@@ -36,7 +36,7 @@ export function VoiceDesktopBridge() {
     }
     const timer = setInterval(publish, 80)
     return () => clearInterval(timer)
-  }, [sessionId, face, home, phase, muted, speakerMuted, activity, error, analyser, outputAnalyser, docked])
+  }, [sessionId, face, home, phase, muted, speakerMuted, activity, error, transcript, analyser, outputAnalyser, docked])
   useEffect(() => () => clientRuntime.voiceOverlay?.publish(null), [])
   return null
 }
