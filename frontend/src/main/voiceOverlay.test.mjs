@@ -54,6 +54,11 @@ class Window extends EventEmitter {
     return this.position
   }
   setPosition(x, y) {
+    for (const coordinate of [x, y]) {
+      if (!Number.isInteger(coordinate) || Object.is(coordinate, -0)) {
+        throw new TypeError('Window coordinates must be native integers')
+      }
+    }
     this.position = [x, y]
   }
   getBounds() {
@@ -157,6 +162,25 @@ test('only the owning frames control a call; document loss clears the overlay', 
     expect(owner.throttled).toBe(true)
     ipcMain.emit('jaz:voice:command', sender(overlay), 'exit')
     expect(owner.sent).toEqual([])
+  } finally {
+    owner.destroy()
+  }
+})
+
+test('fractional drag coordinates cross both screen origins without passing negative zero to Electron', () => {
+  const owner = new Window()
+  attachVoiceOverlay(owner)
+  try {
+    ipcMain.emit('jaz:voice:publish', sender(owner), { ...state, docked: false })
+    const overlay = windows.at(-1)
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 100.4, y: 200.4 })
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 10, y: 0.2 })
+    expect(overlay.position).toEqual([10, 0])
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 0.2, y: 10 })
+    expect(overlay.position).toEqual([0, 10])
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: -10, y: -20 })
+    expect(overlay.position).toEqual([-10, -20])
+    ipcMain.emit('jaz:voice:drag', sender(overlay), null)
   } finally {
     owner.destroy()
   }
