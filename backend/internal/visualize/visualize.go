@@ -24,12 +24,13 @@ type Surface string
 const (
 	SurfaceChat   Surface = "chat"
 	SurfaceWidget Surface = "widget"
+	SurfaceCanvas Surface = "canvas"
 )
 
 func NormalizeSurface(surface string) Surface {
 	switch Surface(strings.TrimSpace(surface)) {
-	case SurfaceWidget:
-		return SurfaceWidget
+	case SurfaceWidget, SurfaceCanvas:
+		return Surface(strings.TrimSpace(surface))
 	default:
 		return SurfaceChat
 	}

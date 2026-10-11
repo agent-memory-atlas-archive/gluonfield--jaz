@@ -11,6 +11,8 @@ import { NativeModelOptions } from '@/components/session/NativeModelOptions'
 import { useSessionConfig } from '@/components/session/useSessionConfig'
 import { SelectionContextToolbar } from '@/components/session/SelectionContextToolbar'
 import { useComposerContexts } from '@/components/session/useComposerContexts'
+import { ThreadCanvas } from '@/components/canvas/ThreadCanvas'
+import { useCanvasContexts } from '@/components/canvas/useCanvasContexts'
 import { FileReaderLinkProvider, MessageMarkdown, PreviewLinkProvider } from '@/components/session/MessageMarkdown'
 import { SessionErrorNotice, type SessionErrorAction } from '@/components/session/SessionErrorNotice'
 import { SessionLivenessIndicator } from '@/components/session/SessionLivenessIndicator'
@@ -343,6 +345,8 @@ export function ThreadView({
     storageKey: `${SESSION_DRAFT_KEY_PREFIX}${sessionId}`,
     storage: 'local',
   })
+  const canvasContexts = useCanvasContexts(composerContexts)
+  const canvas = detail.data?.session.runtime_ref?.artifact_surface === 'canvas'
 
   useEffect(() => {
     if (seenRequestedRef.current) return
@@ -462,6 +466,7 @@ export function ThreadView({
             sideChatAvailable={sideChatAvailable}
             header={header}
             overviewLabel={details ? 'Details' : undefined}
+            panelControls={!canvas}
           />
           {/* Phone: the open panel covers the chat full-width, so the only
               non-panel area left is the title bar. This catches taps on its empty
@@ -471,7 +476,8 @@ export function ThreadView({
           ) : null}
           {sidePanel.resizing ? <div className="fixed inset-0 z-modal cursor-col-resize" aria-hidden /> : null}
 
-          <div className="relative h-full min-w-0 flex-1">
+          {/* A canvas thread keeps its chat in a narrow column beside the board. */}
+          <div className={`relative h-full min-w-0 ${canvas ? 'w-[360px] shrink-0 border-r border-border' : 'flex-1'}`}>
             <div
               ref={attachScroll}
               className="scrollbar-quiet relative z-0 h-full overflow-y-auto"
@@ -480,7 +486,7 @@ export function ThreadView({
             >
               <div
                 ref={threadFind.rootRef}
-                className={`${THREAD_COLUMN_CLASS} pt-6`}
+                className={`${canvas ? 'px-4' : THREAD_COLUMN_CLASS} pt-6`}
                 style={{ paddingBottom: transcriptBottomPadding }}
               >
                 {chat ? (
@@ -558,7 +564,7 @@ export function ThreadView({
                 )}
               </div>
             </div>
-            {chat ? null : (
+            {chat || canvas ? null : (
               <ThreadOutline
                 messages={transcriptMessages}
                 events={displayEvents}
@@ -576,6 +582,7 @@ export function ThreadView({
             ) : null}
             <BottomDock
               before={<ScrollToBottomButton visible={showScrollToBottom} onClick={scrollToBottom} />}
+              compact={canvas}
               onHeightChange={setBottomDockHeight}
             >
               <VoiceMode voice={voice} face={voice.bot?.avatar ?? null} />
@@ -603,7 +610,7 @@ export function ThreadView({
                 <>
                   {goalStatusVisible ? <GoalStatusBar goal={goal} /> : null}
                   <Composer
-                    placeholder={placeholder}
+                    placeholder={canvas ? canvasContexts.placeholder : placeholder}
                     streaming={sessionRunning}
                     commands={derived.agentSession?.commands ?? undefined}
                     optionsSlot={<NativeModelOptions options={derived.agentSession?.config_options} running={sessionRunning} pending={config.isPending} onChange={(id, value) => config.mutate({ id, value })} />}
@@ -618,9 +625,9 @@ export function ThreadView({
                     draftStorageKey={`${SESSION_DRAFT_KEY_PREFIX}${session.id}`}
                     fileRoot={session.runtime_ref?.cwd}
                     attachmentSessionId={session.id}
-                    contexts={composerContexts.contexts}
-                    onRemoveContext={composerContexts.removeContext}
-                    onReplaceContexts={composerContexts.replaceContexts}
+                    contexts={canvasContexts.contexts}
+                    onRemoveContext={canvasContexts.removeContext}
+                    onReplaceContexts={canvasContexts.replaceContexts}
                     onSend={handleSend}
                     onQueuePrompt={queue.onQueuePrompt}
                     onStop={stopSession}
@@ -628,6 +635,7 @@ export function ThreadView({
                     onVoice={voiceAvailable && voice.phase === 'off' ? voice.start : undefined}
                     voiceActive={voice.phase !== 'off'}
                     onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
+                    attachable={!canvas}
                     onSteerQueuedPrompt={queue.onSteerQueuedPrompt}
                     onDeleteQueuedPrompt={queue.onDeleteQueuedPrompt}
                     onEditQueuedPrompt={queue.onEditQueuedPrompt}
@@ -637,28 +645,35 @@ export function ThreadView({
               )}
             </BottomDock>
           </div>
+          {canvas ? (
+            <div className="relative h-full min-w-0 flex-1">
+              <ThreadCanvas sessionId={session.id} working={sessionRunning} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
+            </div>
+          ) : null}
 
           {/* Docked, never overlapping: the chat pane flexes and stays centered
               between the sidebar and this panel. */}
-          <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
-            <SidePanel
-              session={session}
-              progress={panelProgress}
-              subagents={providerSubagents}
-              spawnedThreads={spawnedThreads}
-              working={sessionRunning}
-              panel={sidePanel}
-              sideChatAvailable={sideChatAvailable}
-              sideChatEvents={sideChatEvents}
-              overview={details?.({ agentSession: derived.agentSession, working: sessionRunning, threads: spawnedThreads, subagents: providerSubagents })}
-              onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
-              onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
-              onSend={handleSend}
-              onQueuePrompt={queue.onQueuePrompt}
-              onQueueAction={queue.onQueueAction}
-              onSendSideChat={handleSideChatSend}
-            />
-          </SidePanelDrawer>
+          {canvas ? null : (
+            <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
+              <SidePanel
+                session={session}
+                progress={panelProgress}
+                subagents={providerSubagents}
+                spawnedThreads={spawnedThreads}
+                working={sessionRunning}
+                panel={sidePanel}
+                sideChatAvailable={sideChatAvailable}
+                sideChatEvents={sideChatEvents}
+                overview={details?.({ agentSession: derived.agentSession, working: sessionRunning, threads: spawnedThreads, subagents: providerSubagents })}
+                onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
+                onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
+                onSend={handleSend}
+                onQueuePrompt={queue.onQueuePrompt}
+                onQueueAction={queue.onQueueAction}
+                onSendSideChat={handleSideChatSend}
+              />
+            </SidePanelDrawer>
+          )}
         </FileDropScope>
       </PreviewLinkProvider>
     </FileReaderLinkProvider>

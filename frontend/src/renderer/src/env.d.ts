@@ -7,6 +7,10 @@ declare module '*.png' {
   const url: string
   export default url
 }
+declare module '*?url' {
+  const url: string
+  export default url
+}
 declare module '@fontsource-variable/inter'
 declare module '@fontsource-variable/jetbrains-mono'
 

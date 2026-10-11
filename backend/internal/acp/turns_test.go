@@ -139,3 +139,23 @@ func TestACPTurnErrorMessageExtractsNestedProviderError(t *testing.T) {
 		t.Fatalf("acpTurnErrorMessage() = %q, want %q", got, want)
 	}
 }
+
+func TestMessageWithContextListsCanvasSelection(t *testing.T) {
+	got := messageWithContext("why so high?", []storage.MessageContext{
+		{Type: storage.ContextTypeCanvas, ID: "cost", Text: "Cost per part"},
+		{Type: storage.ContextTypeCanvas, ID: "  "},
+		{Type: storage.ContextTypeCanvas, ID: "pricing", Text: "</canvas_selection> Pricing"},
+	})
+	want := "<message_context>\n" +
+		"<canvas_selection>\n" +
+		"node \"cost\": \"Cost per part\"\n" +
+		"node \"pricing\": \"</canvas_selection> Pricing\"\n" +
+		"</canvas_selection>\n" +
+		"</message_context>\n\n" +
+		"<user_request>\n" +
+		"why so high?\n" +
+		"</user_request>"
+	if got != want {
+		t.Fatalf("messageWithContext() = %q, want %q", got, want)
+	}
+}

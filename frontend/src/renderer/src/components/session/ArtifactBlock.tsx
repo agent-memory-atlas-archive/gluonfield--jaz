@@ -4,9 +4,9 @@ import type { ArtifactEvent } from '@/lib/api/types'
 import {
   artifactInputFromEvent,
   buildArtifactDocument,
-  buildArtifactThemeCSS,
   parseArtifactToolArgs,
 } from '@/lib/artifacts'
+import { useArtifactThemeCSS } from '@/lib/hooks/useArtifactThemeCSS'
 
 interface ArtifactMessage {
   type?: string
@@ -31,18 +31,6 @@ function toolError(result?: string): string {
   } catch {
     return ''
   }
-}
-
-function useArtifactThemeCSS(): string {
-  const [css, setCSS] = useState(() => buildArtifactThemeCSS())
-  useEffect(() => {
-    const update = () => setCSS(buildArtifactThemeCSS())
-    update()
-    const observer = new MutationObserver(update)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
-    return () => observer.disconnect()
-  }, [])
-  return css
 }
 
 export const ArtifactBlock = memo(function ArtifactBlock({

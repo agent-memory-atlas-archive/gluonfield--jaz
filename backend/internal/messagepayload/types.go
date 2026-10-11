@@ -6,6 +6,9 @@ const (
 	ContextTypeSelection         = "selection"
 	ContextTypeVoice             = "voice"
 	ContextTypeBrowserAnnotation = "browser_annotation"
+	// ContextTypeCanvas names a selected canvas item: ID is its node id, Text
+	// its label.
+	ContextTypeCanvas = "canvas"
 )
 
 type MessageContext struct {
@@ -84,6 +87,10 @@ func NormalizeMessageContexts(contexts []MessageContext) []MessageContext {
 			text := strings.TrimSpace(context.Text)
 			if text != "" {
 				out = append(out, MessageContext{Type: ContextTypeSelection, Text: text, Comment: strings.TrimSpace(context.Comment)})
+			}
+		case ContextTypeCanvas:
+			if id := strings.TrimSpace(context.ID); id != "" {
+				out = append(out, MessageContext{Type: ContextTypeCanvas, ID: id, Text: strings.TrimSpace(context.Text)})
 			}
 		case ContextTypeBrowserAnnotation:
 			annotation := NormalizeBrowserAnnotation(context.BrowserAnnotation)

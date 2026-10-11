@@ -2,9 +2,11 @@ package app
 
 import (
 	"github.com/wins/jaz/backend/internal/acp"
+	"github.com/wins/jaz/backend/internal/canvas"
 	"github.com/wins/jaz/backend/internal/deviceauth"
 	feedcore "github.com/wins/jaz/backend/internal/feed"
 	agentsessionsapi "github.com/wins/jaz/backend/internal/httpapi/agentsessions"
+	canvasapi "github.com/wins/jaz/backend/internal/httpapi/canvas"
 	previewapi "github.com/wins/jaz/backend/internal/httpapi/preview"
 	sessionsapi "github.com/wins/jaz/backend/internal/httpapi/sessions"
 	voiceapi "github.com/wins/jaz/backend/internal/httpapi/voice"
@@ -37,6 +39,8 @@ func HTTPModule() fx.Option {
 		sessionsapi.NewMessagesHandler,
 		sessionsapi.NewOverviewHandler,
 		fx.Annotate(sessionsapi.NewGoalHandler, fx.From(new(*acp.Manager))),
+		canvas.NewService,
+		fx.Annotate(canvasapi.NewHandler, fx.From(new(*sqlitestore.Store))),
 		NewRoutes,
 		NewPublicRoutes,
 	)

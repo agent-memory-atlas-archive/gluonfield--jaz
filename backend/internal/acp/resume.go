@@ -42,6 +42,7 @@ func (m *Manager) resumeLocked(ctx context.Context, ref string) (*jobState, erro
 	if session.Runtime != storage.RuntimeACP || session.RuntimeRef == nil || session.RuntimeRef.Agent == "" {
 		return nil, fmt.Errorf("session %s is not acp-backed", ref)
 	}
+	ctx = mcpsession.With(ctx, session.ID)
 	mcpServerPolicy := effectiveMCPServerPolicy(session)
 	agentName := CanonicalAgentName(session.RuntimeRef.Agent)
 	sessionChanged := false
@@ -188,8 +189,7 @@ func (m *Manager) restoreACPSession(ctx context.Context, ac *agentConn, agentNam
 		if err != nil {
 			return "", ModeState{}, false, err
 		}
-		mcpCtx := mcpsession.With(ctx, session.ID)
-		raw, err := ac.peer.Call(mcpCtx, restoreMethod, struct {
+		raw, err := ac.peer.Call(ctx, restoreMethod, struct {
 			Meta       map[string]any      `json:"_meta,omitempty"`
 			Cwd        string              `json:"cwd"`
 			MCPServers []json.RawMessage   `json:"mcpServers"`
@@ -197,7 +197,7 @@ func (m *Manager) restoreACPSession(ctx context.Context, ac *agentConn, agentNam
 		}{
 			Meta:       meta,
 			Cwd:        cwd,
-			MCPServers: m.mcpServersForAgent(mcpCtx, ac.initRaw, mcpServerPolicy),
+			MCPServers: m.mcpServersForAgent(ctx, ac.initRaw, mcpServerPolicy),
 			SessionID:  acpschema.SessionID(storedID),
 		})
 		if err == nil {
@@ -221,7 +221,7 @@ func (m *Manager) restoreACPSession(ctx context.Context, ac *agentConn, agentNam
 		}
 		m.log.Warn("replacing unmaterialized agent session", "agent", agentName, "session", session.ID, "acp_session", storedID)
 	}
-	acpSession, err := m.newACPSession(mcpsession.With(ctx, session.ID), ac, agentName, cfg, cwd, session.RuntimeRef.ArtifactSurface, mcpServerPolicy, systemPromptExtensions)
+	acpSession, err := m.newACPSession(ctx, ac, agentName, cfg, cwd, session.RuntimeRef.ArtifactSurface, mcpServerPolicy, systemPromptExtensions)
 	if err != nil {
 		return "", ModeState{}, false, err
 	}

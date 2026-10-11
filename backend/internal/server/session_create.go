@@ -9,6 +9,7 @@ import (
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/sessionview"
 	"github.com/wins/jaz/backend/internal/storage"
+	"github.com/wins/jaz/backend/internal/visualize"
 )
 
 type createSessionRequest struct {
@@ -18,6 +19,8 @@ type createSessionRequest struct {
 	Agent     string `json:"agent,omitempty"`
 	Directory string `json:"directory,omitempty"`
 	Worktree  bool   `json:"worktree,omitempty"`
+	// ArtifactSurface is fixed at creation: "chat" (default) or "canvas".
+	ArtifactSurface string `json:"artifact_surface,omitempty"`
 
 	ModelProvider   string `json:"model_provider,omitempty"`
 	Model           string `json:"model,omitempty"`
@@ -49,6 +52,11 @@ func (s *Server) createACPSession(w http.ResponseWriter, req createSessionReques
 		writeError(w, http.StatusBadRequest, fmt.Errorf("worktree requires a directory pointing at a git repository"))
 		return
 	}
+	surface := strings.TrimSpace(req.ArtifactSurface)
+	if surface != "" && surface != string(visualize.SurfaceChat) && surface != string(visualize.SurfaceCanvas) {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported artifact surface %q; use chat or canvas", surface))
+		return
+	}
 	ctx, cancel := serverACPBootstrapContext()
 	defer cancel()
 	session, err := s.ACP.CreateSession(ctx, acp.SpawnRequest{
@@ -57,6 +65,7 @@ func (s *Server) createACPSession(w http.ResponseWriter, req createSessionReques
 		Title:           req.Title,
 		Directory:       directory,
 		Worktree:        req.Worktree,
+		ArtifactSurface: surface,
 		ModelProvider:   strings.TrimSpace(req.ModelProvider),
 		Model:           strings.TrimSpace(req.Model),
 		ReasoningEffort: strings.TrimSpace(req.ReasoningEffort),

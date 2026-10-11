@@ -436,6 +436,53 @@ func TestPublishWidgetToolOnlyAdvertisedForWidgetSurfaceSessions(t *testing.T) {
 	}
 }
 
+func TestCanvasThreadsGetThreadToolsWithoutInlineArtifacts(t *testing.T) {
+	store, err := sqlitestore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	memory, err := jazmem.Open(jazmem.Config{Root: t.TempDir(), DBPath: filepath.Join(t.TempDir(), "memory.sqlite")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = memory.Close() })
+	service := New(
+		memoryservice.New(memory, store, fakeScheduler{}, "http://127.0.0.1:5299/mcp/jaztools"),
+		serverconfig.URLs{JazToolsMCP: "http://127.0.0.1:5299/mcp/jaztools"},
+		store,
+		sessionevents.New(),
+		store,
+		store,
+		&widgets.SessionPublisher{Service: widgets.NewService(store, nil), Sessions: store, Loops: store},
+		testCalendarTools(t, store),
+		testGmailTools(t, store),
+		connections.NewWhatsAppMCPTools(store, nil, nil),
+		connections.NewTelegramMCPTools(store, nil, nil),
+	)
+	service.SetLoops(loops.NewService(store, &fakeExecutor{started: make(chan loops.Run, 1)}, nil))
+	service.SetAgents(fakeACPService{spawned: make(chan acp.SpawnRequest, 1)})
+	canvas, err := store.CreateSession(storage.CreateSession{
+		Slug:       "canvas",
+		Runtime:    storage.RuntimeACP,
+		RuntimeRef: &storage.RuntimeRef{Type: storage.RuntimeACP, ArtifactSurface: string(visualize.SurfaceCanvas)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.surface(sessionRequest(canvas.ID)) != canvasSurface {
+		t.Fatal("canvas session did not route to the canvas surface")
+	}
+	client, closeClient := connectClient(t, service.server(canvasSurface))
+	defer closeClient()
+	if hasTool(t, client, "visualise_show_widget") || hasTool(t, client, "visualise_read_me") {
+		t.Fatal("canvas threads put visuals on the board, not inline in the chat")
+	}
+	if !hasTool(t, client, "create_thread") {
+		t.Fatal("canvas threads keep the ordinary thread tools")
+	}
+}
+
 func TestSourceWorkerSurfaceIsRestrictedToMemoryTools(t *testing.T) {
 	store, err := sqlitestore.New(t.TempDir())
 	if err != nil {

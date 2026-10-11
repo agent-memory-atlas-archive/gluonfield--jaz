@@ -29,6 +29,7 @@ export interface CreateSessionInput {
   agent?: string
   directory?: string
   worktree?: boolean
+  artifact_surface?: 'chat' | 'canvas'
   // Per-session overrides of the Settings > Agents defaults; model_provider
   // applies to ACP agents with provider-backed models.
   model_provider?: string

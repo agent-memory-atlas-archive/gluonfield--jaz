@@ -12,6 +12,7 @@ import (
 	agentsessionsapi "github.com/wins/jaz/backend/internal/httpapi/agentsessions"
 	botsapi "github.com/wins/jaz/backend/internal/httpapi/bots"
 	browserapi "github.com/wins/jaz/backend/internal/httpapi/browser"
+	canvasapi "github.com/wins/jaz/backend/internal/httpapi/canvas"
 	computerapi "github.com/wins/jaz/backend/internal/httpapi/computer"
 	connectionsapi "github.com/wins/jaz/backend/internal/httpapi/connections"
 	deviceapi "github.com/wins/jaz/backend/internal/httpapi/devices"
@@ -58,6 +59,7 @@ type routeDeps struct {
 	SessionMessages  *sessionsapi.MessagesHandler
 	SessionOverview  *sessionsapi.OverviewHandler
 	SessionGoal      *sessionsapi.GoalHandler
+	Canvas           *canvasapi.Handler
 	AgentSession     *agentsessionsapi.Handler
 	Voice            *voiceapi.Handler
 }
@@ -72,6 +74,8 @@ func NewRoutes(deps routeDeps) server.Routes {
 		{Pattern: "GET /v1/sessions/{session}/messages", Handler: deps.SessionMessages},
 		{Pattern: "GET /v1/sessions/{session}/overview", Handler: deps.SessionOverview},
 		{Pattern: "DELETE /v1/sessions/{session}/goal", Handler: deps.SessionGoal},
+		{Pattern: "GET /v1/sessions/{session}/canvas", Handler: http.HandlerFunc(deps.Canvas.Get)},
+		{Pattern: "PATCH /v1/sessions/{session}/canvas", Handler: http.HandlerFunc(deps.Canvas.Patch)},
 		{Pattern: "GET /v1/settings/voice", Handler: http.HandlerFunc(deps.Voice.Settings)},
 		{Pattern: "PUT /v1/settings/voice", Handler: http.HandlerFunc(deps.Voice.Settings)},
 		{Pattern: "POST /v1/voice/connect", Handler: http.HandlerFunc(deps.Voice.Connect)},

@@ -9,6 +9,9 @@ export interface ArtifactInput {
 const ARTIFACT_CSP =
   "default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://esm.sh https://cdn.jsdelivr.net https://unpkg.com; style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; font-src data: https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; img-src data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://fonts.gstatic.com https://fonts.googleapis.com; connect-src https://cdnjs.cloudflare.com https://esm.sh https://cdn.jsdelivr.net https://unpkg.com; media-src data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; frame-src 'none'; base-uri 'none'; form-action 'none'"
 
+const REACT_CDN = 'https://esm.sh/react@19.2.0'
+const REACT_DOM_CDN = 'https://esm.sh/react-dom@19.2.0'
+
 const THEME_VARS = [
   '--color-bg',
   '--color-surface',
@@ -169,6 +172,32 @@ export function buildArtifactDocument(
   const css = opts.measureLayout ? `${artifactCSS(theme)} html,body{height:100%}` : artifactCSS(theme)
   if (isFullHTMLDocument(input.code)) return injectArtifactHost(input.code, theme, bridge)
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}"><style>${css}</style><script>${bridge}</script></head><body>${input.code}</body></html>`
+}
+
+// A canvas component is CommonJS compiled from the agent's TSX. React and any
+// other bare imports load from esm.sh, sharing one React instance.
+export function buildComponentDocument(code: string, theme: string): string {
+  const imports: Record<string, string> = {
+    react: REACT_CDN,
+    'react/jsx-runtime': `${REACT_CDN}/jsx-runtime`,
+    'react-dom': REACT_DOM_CDN,
+    'react-dom/client': `${REACT_DOM_CDN}/client`,
+  }
+  const packages = [...new Set([...code.matchAll(/require\("([^"]+)"\)/g)].map((match) => match[1]))]
+  const main = `
+const modules = {};
+for (const name of ${JSON.stringify(packages)}) {
+  modules[name] = await import(${JSON.stringify(Object.keys(imports))}.includes(name) ? name : 'https://esm.sh/' + name + '?external=react,react-dom');
+}
+const module = { exports: {} };
+(function (require, module, exports) {
+${code.replaceAll('</', '<\\/')}
+})((name) => modules[name], module, module.exports);
+const React = await import('react');
+const { createRoot } = await import('react-dom/client');
+createRoot(document.getElementById('root')).render(React.createElement(module.exports.default ?? module.exports));
+`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}"><style>${artifactCSS(theme)} html,body,#root{height:100%}</style><script>${bridgeScript}</script><script type="importmap">${JSON.stringify({ imports })}</script></head><body><div id="root"></div><script type="module">${main}</script></body></html>`
 }
 
 function isFullHTMLDocument(code: string): boolean {

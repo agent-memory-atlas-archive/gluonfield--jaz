@@ -23,7 +23,7 @@ func messageWithNormalizedContext(message string, contexts []storage.MessageCont
 	if len(contexts) == 0 {
 		return message
 	}
-	out := taggedBlock("message_context", selectionContext(contexts)+browserAnnotationContext(contexts)+voiceContext(contexts))
+	out := taggedBlock("message_context", selectionContext(contexts)+canvasContext(contexts)+browserAnnotationContext(contexts)+voiceContext(contexts))
 	if strings.TrimSpace(message) != "" {
 		out += "\n\n" + taggedBlock("user_request", message)
 	}
@@ -46,6 +46,19 @@ func selectionContext(contexts []storage.MessageContext) string {
 		return ""
 	}
 	return taggedSection("selected_text", strings.Join(sections, ""))
+}
+
+func canvasContext(contexts []storage.MessageContext) string {
+	nodes := ""
+	for _, context := range contexts {
+		if context.Type == storage.ContextTypeCanvas {
+			nodes += fmt.Sprintf("node %q: %q\n", context.ID, context.Text)
+		}
+	}
+	if nodes == "" {
+		return ""
+	}
+	return taggedSection("canvas_selection", nodes)
 }
 
 func browserAnnotationContext(contexts []storage.MessageContext) string {

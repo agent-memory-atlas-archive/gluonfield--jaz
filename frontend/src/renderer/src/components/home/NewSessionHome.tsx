@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { motion } from 'motion/react'
+import { CanvasDots } from '@/components/home/CanvasDots'
 import { DitherTerrain, DitherWordmark } from '@/components/launch/DitherArt'
 import { ComposerCard } from '@/components/session/Composer'
 import { FileDropScope } from '@/components/ui/FileDrop'
@@ -38,6 +39,8 @@ export function NewSessionHome({
   disabled = false,
   goalAvailable = false,
   leftSlot,
+  shelf,
+  canvas = false,
   optionsSlot,
   draftStorageKey,
   fileRoot,
@@ -48,6 +51,10 @@ export function NewSessionHome({
   disabled?: boolean
   goalAvailable?: boolean
   leftSlot: ReactNode
+  /** setup controls on a tab behind the composer's top edge */
+  shelf?: ReactNode
+  /** a canvas thread is being set up: the page shows the canvas's dots */
+  canvas?: boolean
   optionsSlot?: ReactNode
   draftStorageKey?: string
   /** directory the composer's @-mention file picker indexes ('' = workspace root) */
@@ -59,7 +66,8 @@ export function NewSessionHome({
   const wordmark = effectiveHomeWordmark(settings.homeWordmark)
 
   return (
-    <FileDropScope className="relative flex h-full flex-col overflow-hidden">
+    <FileDropScope className="relative isolate flex h-full flex-col overflow-hidden">
+      <CanvasDots on={canvas} />
       <motion.div
         className="flex flex-1 items-center justify-center px-10 py-8 max-sm:px-4"
         initial={{ opacity: 0, y: 14, scale: 0.985 }}
@@ -73,22 +81,29 @@ export function NewSessionHome({
             invertInLightMode={settings.invertHomeLogoInLightMode}
             invertInDarkMode={settings.invertHomeLogoInDarkMode}
           />
-          <ComposerCard
-            streaming={creating}
-            autoFocus
-            placeholder="Ask anything, or hand your assistant a task…"
-            planAvailable
-            goalControlVisible
-            goalAvailable={goalAvailable}
-            disabled={creating || disabled}
-            leftSlot={leftSlot}
-            optionsSlot={optionsSlot}
-            draftStorageKey={draftStorageKey}
-            clearTiming="never"
-            fileRoot={fileRoot}
-            onSend={onSend}
-            onVoice={onVoice}
-          />
+          <div>
+            {shelf ? (
+              <div className="mx-5 -mb-3 flex items-center gap-1 rounded-t-[18px] bg-surface-2 px-2.5 pt-2 pb-5 ring-1 ring-border dark:bg-bg">
+                {shelf}
+              </div>
+            ) : null}
+            <ComposerCard
+              streaming={creating}
+              autoFocus
+              placeholder="Ask anything, or hand your assistant a task…"
+              planAvailable
+              goalControlVisible
+              goalAvailable={goalAvailable}
+              disabled={creating || disabled}
+              leftSlot={leftSlot}
+              optionsSlot={optionsSlot}
+              draftStorageKey={draftStorageKey}
+              clearTiming="never"
+              fileRoot={fileRoot}
+              onSend={onSend}
+              onVoice={onVoice}
+            />
+          </div>
         </div>
       </motion.div>
       {/* in flow, so the hero centers in whatever the brandscape leaves; a short

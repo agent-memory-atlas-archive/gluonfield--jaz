@@ -1,4 +1,4 @@
-import { MessageSquareQuote, SlidersHorizontal, X } from 'lucide-react'
+import { MessageSquareQuote, Shapes, SlidersHorizontal, X } from 'lucide-react'
 import type { ComposerContext } from '@/lib/sendMessage'
 import { contextLabel, contextPreviewText } from '@/lib/sendMessage'
 
@@ -15,7 +15,7 @@ export function ContextChip({
 }) {
   const label = contextLabel(context)
   const text = contextPreviewText(context)
-  const Icon = context.type === 'selection' ? MessageSquareQuote : SlidersHorizontal
+  const Icon = context.type === 'selection' ? MessageSquareQuote : context.type === 'canvas' ? Shapes : SlidersHorizontal
   return (
     <div
       className={`group relative flex items-center gap-1.5 rounded-full bg-bg py-1.5 pl-3 text-xs text-ink-2 transition-colors hover:bg-surface-2 ${

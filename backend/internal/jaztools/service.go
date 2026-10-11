@@ -84,6 +84,7 @@ type Service struct {
 	search      serverSlot
 	source      serverSlot
 	retired     serverSlot
+	canvas      serverSlot
 	handlerOnce sync.Once
 	handler     http.Handler
 }
@@ -97,6 +98,7 @@ const (
 	searchWorkerSurface
 	sourceWorkerSurface
 	retiredWorkerSurface
+	canvasSurface
 )
 
 type surfaceSlot struct {
@@ -226,6 +228,7 @@ func (s *Service) slots() []surfaceSlot {
 		{surface: searchWorkerSurface, slot: &s.search},
 		{surface: sourceWorkerSurface, slot: &s.source},
 		{surface: retiredWorkerSurface, slot: &s.retired},
+		{surface: canvasSurface, slot: &s.canvas},
 	}
 }
 
@@ -241,6 +244,8 @@ func (s *Service) slot(surface toolSurface) *serverSlot {
 		return &s.bot
 	case retiredWorkerSurface:
 		return &s.retired
+	case canvasSurface:
+		return &s.canvas
 	default:
 		return &s.thread
 	}
@@ -262,18 +267,22 @@ func (s *Service) newServer(surface toolSurface) *mcp.Server {
 			s.botTools.AddBotTo(server)
 		}
 	}
-	if (surface == threadSurface || surface == botSurface) && s.goalTools != nil {
+	if (surface == threadSurface || surface == botSurface || surface == canvasSurface) && s.goalTools != nil {
 		s.goalTools.AddTo(server)
 	}
 	s.calendarTools.AddTo(server)
 	s.gmailTools.AddTo(server)
 	s.whatsAppTools.AddTo(server)
 	s.telegramTools.AddTo(server)
-	s.visualizeTools.AddReadMeTo(server)
 	switch surface {
 	case widgetSurface:
+		s.visualizeTools.AddReadMeTo(server)
 		widgets.AddMCPTools(server, s.widgetPublisher)
+	case canvasSurface:
+		// A canvas thread's visuals belong on its board, not in the narrow chat
+		// beside it.
 	default:
+		s.visualizeTools.AddReadMeTo(server)
 		s.visualizeTools.AddShowWidgetTo(server)
 	}
 	return server
@@ -323,6 +332,9 @@ func (s *Service) surface(r *http.Request) toolSurface {
 	if session, ok := s.sessionFromRequest(r); ok {
 		if sourced, found := surfaceBySourceType[session.SourceType]; found {
 			return sourced
+		}
+		if session.RuntimeRef != nil && visualize.NormalizeSurface(session.RuntimeRef.ArtifactSurface) == visualize.SurfaceCanvas {
+			return canvasSurface
 		}
 	}
 	if s.widgetSession(r) {
@@ -382,6 +394,7 @@ func (s *Service) syncBrowserTools() {
 func (s *Service) syncThreadTools() {
 	s.syncThreadToolsFor(&s.thread, threadSurface)
 	s.syncThreadToolsFor(&s.widget, widgetSurface)
+	s.syncThreadToolsFor(&s.canvas, canvasSurface)
 }
 
 func (s *Service) syncAgentToolsFor(slot *serverSlot, surface toolSurface) {

@@ -11,6 +11,9 @@ export interface RuntimeRef {
   session_id?: string
   cwd?: string
   project_path?: string
+  // Fixed when the thread is created; 'canvas' threads render a board instead
+  // of a transcript.
+  artifact_surface?: 'chat' | 'widget' | 'canvas'
 }
 
 // Provider-facing token fields: input includes cache reads/writes when the
