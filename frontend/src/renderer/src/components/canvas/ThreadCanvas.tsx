@@ -17,7 +17,7 @@ import '@xyflow/react/dist/base.css'
 import './canvas.css'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Minus, Plus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { getCanvas, patchCanvas, type CanvasItem, type CanvasPatch, type CanvasView } from '@/lib/api/canvas'
 import { useArtifactThemeCSS } from '@/lib/hooks/useArtifactThemeCSS'
@@ -373,6 +373,7 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
     <div
       ref={container}
       className={`canvas tool-${tool}${busy ? ' canvas-busy' : ''}${tool === 'connector' ? ' canvas-connecting' : ''}`}
+      style={{ '--canvas-zoom': zoom } as CSSProperties}
       onPointerDownCapture={() => (touched.current = Date.now())}
       onWheelCapture={() => (touched.current = Date.now())}
       onKeyDownCapture={() => (touched.current = Date.now())}
