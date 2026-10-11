@@ -67,7 +67,6 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
       onPointerCancel={finish}
       onLostPointerCapture={finish}
     >
-      {transcriptShown && voice.transcript.length ? <VoiceTranscript lines={voice.transcript} /> : null}
       <VoicePill
         voice={voice}
         face={face}
@@ -80,6 +79,7 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
           setTranscriptShown(!transcriptShown)
         }}
       />
+      {transcriptShown && voice.transcript.length ? <VoiceTranscript lines={voice.transcript} /> : null}
     </div>
   )
 }

@@ -7,6 +7,8 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
   let state: VoiceOverlayState | null = null
   let loaded = false
   let dragOrigin: { x: number; y: number; windowX: number; windowY: number } | null = null
+  // Where the pill sits; the transcript below it may push the window up.
+  let top: number | null = null
   const throttled = owner.webContents.getBackgroundThrottling()
 
   const present = () => {
@@ -48,6 +50,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
         overlay = null
         loaded = false
         dragOrigin = null
+        top = null
       })
       if (process.env.ELECTRON_RENDERER_URL) {
         void overlay.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -112,21 +115,19 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
       const [windowX, windowY] = overlay.getPosition()
       dragOrigin = { ...point, windowX, windowY }
     } else {
-      overlay.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), Math.round(dragOrigin.windowY + point.y - dragOrigin.y))
+      top = Math.round(dragOrigin.windowY + point.y - dragOrigin.y)
+      overlay.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), top)
     }
   }
-  // Grows and shrinks upwards, keeping the pill where it sits.
   const resize = (event: IpcMainEvent, height: number) => {
     if (!overlay || event.sender !== overlay.webContents || event.senderFrame !== overlay.webContents.mainFrame || !Number.isFinite(height) || height <= 0) {
       return
     }
     const bounds = overlay.getBounds()
+    const { workArea } = screen.getDisplayMatching(bounds)
     const next = Math.round(height)
-    const y = Math.max(screen.getDisplayMatching(bounds).workArea.y, bounds.y + bounds.height - next)
-    if (dragOrigin) {
-      dragOrigin.windowY += y - bounds.y
-    }
-    overlay.setBounds({ ...bounds, y, height: next })
+    top ??= bounds.y
+    overlay.setBounds({ ...bounds, y: Math.max(workArea.y, Math.min(top, workArea.y + workArea.height - next)), height: next })
   }
   const navigate = (_event: Electron.Event, _url: string, sameDocument: boolean, mainFrame: boolean) => {
     if (mainFrame && !sameDocument) {

@@ -162,7 +162,7 @@ test('only the owning frames control a call; document loss clears the overlay', 
   }
 })
 
-test('the transcript grows the overlay upwards from where the pill sits', () => {
+test('the transcript grows the overlay down from the pill and stays on screen', () => {
   const owner = new Window()
   attachVoiceOverlay(owner)
   try {
@@ -174,15 +174,19 @@ test('the transcript grows the overlay upwards from where the pill sits', () => 
     expect(overlay.getBounds()).toEqual({ x: 100, y: 200, width: 380, height: 78 })
 
     ipcMain.emit('jaz:voice:resize', sender(overlay), 177.6)
-    expect(overlay.getBounds()).toEqual({ x: 100, y: 100, width: 380, height: 178 })
-    ipcMain.emit('jaz:voice:resize', sender(overlay), 400)
-    expect(overlay.getBounds()).toEqual({ x: 100, y: 25, width: 380, height: 400 })
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 200, width: 380, height: 178 })
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 700)
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 100, width: 380, height: 700 })
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 900)
+    expect(overlay.position).toEqual([100, 25])
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 78)
+    expect(overlay.getBounds()).toEqual({ x: 100, y: 200, width: 380, height: 78 })
 
     ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 0, y: 500 })
-    ipcMain.emit('jaz:voice:resize', sender(overlay), 78)
-    expect(overlay.position).toEqual([100, 347])
-    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 10, y: 490 })
-    expect(overlay.position).toEqual([110, 337])
+    ipcMain.emit('jaz:voice:drag', sender(overlay), { x: 10, y: 450 })
+    ipcMain.emit('jaz:voice:drag', sender(overlay), null)
+    ipcMain.emit('jaz:voice:resize', sender(overlay), 300)
+    expect(overlay.getBounds()).toEqual({ x: 110, y: 150, width: 380, height: 300 })
   } finally {
     owner.destroy()
   }
