@@ -139,6 +139,20 @@ export function containsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height
 }
 
+// A section holds the items whose centre lies inside it; it moves, fits and
+// deletes with them.
+export function sectionContents(section: BoardNode, nodes: BoardNode[]): BoardNode[] {
+  const area = rectOfNode(section)
+  return nodes.filter((node) => {
+    const rect = rectOfNode(node)
+    return node.id !== section.id && containsPoint(area, rect.x + rect.width / 2, rect.y + rect.height / 2) && !contains(rect, area)
+  })
+}
+
+export function padded(rect: Rect): Rect {
+  return { x: rect.x - SECTION_PAD, y: rect.y - SECTION_PAD, width: rect.width + 2 * SECTION_PAD, height: rect.height + 2 * SECTION_PAD }
+}
+
 export function growToFit(section: Rect, items: Rect[]): Rect {
   let { x, y } = section
   let right = section.x + section.width
@@ -178,7 +192,8 @@ export function extension(path: string): string {
 
 // The label a selected item carries into the composer and the agent's prompt.
 export function itemLabel(item: CanvasItem): string {
-  if (item.type === 'group') return typeof item.label === 'string' && item.label ? item.label : 'Section'
+  if (typeof item.label === 'string' && item.label) return item.label
+  if (item.type === 'group') return 'Section'
   if (item.type === 'file' && typeof item.file === 'string') return fileName(item.file)
   if (item.type === 'link' && typeof item.url === 'string') return item.url
   const text = typeof item.text === 'string' ? item.text.trim().split('\n')[0].replace(/^#+\s*/, '') : ''

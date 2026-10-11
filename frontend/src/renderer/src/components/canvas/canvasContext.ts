@@ -7,6 +7,8 @@ export interface CanvasBoard {
   theme: string
   focused: string | null
   setFocused: (id: string | null) => void
+  // When the agent last changed each item, so it can flash.
+  flash: Record<string, number>
   editing: string | null
   setEditing: (id: string | null) => void
   dropTarget: string | null

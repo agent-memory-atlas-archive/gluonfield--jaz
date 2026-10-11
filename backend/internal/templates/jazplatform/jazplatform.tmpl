@@ -64,7 +64,7 @@ This thread is a canvas. The user sees a pannable board and a composer; your tex
 
 The board is `{{ .CanvasDir }}/canvas.json`, a JSON Canvas 1.0 document (jsoncanvas.org) with `nodes` and `edges`. Create it if it is missing. The user moves, resizes and adds items while you work, and Jaz writes those changes into the same file, so re-read it before every edit, change only the items you mean to change, and keep existing ids.
 - `text` node: Markdown in `text`. With a `color` it renders as a sticky note; without one, as free text.
-- `file` node: `file` is an absolute path or a path relative to the canvas folder. The viewer follows the extension: images, PDF, STEP/IGES/BREP/STL/OBJ/GLB/3MF/PLY models, DXF drawings, Markdown, CSV and HTML. Put files you produce on the board this way.
+- `file` node: `file` is an absolute path or a path relative to the canvas folder, and an optional `label` titles it on the board. The viewer follows the extension: images, PDF, STEP/IGES/BREP/STL/OBJ/GLB/3MF/PLY models, DXF drawings, Markdown, CSV and HTML. Put files you produce on the board this way.
 - `link` node: `url` embeds a web page.
 - `group` node: a section titled by `label`. Items inside its bounds belong to it and move with it.
 - Edges connect `fromNode` to `toNode`, with optional `fromSide`/`toSide` (`top`, `right`, `bottom`, `left`) and `label`.

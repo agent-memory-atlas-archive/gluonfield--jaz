@@ -12,12 +12,15 @@
   --canvas-map-node: color-mix(in oklab, var(--color-ink) 30%, transparent);
   --canvas-map-section: color-mix(in oklab, var(--color-ink) 8%, transparent);
   --canvas-map-mask: color-mix(in oklab, var(--canvas-bg) 70%, transparent);
+  /* FigJam's selection blue: the canvas reads as FigJam, not as Jaz chrome. */
+  --canvas-accent: #0d99ff;
   position: absolute;
   inset: 0;
   background: var(--canvas-bg);
 }
 
 :root:where(.dark) .canvas {
+  --canvas-accent: #0c8ce9;
   --canvas-bg: var(--color-bg);
   --canvas-section: var(--color-surface);
   --canvas-card: var(--color-surface-2);
@@ -74,7 +77,7 @@
 }
 
 .react-flow__node.selected .canvas-item-label {
-  color: var(--color-primary);
+  color: var(--canvas-accent);
 }
 
 .canvas-card {
@@ -89,11 +92,11 @@
 .react-flow__node.selected .canvas-card,
 .react-flow__node.selected .canvas-sticky,
 .react-flow__node.selected .canvas-text {
-  box-shadow: 0 0 0 1px var(--color-primary), var(--canvas-shadow);
+  box-shadow: 0 0 0 1px var(--canvas-accent), var(--canvas-shadow);
 }
 
 .canvas-connect-source {
-  box-shadow: 0 0 0 2px var(--color-primary), var(--canvas-shadow) !important;
+  box-shadow: 0 0 0 2px var(--canvas-accent), var(--canvas-shadow) !important;
 }
 
 .canvas-shield {
@@ -186,8 +189,8 @@
 }
 
 .canvas-focus.on {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
+  color: #fff;
+  background: var(--canvas-accent);
 }
 
 .react-flow__node:hover .canvas-focus,
@@ -205,7 +208,7 @@
 }
 
 .react-flow__node:has(.canvas-focus.on) .canvas-card {
-  box-shadow: 0 0 0 2px var(--color-primary), 0 16px 48px rgb(0 0 0 / 0.3);
+  box-shadow: 0 0 0 2px var(--canvas-accent), 0 16px 48px rgb(0 0 0 / 0.3);
 }
 
 .canvas-viewer-empty,
@@ -276,12 +279,12 @@
 }
 
 .canvas-section.target {
-  background: color-mix(in oklab, var(--color-primary) 6%, var(--canvas-section));
-  box-shadow: inset 0 0 0 2px var(--color-primary);
+  background: color-mix(in oklab, var(--canvas-accent) 6%, var(--canvas-section));
+  box-shadow: inset 0 0 0 2px var(--canvas-accent);
 }
 
 .react-flow__node-group.selected .canvas-section {
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--canvas-accent);
 }
 
 .canvas-section-label {
@@ -301,7 +304,7 @@
 }
 
 .react-flow__node.selected .canvas-section-label {
-  color: var(--color-primary);
+  color: var(--canvas-accent);
 }
 
 .canvas-section-label input,
@@ -328,7 +331,7 @@
   --color-ink-3: oklch(0.46 0.012 264);
   padding: 16px;
   border-radius: 4px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
   color: var(--color-ink);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 8px 20px rgb(0 0 0 / 0.1);
@@ -361,7 +364,7 @@
 .canvas-text {
   padding: 2px 4px;
   border-radius: 4px;
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 500;
   color: var(--color-ink);
 }
@@ -384,7 +387,7 @@
   height: 8px;
   min-width: 0;
   min-height: 0;
-  border: 1.5px solid var(--color-primary);
+  border: 1.5px solid var(--canvas-accent);
   border-radius: 50%;
   background: var(--canvas-card);
   opacity: 0;
@@ -410,7 +413,7 @@
 }
 
 .canvas-edge.selected {
-  stroke: var(--color-primary);
+  stroke: var(--canvas-accent);
 }
 
 .canvas-edge-label {
@@ -425,19 +428,19 @@
 }
 
 .canvas-edge-label.selected {
-  color: var(--color-primary);
+  color: var(--canvas-accent);
 }
 
 .canvas .react-flow__edge.selected .react-flow__edgeupdater {
   fill: var(--canvas-card);
-  stroke: var(--color-primary);
+  stroke: var(--canvas-accent);
   stroke-width: 1.5;
 }
 
 .canvas .react-flow__resize-control.handle.canvas-resize-handle {
   width: 8px;
   height: 8px;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--canvas-accent);
   border-radius: 1px;
   background: #fff;
 }
@@ -449,19 +452,19 @@
 .canvas .react-flow__resize-control.line.canvas-resize-line.left,
 .canvas .react-flow__resize-control.line.canvas-resize-line.right {
   width: 9px;
-  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 1px 100% no-repeat;
+  background: linear-gradient(var(--canvas-accent), var(--canvas-accent)) center / 1px 100% no-repeat;
 }
 
 .canvas .react-flow__resize-control.line.canvas-resize-line.top,
 .canvas .react-flow__resize-control.line.canvas-resize-line.bottom {
   height: 9px;
-  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 100% 1px no-repeat;
+  background: linear-gradient(var(--canvas-accent), var(--canvas-accent)) center / 100% 1px no-repeat;
 }
 
 .canvas .react-flow__selection,
 .canvas .react-flow__nodesselection-rect {
-  border: 1px solid var(--color-primary);
-  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+  border: 1px solid var(--canvas-accent);
+  background: color-mix(in oklab, var(--canvas-accent) 8%, transparent);
 }
 
 .canvas-dock {
@@ -507,8 +510,8 @@
 }
 
 .canvas-dock button.on {
-  color: var(--color-on-primary);
-  background: var(--color-primary);
+  color: #fff;
+  background: var(--canvas-accent);
 }
 
 .canvas-dock button::after {
@@ -543,8 +546,8 @@
 .canvas-section-draft {
   position: absolute;
   border-radius: 12px;
-  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
+  background: color-mix(in oklab, var(--canvas-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--canvas-accent);
 }
 
 .canvas-map {
@@ -614,7 +617,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-primary);
+  background: var(--canvas-accent);
 }
 
 .canvas-banner button {
@@ -622,8 +625,8 @@
   padding: 0 12px;
   border-radius: 8px;
   font-weight: 500;
-  color: var(--color-on-primary);
-  background: var(--color-primary);
+  color: #fff;
+  background: var(--canvas-accent);
 }
 
 .canvas-pill {
@@ -679,4 +682,27 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   color: var(--color-ink);
+}
+
+/* The agent just changed this item. */
+.canvas-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--canvas-accent) 10%, transparent);
+  box-shadow: inset 0 0 0 2px var(--canvas-accent);
+  pointer-events: none;
+  animation: canvas-flash 1.4s ease-out forwards;
+}
+
+@keyframes canvas-flash {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-flash {
+    animation-duration: 0.01s;
+  }
 }

@@ -1,12 +1,14 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { GitBranch } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NewSessionHome } from '@/components/home/NewSessionHome'
 import { NewThreadOptions } from '@/components/home/NewThreadOptions'
+import { ThreadModeSwitch } from '@/components/home/ThreadModeSwitch'
 import { deleteAttachmentDraft } from '@/components/session/composerAttachmentDraftStore'
 import { ProjectPicker } from '@/components/session/NewThreadControls'
 import { AgentModelControls, useNewThreadControls } from '@/components/session/useNewThreadControls'
 import { FastModeOption } from '@/components/session/NativeModelOptions'
-import { Checkbox } from '@/components/ui/Checkbox'
+import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/components/ui/toast'
 import { ApiError } from '@/lib/api/client'
 import { voiceAvailableQuery } from '@/lib/api/liveVoice'
@@ -156,13 +158,6 @@ function NewSessionPage() {
   const directoryLabel = directory
     ? (project?.name ?? directory.split(/[\\/]+/).filter(Boolean).at(-1) ?? directory)
     : ''
-  // Mobile header: shown when there's a picker to surface or an agent to connect.
-  const showMobileOptions =
-    !runtimeAvailable ||
-    controls.showAgentPicker ||
-    controls.showModelPicker ||
-    controls.showProjectPicker ||
-    directoryIsGit
   const optionsTitle = controls.showModelPicker
     ? modelLabel
     : controls.showAgentPicker
@@ -175,9 +170,11 @@ function NewSessionPage() {
     .filter(Boolean)
     .join(' · ')
 
-  const composerControls = (
+  const agentControls = <AgentModelControls controls={controls} placement={controlPlacement} disabled={creating} />
+  // The thread's setup sits on a shelf above the composer: where it runs, and
+  // whether it is a chat or a canvas.
+  const setupControls = (
     <>
-      <AgentModelControls controls={controls} placement={controlPlacement} disabled={creating} />
       {controls.showProjectPicker ? (
         <ProjectPicker
           value={directory}
@@ -190,56 +187,32 @@ function NewSessionPage() {
         />
       ) : null}
       {directoryIsGit ? (
-        <div className="flex items-center gap-1.5 text-[13px] text-ink-2">
-          <Checkbox
-            checked={worktree}
-            onChange={setWorktree}
-            disabled={creating}
-            aria-label="Run on a git worktree"
-          />
-          <button
-            type="button"
-            tabIndex={-1}
-            disabled={creating}
-            onClick={() => setWorktree((v) => !v)}
-            className="cursor-pointer select-none disabled:cursor-default disabled:opacity-50"
-          >
-            Worktree
-          </button>
+        <div className="flex h-8 items-center gap-2 px-2 text-[13px] text-ink-2">
+          <GitBranch size={15} className="text-ink-3" />
+          Worktree
+          <Switch checked={worktree} onChange={setWorktree} disabled={creating} aria-label="Run on a git worktree" />
         </div>
       ) : null}
-      <div className="flex items-center gap-1.5 text-[13px] text-ink-2">
-        <Checkbox
-          checked={canvas}
-          onChange={setCanvas}
-          disabled={creating}
-          aria-label="Start as a canvas"
-        />
-        <button
-          type="button"
-          tabIndex={-1}
-          disabled={creating}
-          onClick={() => setCanvas((v) => !v)}
-          className="cursor-pointer select-none disabled:cursor-default disabled:opacity-50"
-        >
-          Canvas
-        </button>
-      </div>
+      <span className="flex-1" />
+      <ThreadModeSwitch canvas={canvas} onChange={setCanvas} disabled={creating} />
     </>
   )
 
   return (
     <>
-      {isMobile && showMobileOptions ? (
+      {isMobile ? (
         <NewThreadOptions title={optionsTitle} subtitle={optionsSubtitle || undefined}>
-          {composerControls}
+          {agentControls}
+          {setupControls}
         </NewThreadOptions>
       ) : null}
       <NewSessionHome
         creating={creating}
         disabled={!runtimeAvailable}
         goalAvailable={acpAgentSupportsGoal(runtime)}
-        leftSlot={isMobile ? null : composerControls}
+        leftSlot={isMobile ? null : agentControls}
+        shelf={isMobile ? null : setupControls}
+        canvas={canvas}
         optionsSlot={controls.fastMode ? <FastModeOption {...controls.fastMode} disabled={creating} /> : null}
         draftStorageKey={NEW_SESSION_DRAFT_KEY}
         // Tokens freeze their absolute expansion at insert time, so re-picking

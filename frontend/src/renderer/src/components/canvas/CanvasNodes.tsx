@@ -10,7 +10,7 @@ import {
 } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 import { MessageMarkdown } from '@/components/session/MessageMarkdown'
-import { extension, fileName, rounded, viewerFor, type BoardEdge, type BoardNode } from './board'
+import { extension, itemLabel, rounded, viewerFor, type BoardEdge, type BoardNode } from './board'
 import { useCanvas } from './canvasContext'
 import { FileViewer } from './CanvasViewers'
 import { ViewerFrame } from './ViewerFrame'
@@ -40,6 +40,11 @@ function Resizer({ id, selected, minWidth = 120, minHeight = 60 }: { id: string;
   )
 }
 
+function Flash({ id }: { id: string }) {
+  const { flash } = useCanvas()
+  return flash[id] ? <div key={flash[id]} className="canvas-flash" /> : null
+}
+
 function ItemLabel({ badge, name }: { badge: string; name: string }) {
   return (
     <div className="canvas-item-label">
@@ -63,10 +68,11 @@ export function FileNode({ id, data, selected }: NodeProps<BoardNode>) {
     <>
       <Resizer id={id} selected={selected} />
       <Handles />
-      <ItemLabel badge={extension(path).toUpperCase() || 'FILE'} name={fileName(path)} />
+      <ItemLabel badge={extension(path).toUpperCase() || 'FILE'} name={itemLabel(data.item)} />
       <div className={`canvas-card${connectSource === id ? ' canvas-connect-source' : ''}`}>
         <FileViewer id={id} file={file} />
         {shielded(path) && !selected ? <div className="canvas-shield" /> : null}
+        <Flash id={id} />
       </div>
     </>
   )
@@ -86,6 +92,7 @@ export function LinkNode({ id, data, selected }: NodeProps<BoardNode>) {
           <iframe className="canvas-frame" title={host} src={url} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerPolicy="no-referrer" />
         </ViewerFrame>
         {focused === id ? null : <div className="canvas-shield" />}
+        <Flash id={id} />
       </div>
     </>
   )
@@ -117,6 +124,7 @@ export function TextNode({ id, data, selected }: NodeProps<BoardNode>) {
         onDoubleClick={() => setEditing(id)}
       >
         {editing === id ? <TextEditor initial={text} onDone={finish} /> : <MessageMarkdown text={text} />}
+        <Flash id={id} />
       </div>
     </>
   )
@@ -175,7 +183,9 @@ export function GroupNode({ id, data, selected }: NodeProps<BoardNode>) {
           />
         ) : label}
       </div>
-      <div className={`canvas-section${dropTarget === id ? ' target' : ''}`} />
+      <div className={`canvas-section${dropTarget === id ? ' target' : ''}`}>
+        <Flash id={id} />
+      </div>
     </>
   )
 }

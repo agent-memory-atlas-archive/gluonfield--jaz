@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { applyPatch, changedNodeIds, mergeNodes, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
+import { applyPatch, changedNodeIds, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
 
 const view = (nodes, edges = [], files = {}) => ({ version: 'v', dir: '/c', nodes, edges, files, components: {} })
 
@@ -75,4 +75,18 @@ test('a file rewritten behind an unchanged node still counts as an agent change'
   const after = view([node, { id: 'note', type: 'text', text: 'a' }], [], { pdf: { path: '/c/quote.pdf', version: '2' } })
   expect(changedNodeIds(before, after)).toEqual(['pdf'])
   expect(changedNodeIds(after, after)).toEqual([])
+})
+
+test('a section holds what is centred inside it, never the section around it', () => {
+  const nodes = toFlowNodes(view([
+    { id: 'outer', type: 'group', x: 0, y: 0, width: 1000, height: 800 },
+    { id: 'inner', type: 'group', x: 100, y: 100, width: 400, height: 300 },
+    { id: 'in', type: 'text', x: 150, y: 150, width: 100, height: 100 },
+    { id: 'straddling', type: 'text', x: 420, y: 150, width: 120, height: 100 },
+    { id: 'out', type: 'text', x: 600, y: 150, width: 100, height: 100 },
+  ]))
+  const inner = nodes.find((node) => node.id === 'inner')
+  const outer = nodes.find((node) => node.id === 'outer')
+  expect(sectionContents(inner, nodes).map((node) => node.id)).toEqual(['in', 'straddling'])
+  expect(sectionContents(outer, nodes).map((node) => node.id)).toEqual(['inner', 'in', 'straddling', 'out'])
 })

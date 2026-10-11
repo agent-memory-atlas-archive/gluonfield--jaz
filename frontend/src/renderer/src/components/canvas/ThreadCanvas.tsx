@@ -23,7 +23,6 @@ import { getCanvas, patchCanvas, type CanvasItem, type CanvasPatch, type CanvasV
 import { useArtifactThemeCSS } from '@/lib/hooks/useArtifactThemeCSS'
 import { keys } from '@/lib/query/keys'
 import {
-  SECTION_PAD,
   applyPatch,
   bounds,
   changedNodeIds,
@@ -36,7 +35,9 @@ import {
   mergeEdges,
   mergeNodes,
   rectOfNode,
+  padded,
   rounded,
+  sectionContents,
   sidesBetween,
   toFlowEdges,
   toFlowNodes,
@@ -132,6 +133,7 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
   // something; then a pill offers to show them.
   const touched = useRef(0)
   const seen = useRef<CanvasView | undefined>(undefined)
+  const [flash, setFlash] = useState<Record<string, number>>({})
   const [news, setNews] = useState<string[]>([])
   const show = useCallback((ids: string[]) => {
     setNews([])
@@ -157,7 +159,9 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
       return left >= 0 && top >= 0 && left + rect.width * viewport.zoom <= box.width && top + rect.height * viewport.zoom <= box.height
     }
     const changed = changedNodeIds(before, view).filter((id) => (mine.current.get(id) ?? 0) < now)
-    if (!changed.length || changed.every(visible)) return
+    if (!changed.length) return
+    setFlash((current) => ({ ...current, ...Object.fromEntries(changed.map((id) => [id, now])) }))
+    if (changed.every(visible)) return
     if (now - touched.current > IDLE_MS) show(changed)
     else setNews(changed)
   }, [view, flow, show])
@@ -237,7 +241,7 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
     dragStart.current = new Map(all.map((node) => [node.id, rectOfNode(node)]))
     members.current = new Map(dragged.filter((node) => node.type === 'group').map((group) => [
       group.id,
-      all.filter((node) => !draggedIds.has(node.id) && node.id !== group.id && contains(rectOfNode(group), rectOfNode(node))).map((node) => node.id),
+      sectionContents(group, all).filter((node) => !draggedIds.has(node.id)).map((node) => node.id),
     ]))
     held.current = new Set(all.map((node) => node.id))
   }
@@ -323,6 +327,16 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
         setConnectSource(null)
         return
       }
+      // Cmd+Delete removes a section and keeps what it holds; React Flow's own
+      // Delete would take the contents too.
+      if ((event.metaKey || event.ctrlKey) && (event.key === 'Backspace' || event.key === 'Delete')) {
+        const sections = flow.getNodes().filter((node) => node.selected && node.type === 'group')
+        if (!sections.length) return
+        event.preventDefault()
+        event.stopPropagation()
+        commit({ remove: sections.map((node) => node.id) })
+        return
+      }
       if (event.metaKey || event.ctrlKey || event.altKey) return
       const shortcuts: Record<string, Tool> = { KeyV: 'select', KeyH: 'hand', KeyS: 'sticky', KeyT: 'text', KeyX: 'connector' }
       if (event.code === 'KeyS' && event.shiftKey) {
@@ -332,14 +346,13 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
           setTool('section')
           return
         }
-        const area = bounds(picked.map(rectOfNode))
-        addSection({ x: area.x - SECTION_PAD, y: area.y - SECTION_PAD, width: area.width + 2 * SECTION_PAD, height: area.height + 2 * SECTION_PAD })
+        addSection(padded(bounds(picked.map(rectOfNode))))
         return
       }
       if (!event.shiftKey && shortcuts[event.code]) setTool(shortcuts[event.code])
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   })
 
   const board = useMemo<CanvasBoard | null>(() => view ? {
@@ -348,13 +361,14 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
     theme,
     focused,
     setFocused,
+    flash,
     editing,
     setEditing,
     dropTarget,
     connectSource,
     commit,
     prompt: onPrompt,
-  } : null, [sessionId, view, theme, focused, editing, dropTarget, connectSource, commit, onPrompt])
+  } : null, [sessionId, view, theme, focused, flash, editing, dropTarget, connectSource, commit, onPrompt])
 
   const focusedItem = nodes.find((node) => node.id === focused)?.data.item
   const focusedKind = focusedItem?.type === 'link' ? 'link' : viewerFor(String(focusedItem?.file ?? ''))
@@ -378,12 +392,25 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onReconnect={onReconnect}
-            onDelete={({ nodes: gone, edges: cut }) => commit({ remove: [...gone, ...cut].map((item) => item.id) })}
+            onDelete={({ nodes: gone, edges: cut }) => {
+              const contents = gone.filter((node) => node.type === 'group').flatMap((section) => sectionContents(section, flow.getNodes()))
+              commit({ remove: [...new Set([...gone, ...cut, ...contents].map((item) => item.id))] })
+            }}
             onNodeDragStart={onNodeDragStart}
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
             onNodeClick={onNodeClick}
-            onNodeDoubleClick={(_event, node) => focusable(node.data.item) && setFocused(node.id)}
+            onNodeDoubleClick={(event, node) => {
+              if (node.type !== 'group') {
+                if (focusable(node.data.item)) setFocused(node.id)
+                return
+              }
+              // Double-clicking a section's edge fits it to what it holds.
+              const inside = sectionContents(node, flow.getNodes())
+              if (inside.length && (event.target as HTMLElement).closest('.react-flow__resize-control')) {
+                commit({ nodes: [{ id: node.id, ...rounded(padded(bounds(inside.map(rectOfNode)))) }] })
+              }
+            }}
             onEdgeDoubleClick={(_event, edge) => setEditing(edge.id)}
             onPaneClick={() => setFocused(null)}
             onSelectionChange={onSelectionChange}
@@ -392,7 +419,7 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
             onSelectionStart={() => setBusy(true)}
             onSelectionEnd={() => setBusy(false)}
             connectionMode={ConnectionMode.Loose}
-            connectionLineStyle={{ stroke: 'var(--color-primary)', strokeWidth: 1.5 }}
+            connectionLineStyle={{ stroke: 'var(--canvas-accent)', strokeWidth: 1.5 }}
             reconnectRadius={8}
             panOnScroll
             selectionOnDrag={tool !== 'hand'}
