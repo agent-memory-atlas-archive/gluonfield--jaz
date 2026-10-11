@@ -152,6 +152,11 @@ func NewRuntimeLayout(cfg Config) (runtimefiles.Layout, error) {
 	if root == "" {
 		root = sqlitestore.DefaultRoot()
 	}
+	// Agents run in other directories, so every runtime path must be absolute.
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return runtimefiles.Layout{}, err
+	}
 	layout, err := runtimefiles.Ensure(root)
 	if err != nil {
 		return runtimefiles.Layout{}, err

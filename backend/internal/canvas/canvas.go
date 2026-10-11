@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -43,10 +42,9 @@ type Component struct {
 }
 
 type View struct {
+	Board
 	Version    string               `json:"version"`
 	Dir        string               `json:"dir"`
-	Nodes      []Item               `json:"nodes"`
-	Edges      []Item               `json:"edges"`
 	Files      map[string]File      `json:"files"`
 	Components map[string]Component `json:"components"`
 }
@@ -80,14 +78,8 @@ func (s *Service) Dir(sessionID string) string {
 	return Dir(s.root, sessionID)
 }
 
-// Dir is absolute: the agent and the session file API resolve relative paths
-// against the session's working directory, not the Jaz root.
 func Dir(canvasesRoot, sessionID string) string {
-	dir, err := filepath.Abs(filepath.Join(canvasesRoot, sessionID))
-	if err != nil {
-		return filepath.Join(canvasesRoot, sessionID)
-	}
-	return dir
+	return filepath.Join(canvasesRoot, sessionID)
 }
 
 func (s *Service) Load(sessionID string) (Snapshot, error) {
@@ -122,7 +114,7 @@ func (s Snapshot) View() View {
 			components[id] = compile(file.Path)
 		}
 	}
-	return View{Version: s.Version, Dir: s.dir, Nodes: s.board.Nodes, Edges: s.board.Edges, Files: s.files, Components: components}
+	return View{Board: s.board, Version: s.Version, Dir: s.dir, Files: s.files, Components: components}
 }
 
 func (s *Service) Patch(sessionID string, patch Patch) (string, error) {
@@ -250,45 +242,22 @@ func writeBoard(dir string, board Board) error {
 	return os.Rename(temp.Name(), filepath.Join(dir, FileName))
 }
 
+// Markdown in text nodes stays readable: no HTML escaping of < > &.
 func writeItems(out *bytes.Buffer, items []Item) error {
+	encoder := json.NewEncoder(out)
+	encoder.SetEscapeHTML(false)
 	for i, item := range items {
 		if i > 0 {
 			out.WriteString(",")
 		}
-		out.WriteString("\n    {")
-		for j, key := range itemKeys(item) {
-			if j > 0 {
-				out.WriteString(",")
-			}
-			if err := writeJSON(out, key); err != nil {
-				return err
-			}
-			out.WriteString(":")
-			if err := writeJSON(out, item[key]); err != nil {
-				return err
-			}
+		out.WriteString("\n    ")
+		if err := encoder.Encode(item); err != nil {
+			return err
 		}
-		out.WriteString("}")
+		out.Truncate(out.Len() - 1)
 	}
 	if len(items) > 0 {
 		out.WriteString("\n  ")
 	}
-	return nil
-}
-
-func itemKeys(item Item) []string {
-	rank := map[string]int{"id": -2, "type": -1}
-	keys := slices.Sorted(maps.Keys(item))
-	slices.SortStableFunc(keys, func(a, b string) int { return rank[a] - rank[b] })
-	return keys
-}
-
-func writeJSON(out *bytes.Buffer, value any) error {
-	encoder := json.NewEncoder(out)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(value); err != nil {
-		return err
-	}
-	out.Truncate(out.Len() - 1)
 	return nil
 }

@@ -35,5 +35,6 @@ export function useCanvasContexts(draft: DraftContexts) {
     replaceContexts(next.filter((context) => context.type !== 'canvas'))
     setPicks(next.flatMap((context) => (context.type === 'canvas' ? [{ node: context.node, label: context.label }] : [])))
   }, [replaceContexts])
-  return { selection, onSelect, contexts, removeContext: remove, replaceContexts: replace }
+  const placeholder = ['Ask about the canvas', 'Ask about this', 'Ask about these'][Math.min(picks.length, 2)]
+  return { selection, onSelect, contexts, removeContext: remove, replaceContexts: replace, placeholder }
 }

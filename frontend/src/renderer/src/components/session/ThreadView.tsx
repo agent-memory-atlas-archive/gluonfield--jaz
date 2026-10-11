@@ -610,7 +610,7 @@ export function ThreadView({
                 <>
                   {goalStatusVisible ? <GoalStatusBar goal={goal} /> : null}
                   <Composer
-                    placeholder={canvas ? ['Ask about the canvas', 'Ask about this', 'Ask about these'][Math.min(canvasContexts.selection.length, 2)] : placeholder}
+                    placeholder={canvas ? canvasContexts.placeholder : placeholder}
                     streaming={sessionRunning}
                     commands={derived.agentSession?.commands ?? undefined}
                     optionsSlot={<NativeModelOptions options={derived.agentSession?.config_options} running={sessionRunning} pending={config.isPending} onChange={(id, value) => config.mutate({ id, value })} />}

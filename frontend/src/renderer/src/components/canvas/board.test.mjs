@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { applyPatch, changedNodeIds, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
+import { applyPatch, changedNodeIds, innermostSection, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
 
 const view = (nodes, edges = [], files = {}) => ({ version: 'v', dir: '/c', nodes, edges, files, components: {} })
 
@@ -26,24 +26,20 @@ test('optimistic patches follow the server: merge by id, null removes, removed n
   expect(before.nodes[0].x).toBe(0)
 })
 
-test('server views replace the board except items the user is holding', () => {
+test('server views replace the board except selection and an item being resized', () => {
   const server = toFlowNodes(view([
-    { id: 'held', type: 'text', x: 500, y: 500, width: 100, height: 100 },
     { id: 'free', type: 'text', x: 500, y: 500, width: 100, height: 100 },
-    { id: 'dragged', type: 'text', x: 500, y: 500, width: 100, height: 100 },
+    { id: 'resized', type: 'text', x: 500, y: 500, width: 100, height: 100 },
   ]))
   const local = [
-    { ...server[0], position: { x: 1, y: 1 } },
-    { ...server[1], position: { x: 1, y: 1 }, selected: true },
-    { ...server[2], position: { x: 1, y: 1 }, dragging: true },
-    { id: 'unsaved', type: 'text', position: { x: 0, y: 0 }, data: { item: { id: 'unsaved' } } },
+    { ...server[0], position: { x: 1, y: 1 }, selected: true },
+    { ...server[1], width: 300, resizing: true },
+    { id: 'gone', type: 'text', position: { x: 0, y: 0 }, data: { item: { id: 'gone' } } },
   ]
-  const merged = mergeNodes(local, server, new Set(['held', 'unsaved']))
-  expect(merged.map((node) => [node.id, node.position.x, Boolean(node.selected)])).toEqual([
-    ['held', 1, false],
-    ['free', 500, true],
-    ['dragged', 1, false],
-    ['unsaved', 0, false],
+  const merged = mergeNodes(local, server)
+  expect(merged.map((node) => [node.id, node.position.x, node.width, Boolean(node.selected)])).toEqual([
+    ['free', 500, 100, true],
+    ['resized', 500, 300, false],
   ])
 })
 
@@ -69,10 +65,10 @@ test('sections render behind items and edges get sides from geometry unless the 
   ])
 })
 
-test('a file rewritten behind an unchanged node still counts as an agent change', () => {
+test('changes are what differs from what was shown: rewritten files count, field order does not', () => {
   const node = { id: 'pdf', type: 'file', file: 'quote.pdf', x: 0, y: 0, width: 300, height: 400 }
-  const before = view([node, { id: 'note', type: 'text', text: 'a' }], [], { pdf: { path: '/c/quote.pdf', version: '1' } })
-  const after = view([node, { id: 'note', type: 'text', text: 'a' }], [], { pdf: { path: '/c/quote.pdf', version: '2' } })
+  const before = view([node, { id: 'note', type: 'text', text: 'a', x: 1 }], [], { pdf: { path: '/c/quote.pdf', version: '1' } })
+  const after = view([node, { x: 1, text: 'a', type: 'text', id: 'note' }], [], { pdf: { path: '/c/quote.pdf', version: '2' } })
   expect(changedNodeIds(before, after)).toEqual(['pdf'])
   expect(changedNodeIds(after, after)).toEqual([])
 })
@@ -89,4 +85,14 @@ test('a section holds what is centred inside it, never the section around it', (
   const outer = nodes.find((node) => node.id === 'outer')
   expect(sectionContents(inner, nodes).map((node) => node.id)).toEqual(['in', 'straddling'])
   expect(sectionContents(outer, nodes).map((node) => node.id)).toEqual(['inner', 'in', 'straddling', 'out'])
+})
+
+test('the innermost section under a point wins', () => {
+  const sections = [
+    { id: 'outer', rect: { x: 0, y: 0, width: 1000, height: 800 } },
+    { id: 'inner', rect: { x: 100, y: 100, width: 400, height: 300 } },
+  ]
+  expect(innermostSection(sections, 150, 150)?.id).toBe('inner')
+  expect(innermostSection(sections, 700, 150)?.id).toBe('outer')
+  expect(innermostSection(sections, 2000, 150)).toBeUndefined()
 })

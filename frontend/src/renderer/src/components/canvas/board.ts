@@ -102,19 +102,16 @@ export function applyPatch(view: CanvasView, change: CanvasPatch): CanvasView {
   return { ...view, nodes, edges }
 }
 
-// The server owns the board, except for items the user is holding: those keep
-// their local state until the user's own write has come back. Selection and
-// measurements are always local.
-export function mergeNodes(current: BoardNode[], next: BoardNode[], held: Set<string>): BoardNode[] {
+// The server owns the board; selection and measurements stay local, and an
+// item the user is resizing keeps its live geometry.
+export function mergeNodes(current: BoardNode[], next: BoardNode[]): BoardNode[] {
   const local = new Map(current.map((node) => [node.id, node]))
-  const merged = next.map((node) => {
+  return next.map((node) => {
     const mine = local.get(node.id)
     if (!mine) return node
-    if (held.has(node.id) || mine.dragging || mine.resizing) return mine
+    if (mine.resizing) return mine
     return { ...node, selected: mine.selected, measured: mine.measured }
   })
-  const known = new Set(next.map((node) => node.id))
-  return [...merged, ...current.filter((node) => held.has(node.id) && !known.has(node.id))]
 }
 
 export function mergeEdges(current: BoardEdge[], next: BoardEdge[]): BoardEdge[] {
@@ -125,17 +122,30 @@ export function mergeEdges(current: BoardEdge[], next: BoardEdge[]): BoardEdge[]
 // Ids of nodes the new view adds or changes, including files whose content
 // changed behind an unchanged node.
 export function changedNodeIds(previous: CanvasView, next: CanvasView): string[] {
-  const before = new Map(previous.nodes.map((item) => [item.id, JSON.stringify(item)]))
+  const before = new Map(previous.nodes.map((item) => [item.id, item]))
   return next.nodes
-    .filter((item) => before.get(item.id) !== JSON.stringify(item) || previous.files[item.id]?.version !== next.files[item.id]?.version)
+    .filter((item) => !sameItem(before.get(item.id), item) || previous.files[item.id]?.version !== next.files[item.id]?.version)
     .map((item) => item.id)
+}
+
+// The server writes fields in its own order, so compare field by field.
+function sameItem(a: CanvasItem | undefined, b: CanvasItem): boolean {
+  const keys = Object.keys(b)
+  return !!a && Object.keys(a).length === keys.length && keys.every((key) => JSON.stringify(a[key]) === JSON.stringify(b[key]))
+}
+
+// The smallest section that contains the point.
+export function innermostSection<T extends { rect: Rect }>(sections: T[], x: number, y: number): T | undefined {
+  return sections
+    .filter(({ rect }) => containsPoint(rect, x, y))
+    .sort((a, b) => a.rect.width * a.rect.height - b.rect.width * b.rect.height)[0]
 }
 
 export function contains(outer: Rect, inner: Rect): boolean {
   return inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height
 }
 
-export function containsPoint(rect: Rect, x: number, y: number): boolean {
+function containsPoint(rect: Rect, x: number, y: number): boolean {
   return x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height
 }
 

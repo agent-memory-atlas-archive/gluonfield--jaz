@@ -61,8 +61,8 @@ func TestPatchMergesFieldsIntoTheAgentsBoard(t *testing.T) {
 		t.Fatal(err)
 	}
 	lines := strings.Split(string(raw), "\n")
-	if !strings.HasPrefix(strings.TrimSpace(lines[2]), `{"id":"a","type":"text",`) {
-		t.Fatalf("each item should sit on its own line with id and type first:\n%s", raw)
+	if line := strings.TrimSpace(lines[2]); !strings.HasPrefix(line, "{") || !strings.Contains(line, `"id":"a"`) || !strings.Contains(line, `"text":"Agent note"`) {
+		t.Fatalf("each item should sit whole on its own line:\n%s", raw)
 	}
 }
 
