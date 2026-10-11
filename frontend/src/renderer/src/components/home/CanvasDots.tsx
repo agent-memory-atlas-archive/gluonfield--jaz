@@ -15,6 +15,8 @@ const OMEGA = TAU / 600
 const DAMPED = OMEGA * Math.sqrt(1 - DAMPING ** 2)
 const APPEAR_MS = 120
 const FLARE_MS = 80
+const FLARE_ALPHA = 0.75
+const FLARE_GROWTH = 1.4
 const SPREAD_MS = 520
 const JITTER_MS = 80
 const SETTLE_MS = 1100
@@ -22,6 +24,7 @@ const SETTLE_MS = 1100
 const FADE_MS = 250
 
 type Point = { x: number; y: number }
+type Sample = Point & { shown: number; flare: number }
 type Motion = {
   on: boolean
   start: number
@@ -39,19 +42,27 @@ function hash(n: number): number {
   return v - Math.floor(v)
 }
 
-// Where dot i is ms into the motion; returns how visible it is.
-function locate(m: Motion, i: number, tx: number, ty: number, ms: number, out: Point): number {
+// Dot i, ms into the motion: where it is, how visible, and how much it flares.
+function sample(m: Motion, i: number, tx: number, ty: number, ms: number, out: Sample) {
+  out.x = m.sx[i]
+  out.y = m.sy[i]
+  out.flare = 0
+  if (!m.on) {
+    out.shown = m.seen[i] * Math.max(0, 1 - ms / FADE_MS)
+    return
+  }
   const t = ms - m.delay[i]
-  if (!m.on || t <= 0) {
-    out.x = m.sx[i]
-    out.y = m.sy[i]
-    return m.on ? m.seen[i] : m.seen[i] * Math.max(0, 1 - ms / FADE_MS)
+  if (t <= 0) {
+    out.shown = m.seen[i]
+    return
   }
   const decay = Math.exp(-DAMPING * OMEGA * t)
   const settle = decay * (Math.cos(DAMPED * t) + ((DAMPING * OMEGA) / DAMPED) * Math.sin(DAMPED * t))
+  const fresh = 1 - m.seen[i]
   out.x = tx + (m.sx[i] - tx) * settle
   out.y = ty + (m.sy[i] - ty) * settle
-  return m.seen[i] + (1 - m.seen[i]) * Math.min(1, t / APPEAR_MS)
+  out.shown = m.seen[i] + fresh * Math.min(1, t / APPEAR_MS)
+  out.flare = fresh * (t / FLARE_MS) * Math.exp(1 - t / FLARE_MS)
 }
 
 function createField(canvas: HTMLCanvasElement) {
@@ -66,7 +77,7 @@ function createField(canvas: HTMLCanvasElement) {
   let accent = ''
   let raf = 0
   let pointer = { x: 0, y: 0, at: -Infinity }
-  const here = { x: 0, y: 0 }
+  const dot: Sample = { x: 0, y: 0, shown: 0, flare: 0 }
 
   const draw = (now: number) => {
     ctx.clearRect(0, 0, width, height)
@@ -84,23 +95,21 @@ function createField(canvas: HTMLCanvasElement) {
       ctx.fill()
       return
     }
+    const ms = now - motion.start
     let color = ink
     for (let i = 0; i < xs.length; i++) {
-      const ms = now - motion.start
-      const shown = locate(motion, i, xs[i], ys[i], ms, here)
-      if (shown < 0.02) {
+      sample(motion, i, xs[i], ys[i], ms, dot)
+      if (dot.shown < 0.02) {
         continue
       }
-      const t = Math.max(0, ms - motion.delay[i]) / FLARE_MS
-      const flare = motion.on ? (1 - motion.seen[i]) * t * Math.exp(1 - t) : 0
-      const next = flare > 0.1 ? accent : ink
+      const next = dot.flare > 0.1 ? accent : ink
       if (next !== color) {
         color = next
         ctx.fillStyle = color
       }
-      ctx.globalAlpha = ALPHA * shown + (0.75 - ALPHA) * flare
+      ctx.globalAlpha = ALPHA * dot.shown + (FLARE_ALPHA - ALPHA) * dot.flare
       ctx.beginPath()
-      ctx.arc(here.x, here.y, RADIUS * (1 + 1.4 * flare), 0, TAU)
+      ctx.arc(dot.x, dot.y, RADIUS * (1 + FLARE_GROWTH * dot.flare), 0, TAU)
       ctx.fill()
     }
   }
@@ -169,15 +178,16 @@ function createField(canvas: HTMLCanvasElement) {
       const dy = from.y - ys[i]
       const distance = Math.hypot(dx, dy) || 1
       if (motion) {
-        m.seen[i] = locate(motion, i, xs[i], ys[i], now - motion.start, here)
+        sample(motion, i, xs[i], ys[i], now - motion.start, dot)
       } else {
         const drift = on ? 0 : Math.min(DRIFT, distance) / distance
-        here.x = xs[i] + dx * drift
-        here.y = ys[i] + dy * drift
-        m.seen[i] = Number(Boolean(on))
+        dot.x = xs[i] + dx * drift
+        dot.y = ys[i] + dy * drift
+        dot.shown = Number(Boolean(on))
       }
-      m.sx[i] = here.x
-      m.sy[i] = here.y
+      m.sx[i] = dot.x
+      m.sy[i] = dot.y
+      m.seen[i] = dot.shown
       m.delay[i] = next ? (distance / reach) * SPREAD_MS + hash(i) * JITTER_MS : 0
     }
     return m
@@ -237,5 +247,6 @@ export function CanvasDots({ on }: { on: boolean }) {
   useLayoutEffect(() => {
     field.current!.set(on, effects && !reduced)
   }, [on, effects, reduced])
-  return <canvas ref={ref} aria-hidden className="pointer-events-none absolute inset-0 size-full" />
+  // The page's bottom layer: everything else on the page paints over it.
+  return <canvas ref={ref} aria-hidden className="pointer-events-none absolute inset-0 -z-10 size-full" />
 }
