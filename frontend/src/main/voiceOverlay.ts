@@ -8,7 +8,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
   let loaded = false
   let dragOrigin: { x: number; y: number; windowX: number; windowY: number } | null = null
   // Where the pill sits; the transcript below it may push the window up.
-  let top: number | null = null
+  let top = 0
   const throttled = owner.webContents.getBackgroundThrottling()
 
   const present = () => {
@@ -19,11 +19,12 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     if (!overlay) {
       const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
       const size = { width: 380, height: 78 }
+      top = workArea.y + workArea.height - size.height - 20
       overlay = new BrowserWindow({
         title: 'Jaz Voice',
         ...size,
         x: workArea.x + workArea.width - size.width - 20,
-        y: workArea.y + workArea.height - size.height - 20,
+        y: top,
         show: false,
         frame: false,
         transparent: true,
@@ -50,7 +51,6 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
         overlay = null
         loaded = false
         dragOrigin = null
-        top = null
       })
       if (process.env.ELECTRON_RENDERER_URL) {
         void overlay.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -79,8 +79,11 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
       update(next)
     }
   }
+  // The overlay, when the event comes from its own page.
+  const sentByOverlay = (event: IpcMainEvent) =>
+    overlay && event.sender === overlay.webContents && event.senderFrame === overlay.webContents.mainFrame ? overlay : null
   const ready = (event: IpcMainEvent) => {
-    if (event.sender !== overlay?.webContents || event.senderFrame !== overlay.webContents.mainFrame) {
+    if (!sentByOverlay(event)) {
       return
     }
     loaded = true
@@ -88,7 +91,7 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
     present()
   }
   const command = (event: IpcMainEvent, action: VoiceCommand) => {
-    if (!state || event.sender !== overlay?.webContents || event.senderFrame !== overlay.webContents.mainFrame) {
+    if (!state || !sentByOverlay(event)) {
       return
     }
     if (action === 'return') {
@@ -101,7 +104,8 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
   }
   const clear = () => update(null)
   const drag = (event: IpcMainEvent, point: { x: number; y: number } | null) => {
-    if (!state || !overlay || event.sender !== overlay.webContents || event.senderFrame !== overlay.webContents.mainFrame) {
+    const target = sentByOverlay(event)
+    if (!state || !target) {
       return
     }
     if (!point) {
@@ -112,22 +116,22 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
       return
     }
     if (!dragOrigin) {
-      const [windowX, windowY] = overlay.getPosition()
+      const [windowX, windowY] = target.getPosition()
       dragOrigin = { ...point, windowX, windowY }
     } else {
       top = Math.round(dragOrigin.windowY + point.y - dragOrigin.y)
-      overlay.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), top)
+      target.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), top)
     }
   }
   const resize = (event: IpcMainEvent, height: number) => {
-    if (!overlay || event.sender !== overlay.webContents || event.senderFrame !== overlay.webContents.mainFrame || !Number.isFinite(height) || height <= 0) {
+    const target = sentByOverlay(event)
+    if (!target || !Number.isFinite(height) || height <= 0) {
       return
     }
-    const bounds = overlay.getBounds()
+    const bounds = target.getBounds()
     const { workArea } = screen.getDisplayMatching(bounds)
     const next = Math.round(height)
-    top ??= bounds.y
-    overlay.setBounds({ ...bounds, y: Math.max(workArea.y, Math.min(top, workArea.y + workArea.height - next)), height: next })
+    target.setBounds({ ...bounds, y: Math.max(workArea.y, Math.min(top, workArea.y + workArea.height - next)), height: next })
   }
   const navigate = (_event: Electron.Event, _url: string, sameDocument: boolean, mainFrame: boolean) => {
     if (mainFrame && !sameDocument) {

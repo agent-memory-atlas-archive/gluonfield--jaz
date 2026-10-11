@@ -120,8 +120,7 @@ export class VoiceSession {
           const message = recorder.accept(event)
           if (message) {
             this.writer.append(message, event.type === 'transcript_done')
-            const index = this.state.transcript.findIndex((line) => line.id === message.id)
-            this.update({ transcript: index < 0 ? [...this.state.transcript, message].slice(-20) : this.state.transcript.with(index, message) })
+            this.update({ transcript: recorder.lines })
           }
         }
         if (abort.signal.aborted) {

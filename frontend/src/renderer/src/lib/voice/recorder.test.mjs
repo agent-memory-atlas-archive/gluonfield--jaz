@@ -14,6 +14,7 @@ test('native turn.done replaces streamed speech without duplicating overlapping 
   const next = receive({ type: 'input_transcript.added', item: { text: 'And disk size?' } })
   expect(next.id).not.toBe(user.id)
   expect(next.call_id).toBe(user.call_id)
+  expect(recorder.lines).toEqual([userDone, voiceDone, next])
 })
 
 test('public transcript deltas join within a speaker turn and keep the last partial on close', () => {

@@ -1,4 +1,5 @@
 import type { BotAvatar } from '@shared/bots'
+import type { VoiceLine } from '@shared/voice'
 // Mirrors of the Go backend's JSON shapes (backend/internal/storage,
 // sessionevents, server). Field names must match exactly.
 import type { CallToolResult } from '@modelcontextprotocol/client'
@@ -949,11 +950,8 @@ export interface ACPPermission {
   selected_option_id?: string
 }
 
-export interface VoiceMessage {
-  id: string
+export interface VoiceMessage extends VoiceLine {
   call_id: string
-  role: 'user' | 'assistant'
-  text: string
   at: string
 }
 

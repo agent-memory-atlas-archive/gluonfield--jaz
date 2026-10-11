@@ -3,6 +3,8 @@ import type { VoiceEvent } from '@/lib/voice/protocol'
 
 export class VoiceRecorder {
   readonly callId = crypto.randomUUID()
+  // The call's latest turns as they are said, newest last.
+  lines: VoiceMessage[] = []
   private active = new Map<string, VoiceMessage>()
   private lastRole = ''
   private pending: { id: string; role: 'user' | 'assistant'; text: string; at?: number }[] = []
@@ -34,7 +36,12 @@ export class VoiceRecorder {
       this.active.set(event.role, message)
       this.pending.push({ id: message.id, role: event.role, text: event.text, at: event.at })
     }
-    return message.text.trim() ? message : undefined
+    if (!message.text.trim()) {
+      return
+    }
+    const index = this.lines.findIndex((line) => line.id === message.id)
+    this.lines = index < 0 ? [...this.lines, message].slice(-20) : this.lines.with(index, message)
+    return message
   }
 
   request(delegation: Extract<VoiceEvent, { type: 'delegation' }>): { text: string; context: string } | undefined {

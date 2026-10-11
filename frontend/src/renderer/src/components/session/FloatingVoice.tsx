@@ -73,10 +73,12 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
         level={level}
         outputLevel={outputLevel}
         onReturn={onReturn}
-        transcriptShown={transcriptShown}
-        onTranscript={() => {
-          localStorage.setItem(TRANSCRIPT_KEY, String(!transcriptShown))
-          setTranscriptShown(!transcriptShown)
+        transcript={{
+          shown: transcriptShown,
+          toggle: () => {
+            localStorage.setItem(TRANSCRIPT_KEY, String(!transcriptShown))
+            setTranscriptShown(!transcriptShown)
+          },
         }}
       />
       {transcriptShown && voice.transcript.length ? <VoiceTranscript lines={voice.transcript} /> : null}

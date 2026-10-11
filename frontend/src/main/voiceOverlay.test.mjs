@@ -8,8 +8,6 @@ class Window extends EventEmitter {
   focused = true
   throttled = true
   sent = []
-  position = [100, 200]
-  height = 78
   webContents = Object.assign(new EventEmitter(), {
     mainFrame: {},
     getBackgroundThrottling: () => this.throttled,
@@ -19,8 +17,10 @@ class Window extends EventEmitter {
     send: (...message) => this.sent.push(message),
   })
 
-  constructor() {
+  constructor({ x = 100, y = 200, height = 78 } = {}) {
     super()
+    this.position = [x, y]
+    this.height = height
     windows.push(this)
   }
   isFocused() {
@@ -74,7 +74,7 @@ mock.module('electron', () => ({
   ipcMain,
   screen: {
     getCursorScreenPoint: () => ({ x: 0, y: 0 }),
-    getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 1280, height: 800 } }),
+    getDisplayNearestPoint: () => ({ workArea: { x: 0, y: 0, width: 500, height: 298 } }),
     getDisplayMatching: () => ({ workArea: { x: 0, y: 25, width: 1280, height: 775 } }),
   },
 }))

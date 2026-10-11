@@ -34,14 +34,13 @@ export function VoiceMode({ voice, face }: { voice: VoiceHandle; face: Face | nu
 // Voice as one pill: the face of whoever is talking (a bot's own, or Jaz's), a
 // dotted line in its colour that moves with the sound, and the controls,
 // ending in red.
-export function VoicePill({ voice, face, level = 0, outputLevel = 0, onReturn, transcriptShown, onTranscript }: {
+export function VoicePill({ voice, face, level = 0, outputLevel = 0, onReturn, transcript }: {
   voice: VoiceHandle
   face: Face | null
   level?: number
   outputLevel?: number
   onReturn?: () => void
-  transcriptShown?: boolean
-  onTranscript?: () => void
+  transcript?: { shown: boolean; toggle: () => void }
 }) {
   const avatar = face
     ? <BotAvatar avatar={face} size={34} working={voice.phase === 'connecting' || Boolean(voice.activity)} />
@@ -69,8 +68,8 @@ export function VoicePill({ voice, face, level = 0, outputLevel = 0, onReturn, t
       )}
       <VoiceWave voice={voice} color={face ? botInk(face.color) : VOICE_COLOR} level={level} outputLevel={outputLevel} />
       <div data-voice-control className="flex items-center gap-1.5">
-        {onTranscript ? (
-          <PillButton label={transcriptShown ? 'Hide transcript' : 'Show transcript'} pressed={transcriptShown} onClick={onTranscript}>
+        {transcript ? (
+          <PillButton label={transcript.shown ? 'Hide transcript' : 'Show transcript'} pressed={transcript.shown} onClick={transcript.toggle}>
             <MessageSquareText size={17} />
           </PillButton>
         ) : null}
