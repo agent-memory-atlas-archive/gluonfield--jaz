@@ -268,10 +268,11 @@
   color: var(--color-ink-2);
 }
 
+/* Figma's section: slightly rounded, its name tagged inside the top-left corner. */
 .canvas-section {
   position: absolute;
   inset: 0;
-  border-radius: 16px;
+  border-radius: 6px;
   background: var(--canvas-section);
   box-shadow: inset 0 0 0 1px var(--canvas-line);
   transition-property: box-shadow, background-color;
@@ -289,17 +290,16 @@
 
 .canvas-section-label {
   position: absolute;
-  left: 0;
-  bottom: 100%;
-  margin-bottom: 8px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 13px;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12.5px;
   font-weight: 500;
   white-space: nowrap;
   color: var(--color-ink);
-  background: var(--canvas-card);
-  box-shadow: 0 0 0 1px var(--canvas-line);
+  background: color-mix(in oklab, var(--color-ink) 7%, var(--canvas-section));
   cursor: grab;
 }
 
