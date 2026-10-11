@@ -34,7 +34,9 @@ export function BottomDock({
       // out under it.
       className={`pointer-events-none absolute inset-x-0 bottom-0 z-[1] pt-6 pb-5 ${floating ? '' : '[background:linear-gradient(to_bottom,transparent,var(--color-bg)_24px)]'}`}
     >
-      <div className={`pointer-events-none relative ${THREAD_COLUMN_CLASS}`}>
+      {/* Over a canvas the column leaves room for the minimap in the
+          bottom-right corner on both sides, so the composer stays centred. */}
+      <div className={`pointer-events-none relative ${floating ? 'mx-auto max-w-[clamp(400px,calc(100%-480px),var(--thread-max))] px-4' : THREAD_COLUMN_CLASS}`}>
         <div className="pointer-events-auto absolute inset-x-0 bottom-full">{before}</div>
         <div className="pointer-events-auto">
           {children}
