@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { applyPatch, changedNodeIds, innermostSection, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
+import { applyPatch, changedNodeIds, cloneItems, innermostSection, invertPatch, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
 
 const view = (nodes, edges = [], files = {}) => ({ version: 'v', dir: '/c', nodes, edges, files, components: {} })
 
@@ -95,4 +95,35 @@ test('the innermost section under a point wins', () => {
   expect(innermostSection(sections, 150, 150)?.id).toBe('inner')
   expect(innermostSection(sections, 700, 150)?.id).toBe('outer')
   expect(innermostSection(sections, 2000, 150)).toBeUndefined()
+})
+
+test('undo restores what a patch changed and keeps edits made since', () => {
+  const before = view(
+    [
+      { id: 'a', type: 'text', text: 'a', x: 0, y: 0, width: 100, height: 100 },
+      { id: 'b', type: 'text', text: 'b', x: 200, y: 0, width: 100, height: 100 },
+    ],
+    [{ id: 'ab', fromNode: 'a', toNode: 'b' }],
+  )
+  const change = { nodes: [{ id: 'a', x: 40, label: 'moved' }, { id: 'c', type: 'text', x: 0, y: 300 }], remove: ['b'] }
+  const undo = invertPatch(before, change)
+  const after = applyPatch(before, change)
+  const byId = (board) => Object.fromEntries([...board.nodes, ...board.edges].map((item) => [item.id, item]))
+  expect(byId(applyPatch(after, undo))).toEqual(byId(before))
+  const agentEdited = applyPatch(after, { nodes: [{ id: 'a', text: 'agent' }] })
+  expect(byId(applyPatch(agentEdited, undo)).a).toEqual({ ...before.nodes[0], text: 'agent' })
+})
+
+test('copies get fresh ids and keep the connectors among them', () => {
+  const nodes = [
+    { id: 'a', type: 'text', x: 0, y: 0, width: 10, height: 10 },
+    { id: 'b', type: 'group', x: 50, y: 0, width: 10, height: 10 },
+  ]
+  const copy = cloneItems(nodes, [{ id: 'ab', fromNode: 'a', toNode: 'b', label: 'next' }], 24, 24)
+  const ids = copy.nodes.map((node) => node.id)
+  expect(ids).not.toContain('a')
+  expect(ids).not.toContain('b')
+  expect(copy.nodes.map((node) => [node.type, node.x, node.y])).toEqual([['text', 24, 24], ['group', 74, 24]])
+  expect(copy.edges).toEqual([{ id: copy.edges[0].id, fromNode: ids[0], toNode: ids[1], label: 'next' }])
+  expect(copy.edges[0].id).not.toBe('ab')
 })

@@ -29,6 +29,7 @@ import {
   itemLabel,
   mergeEdges,
   mergeNodes,
+  newId,
   rectOfNode,
   padded,
   rounded,
@@ -46,6 +47,7 @@ import { CanvasDock, type Tool } from './CanvasDock'
 import { ConnectorEdge, FileNode, GroupNode, LinkNode, TextNode } from './CanvasNodes'
 import { FIT, useAgentFollow } from './useAgentFollow'
 import type { CanvasPick } from './useCanvasContexts'
+import { typing, useCanvasEditing } from './useCanvasEditing'
 import { useCanvasSync } from './useCanvasSync'
 import { useSectionDrag } from './useSectionDrag'
 
@@ -70,16 +72,13 @@ export function ThreadCanvas(props: Props) {
   )
 }
 
-function newId(kind: string): string {
-  return `${kind}-${Date.now().toString(36)}`
-}
-
 function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
   const flow = useReactFlow<BoardNode, BoardEdge>()
   const { zoom } = useViewport()
   const theme = useArtifactThemeCSS()
   const container = useRef<HTMLDivElement>(null)
-  const { view, local, commit, error } = useCanvasSync(sessionId, working)
+  const { view, local, commit, replay, error } = useCanvasSync(sessionId, working)
+  useCanvasEditing({ local, commit, replay, onSelect, container })
   const { flash, news, show, touch } = useAgentFollow(view, local, container)
   const [nodes, setNodes, onNodesChange] = useNodesState<BoardNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<BoardEdge>([])
@@ -178,8 +177,9 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
   }
 
   const onKey = useEffectEvent((event: KeyboardEvent) => {
-    const target = event.target as HTMLElement
-    if (event.defaultPrevented || target.closest('input, textarea, [contenteditable="true"]')) return
+    if (event.defaultPrevented || typing(event.target)) {
+      return
+    }
     if (event.key === 'Escape') {
       setFocused(null)
       setTool('select')

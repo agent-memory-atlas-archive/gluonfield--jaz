@@ -102,6 +102,41 @@ export function applyPatch(view: CanvasView, change: CanvasPatch): CanvasView {
   return { ...view, nodes, edges }
 }
 
+// The patch that undoes `change` on `view`: changed fields get their old
+// values back, removed items return with their connectors, added ones go.
+export function invertPatch(view: CanvasView, change: CanvasPatch): CanvasPatch {
+  const after = applyPatch(view, change)
+  const restore = (before: CanvasItem[], now: CanvasItem[], changes: Partial<CanvasItem>[] = []) => {
+    const present = new Set(now.map((item) => item.id))
+    const changed = new Map(changes.map((fields) => [fields.id, fields]))
+    const back = before.flatMap<Partial<CanvasItem>>((item) => {
+      if (!present.has(item.id)) {
+        return [item]
+      }
+      const fields = changed.get(item.id)
+      return fields ? [Object.fromEntries(Object.keys(fields).map((key) => [key, item[key] ?? null]))] : []
+    })
+    const existed = new Set(before.map((item) => item.id))
+    return { back, added: now.filter((item) => !existed.has(item.id)).map((item) => item.id) }
+  }
+  const nodes = restore(view.nodes, after.nodes, change.nodes)
+  const edges = restore(view.edges, after.edges, change.edges)
+  return { nodes: nodes.back, edges: edges.back, remove: [...nodes.added, ...edges.added] }
+}
+
+export function newId(kind: string): string {
+  return `${kind}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+// The items again under fresh ids, moved by (dx, dy), connectors following.
+export function cloneItems(nodes: CanvasItem[], edges: CanvasItem[], dx: number, dy: number): CanvasPatch {
+  const ids = new Map(nodes.map((item) => [item.id, newId(String(item.type))]))
+  return {
+    nodes: nodes.map((item) => ({ ...item, id: ids.get(item.id), x: Math.round(rectOfItem(item).x + dx), y: Math.round(rectOfItem(item).y + dy) })),
+    edges: edges.map((edge) => ({ ...edge, id: newId('edge'), fromNode: ids.get(edge.fromNode as string), toNode: ids.get(edge.toNode as string) })),
+  }
+}
+
 // The server owns the board; selection and measurements stay local, and an
 // item the user is resizing keeps its live geometry.
 export function mergeNodes(current: BoardNode[], next: BoardNode[]): BoardNode[] {
