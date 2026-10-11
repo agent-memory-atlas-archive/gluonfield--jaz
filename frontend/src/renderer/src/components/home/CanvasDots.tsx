@@ -7,16 +7,17 @@ const PITCH = 22
 const RADIUS = 1.35
 const ALPHA = 0.18
 const TAU = Math.PI * 2
-// On the way in each dot starts a little towards the switch and springs into
-// its slot as it fades in; dots nearer the switch start first.
-const DRIFT = 36
-const DAMPING = 0.7
+// On the way in each dot starts towards the switch and springs into its slot,
+// flaring in the accent as it lands; dots nearer the switch start first.
+const DRIFT = 90
+const DAMPING = 0.55
 const OMEGA = TAU / 600
 const DAMPED = OMEGA * Math.sqrt(1 - DAMPING ** 2)
-const APPEAR_MS = 220
-const SPREAD_MS = 420
+const APPEAR_MS = 120
+const FLARE_MS = 80
+const SPREAD_MS = 520
 const JITTER_MS = 80
-const SETTLE_MS = 900
+const SETTLE_MS = 1100
 // On the way out the dots fade where they are.
 const FADE_MS = 250
 
@@ -62,6 +63,7 @@ function createField(canvas: HTMLCanvasElement) {
   let on: boolean | undefined
   let motion: Motion | null = null
   let ink = ''
+  let accent = ''
   let raf = 0
   let pointer = { x: 0, y: 0, at: -Infinity }
   const here = { x: 0, y: 0 }
@@ -82,14 +84,23 @@ function createField(canvas: HTMLCanvasElement) {
       ctx.fill()
       return
     }
+    let color = ink
     for (let i = 0; i < xs.length; i++) {
-      const shown = locate(motion, i, xs[i], ys[i], now - motion.start, here)
+      const ms = now - motion.start
+      const shown = locate(motion, i, xs[i], ys[i], ms, here)
       if (shown < 0.02) {
         continue
       }
-      ctx.globalAlpha = ALPHA * shown
+      const t = Math.max(0, ms - motion.delay[i]) / FLARE_MS
+      const flare = motion.on ? (1 - motion.seen[i]) * t * Math.exp(1 - t) : 0
+      const next = flare > 0.1 ? accent : ink
+      if (next !== color) {
+        color = next
+        ctx.fillStyle = color
+      }
+      ctx.globalAlpha = ALPHA * shown + (0.75 - ALPHA) * flare
       ctx.beginPath()
-      ctx.arc(here.x, here.y, RADIUS, 0, TAU)
+      ctx.arc(here.x, here.y, RADIUS * (1 + 1.4 * flare), 0, TAU)
       ctx.fill()
     }
   }
@@ -128,7 +139,9 @@ function createField(canvas: HTMLCanvasElement) {
   }
 
   const recolor = () => {
-    ink = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim()
+    const style = getComputedStyle(document.documentElement)
+    ink = style.getPropertyValue('--color-ink').trim()
+    accent = style.getPropertyValue('--color-primary').trim()
     if (!motion) {
       draw(performance.now())
     }
@@ -205,7 +218,7 @@ function createField(canvas: HTMLCanvasElement) {
   }
 }
 
-// The canvas's dot grid behind the new-thread composer. Turning it on settles
+// The canvas's dot grid behind the new-thread composer. Turning it on sweeps
 // the dots into place in a wave from the switch; turning it off fades them.
 export function CanvasDots({ on }: { on: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
