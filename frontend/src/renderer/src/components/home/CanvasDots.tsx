@@ -6,38 +6,30 @@ import { useTheme } from '@/lib/theme'
 const PITCH = 22
 const RADIUS = 1.35
 const ALPHA = 0.18
-const HUES = 48
 const TAU = Math.PI * 2
-// On the way in each dot is a damped spring pulled to its slot; launches
-// spread out so the grid fills outward from the switch.
-const DAMPING = 0.8
+// On the way in each dot starts a little towards the switch and springs into
+// its slot as it fades in; dots nearer the switch start first.
+const DRIFT = 36
+const DAMPING = 0.7
 const OMEGA = TAU / 600
 const DAMPED = OMEGA * Math.sqrt(1 - DAMPING ** 2)
-const SPREAD_MS = 380
-const JITTER_MS = 60
-const SETTLE_MS = 1100
-// On the way out the dots spiral into the switch.
-const GATHER_MS = 180
-const SUCK_MS = 260
-const SWIRL = 0.9
-// Fast dots draw as short comets: a tail along the last stretch of their path.
-const TRAIL_MS = 14
-const TAIL = 12
+const APPEAR_MS = 220
+const SPREAD_MS = 420
+const JITTER_MS = 80
+const SETTLE_MS = 900
+// On the way out the dots fade where they are.
+const FADE_MS = 250
 
 type Point = { x: number; y: number }
 type Motion = {
   on: boolean
   start: number
   end: number
-  origin: Point
   // Where each dot was and how visible when the motion began.
   sx: Float32Array
   sy: Float32Array
   seen: Float32Array
   delay: Float32Array
-  vx: Float32Array
-  vy: Float32Array
-  hue: Uint8Array
 }
 
 // A stable pseudo-random number in [0, 1) per dot.
@@ -49,42 +41,16 @@ function hash(n: number): number {
 // Where dot i is ms into the motion; returns how visible it is.
 function locate(m: Motion, i: number, tx: number, ty: number, ms: number, out: Point): number {
   const t = ms - m.delay[i]
-  if (t <= 0) {
+  if (!m.on || t <= 0) {
     out.x = m.sx[i]
     out.y = m.sy[i]
-    return m.seen[i]
+    return m.on ? m.seen[i] : m.seen[i] * Math.max(0, 1 - ms / FADE_MS)
   }
-  if (m.on) {
-    const dx = m.sx[i] - tx
-    const dy = m.sy[i] - ty
-    const decay = Math.exp(-DAMPING * OMEGA * t)
-    const cos = Math.cos(DAMPED * t)
-    const sin = Math.sin(DAMPED * t) / DAMPED
-    out.x = tx + decay * (dx * cos + (m.vx[i] + DAMPING * OMEGA * dx) * sin)
-    out.y = ty + decay * (dy * cos + (m.vy[i] + DAMPING * OMEGA * dy) * sin)
-    return 1
-  }
-  const u = Math.min(1, t / SUCK_MS)
-  const rx = m.sx[i] - m.origin.x
-  const ry = m.sy[i] - m.origin.y
-  const pull = 1 - u * u
-  const turn = SWIRL * u * u
-  out.x = m.origin.x + pull * (rx * Math.cos(turn) - ry * Math.sin(turn))
-  out.y = m.origin.y + pull * (rx * Math.sin(turn) + ry * Math.cos(turn))
-  return m.seen[i] * (1 - u ** 4)
-}
-
-// The theme's rainbow around a circle, so a dot's colour follows its heading.
-function prism(): string[] {
-  const style = getComputedStyle(document.documentElement)
-  const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!
-  const gradient = ctx.createLinearGradient(0, 0, HUES, 0)
-  const stops = [1, 2, 3, 4, 5, 1].map((i) => style.getPropertyValue(`--color-rainbow-${i}`).trim())
-  stops.forEach((color, i) => gradient.addColorStop(i / (stops.length - 1), color))
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, 0, HUES, 1)
-  const data = ctx.getImageData(0, 0, HUES, 1).data
-  return Array.from({ length: HUES }, (_, i) => `rgb(${data[i * 4]} ${data[i * 4 + 1]} ${data[i * 4 + 2]})`)
+  const decay = Math.exp(-DAMPING * OMEGA * t)
+  const settle = decay * (Math.cos(DAMPED * t) + ((DAMPING * OMEGA) / DAMPED) * Math.sin(DAMPED * t))
+  out.x = tx + (m.sx[i] - tx) * settle
+  out.y = ty + (m.sy[i] - ty) * settle
+  return m.seen[i] + (1 - m.seen[i]) * Math.min(1, t / APPEAR_MS)
 }
 
 function createField(canvas: HTMLCanvasElement) {
@@ -96,63 +62,35 @@ function createField(canvas: HTMLCanvasElement) {
   let on: boolean | undefined
   let motion: Motion | null = null
   let ink = ''
-  let hues: string[] = []
   let raf = 0
   let pointer = { x: 0, y: 0, at: -Infinity }
   const here = { x: 0, y: 0 }
-  const back = { x: 0, y: 0 }
-
-  const flat = () => {
-    ctx.globalAlpha = ALPHA
-    ctx.fillStyle = ink
-    ctx.beginPath()
-    for (let i = 0; i < xs.length; i++) {
-      ctx.moveTo(xs[i] + RADIUS, ys[i])
-      ctx.arc(xs[i], ys[i], RADIUS, 0, TAU)
-    }
-    ctx.fill()
-  }
-
-  // Moving dots streak in the rainbow by heading; slowing down, they turn
-  // back into grey dots.
-  const moving = (m: Motion, ms: number) => {
-    ctx.lineCap = 'round'
-    let color = ''
-    for (let i = 0; i < xs.length; i++) {
-      const shown = locate(m, i, xs[i], ys[i], ms, here)
-      if (shown < 0.02) {
-        continue
-      }
-      locate(m, i, xs[i], ys[i], ms - TRAIL_MS, back)
-      const travelled = Math.hypot(here.x - back.x, here.y - back.y)
-      const glow = Math.min(1, travelled / TRAIL_MS / 1.5)
-      const next = glow > 0.15 ? hues[m.hue[i]] : ink
-      if (next !== color) {
-        color = next
-        ctx.fillStyle = color
-        ctx.strokeStyle = color
-      }
-      ctx.globalAlpha = shown * (ALPHA + (0.75 - ALPHA) * glow)
-      ctx.beginPath()
-      if (glow > 0.15) {
-        const tail = Math.min(TAIL, travelled) / travelled
-        ctx.lineWidth = RADIUS * 2
-        ctx.moveTo(here.x + (back.x - here.x) * tail, here.y + (back.y - here.y) * tail)
-        ctx.lineTo(here.x, here.y)
-        ctx.stroke()
-      } else {
-        ctx.arc(here.x, here.y, RADIUS, 0, TAU)
-        ctx.fill()
-      }
-    }
-  }
 
   const draw = (now: number) => {
     ctx.clearRect(0, 0, width, height)
-    if (motion) {
-      moving(motion, now - motion.start)
-    } else if (on) {
-      flat()
+    ctx.fillStyle = ink
+    if (!motion) {
+      if (!on) {
+        return
+      }
+      ctx.globalAlpha = ALPHA
+      ctx.beginPath()
+      for (let i = 0; i < xs.length; i++) {
+        ctx.moveTo(xs[i] + RADIUS, ys[i])
+        ctx.arc(xs[i], ys[i], RADIUS, 0, TAU)
+      }
+      ctx.fill()
+      return
+    }
+    for (let i = 0; i < xs.length; i++) {
+      const shown = locate(motion, i, xs[i], ys[i], now - motion.start, here)
+      if (shown < 0.02) {
+        continue
+      }
+      ctx.globalAlpha = ALPHA * shown
+      ctx.beginPath()
+      ctx.arc(here.x, here.y, RADIUS, 0, TAU)
+      ctx.fill()
     }
   }
 
@@ -191,7 +129,6 @@ function createField(canvas: HTMLCanvasElement) {
 
   const recolor = () => {
     ink = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim()
-    hues = prism()
     if (!motion) {
       draw(performance.now())
     }
@@ -207,41 +144,29 @@ function createField(canvas: HTMLCanvasElement) {
     return { x: (pointer.x - rect.left) / zoom(), y: (pointer.y - rect.top) / zoom() }
   }
 
-  // Every dot starts the new motion where the last one left it: hidden in the
-  // switch, resting in its slot, or anywhere in between.
+  // Every dot starts the new motion where the last one left it; a hidden dot
+  // starts a little towards the switch.
   const launch = (next: boolean, now: number): Motion => {
     const from = origin()
     const reach = Math.max(Math.hypot(from.x, from.y), Math.hypot(width - from.x, from.y), Math.hypot(from.x, height - from.y), Math.hypot(width - from.x, height - from.y))
     const n = xs.length
-    const m: Motion = { on: next, start: now, end: 0, origin: from, sx: new Float32Array(n), sy: new Float32Array(n), seen: new Float32Array(n), delay: new Float32Array(n), vx: new Float32Array(n), vy: new Float32Array(n), hue: new Uint8Array(n) }
+    const m: Motion = { on: next, start: now, end: next ? SPREAD_MS + JITTER_MS + SETTLE_MS : FADE_MS, sx: new Float32Array(n), sy: new Float32Array(n), seen: new Float32Array(n), delay: new Float32Array(n) }
     for (let i = 0; i < n; i++) {
+      const dx = from.x - xs[i]
+      const dy = from.y - ys[i]
+      const distance = Math.hypot(dx, dy) || 1
       if (motion) {
         m.seen[i] = locate(motion, i, xs[i], ys[i], now - motion.start, here)
       } else {
-        const spread = hash(i + 31) * TAU
-        here.x = on ? xs[i] : from.x + Math.cos(spread) * 6
-        here.y = on ? ys[i] : from.y + Math.sin(spread) * 6
+        const drift = on ? 0 : Math.min(DRIFT, distance) / distance
+        here.x = xs[i] + dx * drift
+        here.y = ys[i] + dy * drift
         m.seen[i] = Number(Boolean(on))
       }
       m.sx[i] = here.x
       m.sy[i] = here.y
-      const heading = next ? Math.atan2(ys[i] - from.y, xs[i] - from.x) : Math.atan2(here.y - from.y, here.x - from.x)
-      m.hue[i] = Math.floor(((heading / TAU + 1) % 1) * HUES)
-      if (next) {
-        // Launched towards the slot but off line, so the paths curve.
-        const dx = xs[i] - here.x
-        const dy = ys[i] - here.y
-        const angle = (hash(i) - 0.5) * 1.8
-        const speed = Math.hypot(dx, dy) * OMEGA * 1.1
-        const length = Math.hypot(dx, dy) || 1
-        m.vx[i] = ((dx * Math.cos(angle) - dy * Math.sin(angle)) / length) * speed
-        m.vy[i] = ((dx * Math.sin(angle) + dy * Math.cos(angle)) / length) * speed
-        m.delay[i] = (Math.hypot(xs[i] - from.x, ys[i] - from.y) / reach) * SPREAD_MS + hash(i + 7) * JITTER_MS
-      } else {
-        m.delay[i] = (1 - Math.hypot(here.x - from.x, here.y - from.y) / reach) * GATHER_MS + hash(i + 7) * JITTER_MS
-      }
+      m.delay[i] = next ? (distance / reach) * SPREAD_MS + hash(i) * JITTER_MS : 0
     }
-    m.end = next ? SPREAD_MS + JITTER_MS + SETTLE_MS : GATHER_MS + JITTER_MS + SUCK_MS
     return m
   }
 
@@ -280,9 +205,8 @@ function createField(canvas: HTMLCanvasElement) {
   }
 }
 
-// The canvas's dot grid behind the new-thread composer. Turning it on bursts
-// the dots out of the switch into their places; turning it off spirals them
-// back in.
+// The canvas's dot grid behind the new-thread composer. Turning it on settles
+// the dots into place in a wave from the switch; turning it off fades them.
 export function CanvasDots({ on }: { on: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const field = useRef<ReturnType<typeof createField>>(null)
