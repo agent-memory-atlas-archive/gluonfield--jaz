@@ -52,8 +52,6 @@
   z-index: 5;
 }
 
-/* Names keep their on-screen size at any zoom, as in Figma; --canvas-zoom
- * is the viewport zoom. */
 .canvas-item-label {
   position: absolute;
   left: 2px;
@@ -62,13 +60,11 @@
   align-items: center;
   gap: 6px;
   width: max-content;
-  max-width: calc(100% * var(--canvas-zoom, 1));
-  padding-bottom: 7px;
+  max-width: 100%;
+  margin-bottom: 7px;
   font-size: 12px;
   white-space: nowrap;
   color: var(--color-ink-2);
-  scale: calc(1 / var(--canvas-zoom, 1));
-  transform-origin: 0 100%;
 }
 
 .canvas-badge {
@@ -272,7 +268,20 @@
   color: var(--color-ink-2);
 }
 
-/* Figma's frame: slightly rounded, its name in small text above the top-left corner. */
+/* Figma's frame: slightly rounded, its name in small text above the top-left
+ * corner. Corner and name keep their on-screen size at any zoom (--canvas-zoom
+ * is the viewport zoom). React Flow's own square border and focus ring on
+ * group nodes are removed so only this shape shows. */
+.canvas .react-flow__node-group,
+.canvas .react-flow__node-group.selected,
+.canvas .react-flow__node-group:focus,
+.canvas .react-flow__node-group:focus-visible {
+  border: 0;
+  background: none;
+  box-shadow: none;
+  outline: none;
+}
+
 .canvas-section {
   position: absolute;
   inset: 0;
