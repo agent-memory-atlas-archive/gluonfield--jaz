@@ -61,7 +61,7 @@ interface Props {
 
 const nodeTypes = { text: TextNode, file: FileNode, link: LinkNode, group: GroupNode }
 const edgeTypes = { connector: ConnectorEdge }
-const FIT = { padding: { top: '56px', bottom: '56px', left: '88px', right: '56px' } } as const
+const FIT = { padding: { top: '56px', bottom: '96px', left: '56px', right: '56px' } } as const
 // After this long without input the camera may follow the agent's edits.
 const IDLE_MS = 3000
 const HINTS: Record<string, string> = { link: 'Use the page', cad: 'Drag to rotate, scroll to zoom', dxf: 'Drag to pan, scroll to zoom', pdf: 'Scroll and use the page controls' }
