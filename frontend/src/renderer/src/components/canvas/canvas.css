@@ -629,61 +629,6 @@
   background: var(--canvas-accent);
 }
 
-.canvas-pill {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 44px;
-  padding: 0 14px 0 6px;
-  border-radius: 14px;
-  background: var(--canvas-card);
-  box-shadow: var(--canvas-float);
-}
-
-/* Centred on the traffic lights (Electron trafficLightPosition y 13). */
-.canvas-pill.beside-traffic-lights {
-  top: 4px;
-  left: 84px;
-  height: 32px;
-  border-radius: 11px;
-}
-
-.canvas-pill-menu {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 32px;
-  padding: 0 6px 0 8px;
-  border-radius: 9px;
-  color: var(--color-ink-2);
-}
-
-.canvas-pill-menu:hover {
-  color: var(--color-ink);
-  background: var(--color-list-hover);
-}
-
-.canvas-pill-mark {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-ink);
-}
-
-.canvas-pill-name {
-  max-width: 280px;
-  overflow: hidden;
-  padding-left: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--color-ink);
-}
-
 /* The agent just changed this item. */
 .canvas-flash {
   position: absolute;

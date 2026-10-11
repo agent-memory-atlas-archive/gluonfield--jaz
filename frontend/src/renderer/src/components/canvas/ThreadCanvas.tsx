@@ -48,13 +48,11 @@ import {
 } from './board'
 import { CanvasContext, type CanvasBoard } from './canvasContext'
 import { CanvasDock, type Tool } from './CanvasDock'
-import { CanvasPill } from './CanvasPill'
 import { ConnectorEdge, FileNode, GroupNode, LinkNode, TextNode } from './CanvasNodes'
 import type { CanvasPick } from './useCanvasContexts'
 
 interface Props {
   sessionId: string
-  name: string
   working: boolean
   // Height of the floating composer, which the overview card sits above.
   dockHeight: number
@@ -86,7 +84,7 @@ function pointerOf(event: MouseEvent | TouchEvent) {
   return 'changedTouches' in event ? event.changedTouches[0] : event
 }
 
-function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPrompt }: Props) {
+function Board({ sessionId, working, dockHeight, selection, onSelect, onPrompt }: Props) {
   const flow = useReactFlow<BoardNode, BoardEdge>()
   const { zoom } = useViewport()
   const queryClient = useQueryClient()
@@ -478,7 +476,6 @@ function Board({ sessionId, name, working, dockHeight, selection, onSelect, onPr
         </div>
       ) : null}
 
-      <CanvasPill name={name} />
       <CanvasDock tool={tool} onTool={chooseTool} />
 
       {focusedItem ? (

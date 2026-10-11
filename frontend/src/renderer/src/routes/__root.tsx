@@ -24,8 +24,7 @@ import { ChatPanel } from '@/components/sidebar/ChatPanel'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { TitlebarNavigation } from '@/components/sidebar/TitlebarNavigation'
 import { ToastProvider } from '@/components/ui/toast'
-import { AppChrome } from '@/lib/chrome'
-import { clientRuntime, isMacDesktop } from '@/lib/clientRuntime'
+import { clientRuntime } from '@/lib/clientRuntime'
 import { SidebarVisibility } from '@/lib/sidebar'
 import { VoiceProvider } from '@/lib/voice/VoiceProvider'
 import { GlobalVoice } from '@/components/session/FloatingVoice'
@@ -103,6 +102,7 @@ const SIDEBAR_WIDTH_KEY = 'jaz.sidebarWidth'
 // native titlebar and redraws its own; the toggle and content header clear
 // them there. The browser client (even on a Mac) keeps the OS title bar, so
 // there is nothing at the window's top-left to dodge.
+const isMacDesktop = clientRuntime.kind === 'electron' && /Mac/.test(navigator.platform)
 
 const clampSidebarWidth = (w: number) =>
   Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(w)))
@@ -127,7 +127,6 @@ function RootLayout() {
   const [resizing, setResizing] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [chromeHidden, setChromeHidden] = useState(false)
 
   // Settings open-state is derived from the URL, not local state. lastSection
   // lets the sidebar button reopen the pane the user last viewed.
@@ -278,52 +277,48 @@ function RootLayout() {
     <TitlebarProvider>
       <ToastProvider>
         <div className="app-chrome flex h-full flex-col">
-          {chromeHidden ? null : (
-            <div className="titlebar-drag flex h-[52px] shrink-0 items-center pr-3 sm:h-10">
-              {/* The controls' column stretches to the panel edge so the page
-                  title starts over the content, not over the thread list. */}
-              <motion.div
-                className={`flex shrink-0 items-center ${hasPanel ? '' : 'min-w-0!'}`}
-                style={{ paddingLeft: isMacDesktop && !isMobile ? 80 : 8 }}
-                initial={false}
-                animate={{ minWidth: `${panelEdge}px` }}
-                transition={slide}
-              >
-                <TitlebarNavigation
-                  hasPanel={hasPanel}
-                  panelOpen={panelOpen}
-                  isMobile={isMobile}
-                  onToggleSidebar={() => setSidebarOpen((open) => !open)}
-                  onNavigate={handleBrowserNavigation}
-                />
-              </motion.div>
-              {/* Settings covers the page, so the page's own title and actions go too. */}
-              {!settingsOpen && (
-                <>
-                  <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 flex-1 items-center gap-1.5">
-                    <TitlebarSlotOutlet />
-                  </div>
-                  <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
-                    <TitlebarActionsOutlet />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          <div className="titlebar-drag flex h-[52px] shrink-0 items-center pr-3 sm:h-10">
+            {/* The controls' column stretches to the panel edge so the page
+                title starts over the content, not over the thread list. */}
+            <motion.div
+              className={`flex shrink-0 items-center ${hasPanel ? '' : 'min-w-0!'}`}
+              style={{ paddingLeft: isMacDesktop && !isMobile ? 80 : 8 }}
+              initial={false}
+              animate={{ minWidth: `${panelEdge}px` }}
+              transition={slide}
+            >
+              <TitlebarNavigation
+                hasPanel={hasPanel}
+                panelOpen={panelOpen}
+                isMobile={isMobile}
+                onToggleSidebar={() => setSidebarOpen((open) => !open)}
+                onNavigate={handleBrowserNavigation}
+              />
+            </motion.div>
+            {/* Settings covers the page, so the page's own title and actions go too. */}
+            {!settingsOpen && (
+              <>
+                <div id="titlebar-slot" className="relative z-shell ml-3 flex min-w-0 flex-1 items-center gap-1.5">
+                  <TitlebarSlotOutlet />
+                </div>
+                <div id="titlebar-actions" className="relative z-shell ml-auto flex min-w-0 items-center gap-1.5">
+                  <TitlebarActionsOutlet />
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="flex min-h-0 flex-1">
-            {chromeHidden ? null : <NavRail tab={tab} onOpenSettings={() => openSettings()} />}
+            <NavRail tab={tab} onOpenSettings={() => openSettings()} />
             <div
-              className={`relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg transition-[margin,border-radius] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none ${
-                chromeHidden
-                  ? ''
-                  : pathname === '/new' && !settingsOpen
-                    ? 'sm:m-4 sm:rounded-3xl sm:border'
-                    : 'sm:mr-[3px] sm:mb-[3px] sm:rounded-card sm:border'
+              className={`relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg transition-[margin,border-radius] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none sm:border ${
+                pathname === '/new' && !settingsOpen
+                  ? 'sm:m-4 sm:rounded-3xl'
+                  : 'sm:mr-[3px] sm:mb-[3px] sm:rounded-card'
               }`}
             >
               <motion.div
-                className={`shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full! ${hasPanel && !chromeHidden ? '' : 'hidden'}`}
+                className={`shrink-0 overflow-hidden max-sm:absolute max-sm:inset-y-0 max-sm:left-0 max-sm:z-drawer max-sm:w-full! ${hasPanel ? '' : 'hidden'}`}
                 initial={false}
                 animate={drawerSlide({ isMobile, open: sidebarOpen, side: 'left', width: sidebarWidth })}
                 transition={slide}
@@ -355,9 +350,7 @@ function RootLayout() {
 
               <main className={`scrollbar-quiet min-w-0 flex-1 overflow-y-auto ${onBoard ? 'bg-surface' : 'bg-bg'}`}>
                 <SidebarVisibility.Provider value={setSidebarOpen}>
-                  <AppChrome.Provider value={setChromeHidden}>
-                    <Outlet />
-                  </AppChrome.Provider>
+                  <Outlet />
                 </SidebarVisibility.Provider>
               </main>
 

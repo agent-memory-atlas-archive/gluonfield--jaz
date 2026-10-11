@@ -3,7 +3,7 @@ import { usePrefetchQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useLocation, useNavigate } from '@tanstack/react-router'
 import { ArrowDown, Play } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { type ReactNode, type RefObject, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BottomDock } from '@/components/session/BottomDock'
 import { UserBubble } from '@/components/session/Bubble'
 import { Composer, PlanDecisionCard } from '@/components/session/Composer'
@@ -13,7 +13,6 @@ import { SelectionContextToolbar } from '@/components/session/SelectionContextTo
 import { useComposerContexts } from '@/components/session/useComposerContexts'
 import { ThreadCanvas } from '@/components/canvas/ThreadCanvas'
 import { useCanvasContexts } from '@/components/canvas/useCanvasContexts'
-import { AppChrome } from '@/lib/chrome'
 import { FileReaderLinkProvider, MessageMarkdown, PreviewLinkProvider } from '@/components/session/MessageMarkdown'
 import { SessionErrorNotice, type SessionErrorAction } from '@/components/session/SessionErrorNotice'
 import { SessionLivenessIndicator } from '@/components/session/SessionLivenessIndicator'
@@ -45,7 +44,6 @@ import {
   answerSessionInteractiveResponse,
   cancelSession,
   clearSessionGoal,
-  projectsQuery,
   sendSessionSideChat,
   sessionEventsQuery,
   sessionOverviewQuery,
@@ -349,13 +347,6 @@ export function ThreadView({
   })
   const canvasContexts = useCanvasContexts(composerContexts)
   const canvas = detail.data?.session.runtime_ref?.artifact_surface === 'canvas'
-  const hideChrome = useContext(AppChrome)
-  useEffect(() => {
-    if (!canvas) return
-    hideChrome?.(true)
-    return () => hideChrome?.(false)
-  }, [canvas, hideChrome])
-  const projects = useQuery({ ...projectsQuery, enabled: canvas })
 
   useEffect(() => {
     if (seenRequestedRef.current) return
@@ -433,8 +424,6 @@ export function ThreadView({
   const visibleSessionError = sessionError || live?.error?.trim() || ''
   const sessionErrorContext = [session.model_provider, session.model].filter(Boolean).join(' · ')
   const isACP = session.runtime === 'acp'
-  const projectPath = session.runtime_ref?.project_path || session.runtime_ref?.cwd
-  const canvasName = projects.data?.find((project) => project.path === projectPath)?.name || session.title || 'Canvas'
   // Covers turns started elsewhere (parent-triggered, or refresh mid-turn).
   const sessionRunning = queue.sessionRunning
   const pendingSteer = session.pending_steer_message
@@ -470,16 +459,14 @@ export function ThreadView({
         {/* Phone: the closed side panel slides off to the right (translateX 100%);
             clip horizontal overflow so it can't be revealed by scrolling. */}
         <FileDropScope ref={sidePanel.containerRef} className="relative flex h-full max-sm:overflow-x-clip">
-          {canvas ? null : (
-            <SessionTitlebar
-              session={session}
-              isMobile={isMobile}
-              panel={sidePanel}
-              sideChatAvailable={sideChatAvailable}
-              header={header}
-              overviewLabel={details ? 'Details' : undefined}
-            />
-          )}
+          <SessionTitlebar
+            session={session}
+            isMobile={isMobile}
+            panel={sidePanel}
+            sideChatAvailable={sideChatAvailable}
+            header={header}
+            overviewLabel={details ? 'Details' : undefined}
+          />
           {/* Phone: the open panel covers the chat full-width, so the only
               non-panel area left is the title bar. This catches taps on its empty
               space (the header controls sit above it) to dismiss the panel. */}
@@ -490,7 +477,7 @@ export function ThreadView({
 
           <div className="relative h-full min-w-0 flex-1">
             {canvas ? (
-              <ThreadCanvas sessionId={session.id} name={canvasName} working={sessionRunning} dockHeight={bottomDockHeight} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
+              <ThreadCanvas sessionId={session.id} working={sessionRunning} dockHeight={bottomDockHeight} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
             ) : (
               <div
                 ref={attachScroll}
@@ -667,27 +654,25 @@ export function ThreadView({
 
           {/* Docked, never overlapping: the chat pane flexes and stays centered
               between the sidebar and this panel. */}
-          {canvas ? null : (
-            <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
-              <SidePanel
-                session={session}
-                progress={panelProgress}
-                subagents={providerSubagents}
-                spawnedThreads={spawnedThreads}
-                working={sessionRunning}
-                panel={sidePanel}
-                sideChatAvailable={sideChatAvailable}
-                sideChatEvents={sideChatEvents}
-                overview={details?.({ agentSession: derived.agentSession, working: sessionRunning, threads: spawnedThreads, subagents: providerSubagents })}
-                onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
-                onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
-                onSend={handleSend}
-                onQueuePrompt={queue.onQueuePrompt}
-                onQueueAction={queue.onQueueAction}
-                onSendSideChat={handleSideChatSend}
-              />
-            </SidePanelDrawer>
-          )}
+          <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
+            <SidePanel
+              session={session}
+              progress={panelProgress}
+              subagents={providerSubagents}
+              spawnedThreads={spawnedThreads}
+              working={sessionRunning}
+              panel={sidePanel}
+              sideChatAvailable={sideChatAvailable}
+              sideChatEvents={sideChatEvents}
+              overview={details?.({ agentSession: derived.agentSession, working: sessionRunning, threads: spawnedThreads, subagents: providerSubagents })}
+              onAddBrowserAnnotation={composerContexts.addBrowserAnnotation}
+              onUploadAttachment={(file) => uploadSessionAttachment(session.id, file)}
+              onSend={handleSend}
+              onQueuePrompt={queue.onQueuePrompt}
+              onQueueAction={queue.onQueueAction}
+              onSendSideChat={handleSideChatSend}
+            />
+          </SidePanelDrawer>
         </FileDropScope>
       </PreviewLinkProvider>
     </FileReaderLinkProvider>
