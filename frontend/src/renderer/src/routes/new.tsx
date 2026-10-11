@@ -62,6 +62,8 @@ function NewSessionPage() {
   // Worktree runs the session on a disposable git worktree (any agent);
   // only offered when the chosen directory is a git repository.
   const [worktree, setWorktree] = useState(false)
+  // Canvas threads show a board instead of a transcript; fixed at creation.
+  const [canvas, setCanvas] = useState(false)
   const projects = useQuery(projectsQuery)
   const project = projects.data?.find((item) => item.path === directory)
   const directoryInfo = useQuery({
@@ -112,7 +114,7 @@ function NewSessionPage() {
     }
     setCreating(true)
     try {
-      const input = controls.sessionConfig({ directory, worktree }, text?.trim() || undefined)
+      const input = controls.sessionConfig({ directory, worktree, canvas }, text?.trim() || undefined)
       if (text === undefined) {
         const session = await createSession(input)
         invalidateSessionLists(queryClient, { session: session.id })
@@ -206,6 +208,23 @@ function NewSessionPage() {
           </button>
         </div>
       ) : null}
+      <div className="flex items-center gap-1.5 text-[13px] text-ink-2">
+        <Checkbox
+          checked={canvas}
+          onChange={setCanvas}
+          disabled={creating}
+          aria-label="Start as a canvas"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={creating}
+          onClick={() => setCanvas((v) => !v)}
+          className="cursor-pointer select-none disabled:cursor-default disabled:opacity-50"
+        >
+          Canvas
+        </button>
+      </div>
     </>
   )
 

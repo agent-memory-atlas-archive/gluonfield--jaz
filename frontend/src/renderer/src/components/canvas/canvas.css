@@ -1,0 +1,682 @@
+/* Light follows FigJam: a grey ground with white sections and cards. Dark
+ * steps up one surface per layer: ground, section, card. */
+.canvas {
+  --canvas-bg: var(--color-surface);
+  --canvas-section: var(--color-bg);
+  --canvas-card: var(--color-bg);
+  --canvas-dot: color-mix(in oklab, var(--color-ink) 18%, transparent);
+  --canvas-edge: color-mix(in oklab, var(--color-ink) 45%, transparent);
+  --canvas-line: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  --canvas-shadow: 0 0 0 1px var(--canvas-line), 0 1px 3px rgb(0 0 0 / 0.07);
+  --canvas-float: 0 0 0 1px var(--canvas-line), 0 2px 6px rgb(0 0 0 / 0.08), 0 10px 24px rgb(0 0 0 / 0.08);
+  --canvas-map-node: color-mix(in oklab, var(--color-ink) 30%, transparent);
+  --canvas-map-section: color-mix(in oklab, var(--color-ink) 8%, transparent);
+  --canvas-map-mask: color-mix(in oklab, var(--canvas-bg) 70%, transparent);
+  position: absolute;
+  inset: 0;
+  background: var(--canvas-bg);
+}
+
+:root:where(.dark) .canvas {
+  --canvas-bg: var(--color-bg);
+  --canvas-section: var(--color-surface);
+  --canvas-card: var(--color-surface-2);
+  --canvas-dot: color-mix(in oklab, var(--color-ink) 14%, transparent);
+  --canvas-shadow: 0 0 0 1px var(--canvas-line), 0 1px 3px rgb(0 0 0 / 0.4);
+  --canvas-float: 0 0 0 1px color-mix(in oklab, var(--color-ink) 12%, transparent), 0 10px 28px rgb(0 0 0 / 0.45);
+}
+
+.canvas .react-flow__pane {
+  cursor: default;
+}
+
+.canvas .react-flow__pane.dragging,
+.canvas.tool-hand .react-flow__pane,
+.canvas.tool-hand .react-flow__node {
+  cursor: grab;
+}
+
+.canvas.canvas-connecting .react-flow__node {
+  cursor: crosshair;
+}
+
+.canvas-busy .canvas-card,
+.canvas-busy .canvas-edge-label {
+  pointer-events: none;
+}
+
+.canvas-overlay {
+  z-index: 5;
+}
+
+.canvas-item-label {
+  position: absolute;
+  left: 2px;
+  bottom: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+  margin-bottom: 7px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+}
+
+.canvas-badge {
+  flex: none;
+  padding: 3px 4px;
+  border-radius: 4px;
+  font: 600 9.5px/1 var(--font-mono);
+  letter-spacing: 0.02em;
+  background: color-mix(in oklab, var(--color-ink) 7%, transparent);
+}
+
+.react-flow__node.selected .canvas-item-label {
+  color: var(--color-primary);
+}
+
+.canvas-card {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--canvas-card);
+  box-shadow: var(--canvas-shadow);
+}
+
+.react-flow__node.selected .canvas-card,
+.react-flow__node.selected .canvas-sticky,
+.react-flow__node.selected .canvas-text {
+  box-shadow: 0 0 0 1px var(--color-primary), var(--canvas-shadow);
+}
+
+.canvas-connect-source {
+  box-shadow: 0 0 0 2px var(--color-primary), var(--canvas-shadow) !important;
+}
+
+.canvas-shield {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-fill {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.canvas-viewer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-viewer-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  pointer-events: none;
+}
+
+.canvas-viewer-body.live {
+  pointer-events: auto;
+}
+
+.canvas-viewer-body.paper {
+  background: #fff;
+}
+
+.canvas-viewer-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 6px 0 12px;
+  border-top: 1px solid var(--canvas-line);
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+}
+
+.canvas-viewer-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-viewer-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.canvas-viewer-controls button,
+.canvas-focus {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--color-ink-2);
+  transition-property: background-color, color, opacity;
+  transition-duration: 150ms;
+}
+
+.canvas-viewer-controls button:hover,
+.canvas-viewer-controls button.on {
+  color: var(--color-ink);
+  background: var(--color-list-hover);
+}
+
+.canvas-focus {
+  font-weight: 500;
+  color: var(--color-ink);
+  background: var(--color-list-hover);
+  opacity: 0;
+}
+
+.canvas-focus.on {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.react-flow__node:hover .canvas-focus,
+.react-flow__node.selected .canvas-focus,
+.canvas-focus.on {
+  opacity: 1;
+}
+
+.canvas-busy .canvas-focus:not(.on) {
+  opacity: 0;
+}
+
+.react-flow__node:has(.canvas-focus.on) {
+  z-index: 1000 !important;
+}
+
+.react-flow__node:has(.canvas-focus.on) .canvas-card {
+  box-shadow: 0 0 0 2px var(--color-primary), 0 16px 48px rgb(0 0 0 / 0.3);
+}
+
+.canvas-viewer-empty,
+.canvas-component-error {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 16px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  color: var(--color-ink-3);
+}
+
+.canvas-component-error {
+  place-items: start;
+  font-family: var(--font-mono);
+  color: var(--color-danger);
+}
+
+.canvas-component-error.overlay {
+  position: absolute;
+  inset: auto 0 0;
+  height: auto;
+  background: var(--color-danger-soft);
+}
+
+.canvas-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.canvas-text-file {
+  height: 100%;
+  overflow: auto;
+  padding: 12px 16px;
+  font-size: 13px;
+  user-select: text;
+}
+
+.canvas-csv {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-csv th,
+.canvas-csv td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--canvas-line);
+  text-align: left;
+}
+
+.canvas-csv th {
+  font-weight: 500;
+  color: var(--color-ink-2);
+}
+
+.canvas-section {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: var(--canvas-section);
+  box-shadow: inset 0 0 0 1px var(--canvas-line);
+  transition-property: box-shadow, background-color;
+  transition-duration: 150ms;
+}
+
+.canvas-section.target {
+  background: color-mix(in oklab, var(--color-primary) 6%, var(--canvas-section));
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.react-flow__node-group.selected .canvas-section {
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.canvas-section-label {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-ink);
+  background: var(--canvas-card);
+  box-shadow: 0 0 0 1px var(--canvas-line);
+  cursor: grab;
+}
+
+.react-flow__node.selected .canvas-section-label {
+  color: var(--color-primary);
+}
+
+.canvas-section-label input,
+.canvas-edge-label input {
+  padding: 0;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  color: var(--color-ink);
+  background: none;
+}
+
+.canvas-sticky,
+.canvas-text {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* Stickies stay paper-coloured in both themes, so their ink stays dark. */
+.canvas-sticky {
+  --color-ink: oklch(0.23 0.012 264);
+  --color-ink-2: oklch(0.38 0.012 264);
+  --color-ink-3: oklch(0.46 0.012 264);
+  padding: 16px;
+  border-radius: 4px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 8px 20px rgb(0 0 0 / 0.1);
+}
+
+.canvas-sticky-1 {
+  background: #ffc7c2;
+}
+
+.canvas-sticky-2 {
+  background: #ffd3a8;
+}
+
+.canvas-sticky-3 {
+  background: #ffe08a;
+}
+
+.canvas-sticky-4 {
+  background: #c4e8b8;
+}
+
+.canvas-sticky-5 {
+  background: #b9e4f0;
+}
+
+.canvas-sticky-6 {
+  background: #dcccff;
+}
+
+.canvas-text {
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.canvas-text-editor {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  font: inherit;
+  color: inherit;
+  background: none;
+}
+
+.canvas .react-flow__handle.canvas-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  min-height: 0;
+  border: 1.5px solid var(--color-primary);
+  border-radius: 50%;
+  background: var(--canvas-card);
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.canvas .react-flow__node:not(.selected):hover .canvas-dot,
+.canvas.canvas-connecting .canvas-dot {
+  opacity: 1;
+}
+
+.canvas.canvas-busy:not(.canvas-connecting) .canvas-dot {
+  opacity: 0;
+}
+
+.canvas .react-flow__node-group .canvas-dot {
+  display: none;
+}
+
+.canvas-edge {
+  stroke: var(--canvas-edge);
+  stroke-width: 1.5;
+}
+
+.canvas-edge.selected {
+  stroke: var(--color-primary);
+}
+
+.canvas-edge-label {
+  position: absolute;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  color: var(--color-ink-2);
+  background: var(--canvas-bg);
+  pointer-events: all;
+}
+
+.canvas-edge-label.selected {
+  color: var(--color-primary);
+}
+
+.canvas .react-flow__edge.selected .react-flow__edgeupdater {
+  fill: var(--canvas-card);
+  stroke: var(--color-primary);
+  stroke-width: 1.5;
+}
+
+.canvas .react-flow__resize-control.handle.canvas-resize-handle {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-primary);
+  border-radius: 1px;
+  background: #fff;
+}
+
+.canvas .react-flow__resize-control.line.canvas-resize-line {
+  border: 0;
+}
+
+.canvas .react-flow__resize-control.line.canvas-resize-line.left,
+.canvas .react-flow__resize-control.line.canvas-resize-line.right {
+  width: 9px;
+  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 1px 100% no-repeat;
+}
+
+.canvas .react-flow__resize-control.line.canvas-resize-line.top,
+.canvas .react-flow__resize-control.line.canvas-resize-line.bottom {
+  height: 9px;
+  background: linear-gradient(var(--color-primary), var(--color-primary)) center / 100% 1px no-repeat;
+}
+
+.canvas .react-flow__selection,
+.canvas .react-flow__nodesselection-rect {
+  border: 1px solid var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+}
+
+.canvas-dock {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--canvas-card);
+  box-shadow: var(--canvas-float);
+  translate: 0 -50%;
+}
+
+.canvas-dock-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-dock-group + .canvas-dock-group {
+  padding-top: 6px;
+  border-top: 1px solid var(--canvas-line);
+}
+
+.canvas-dock button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: var(--color-ink-2);
+  transition-property: background-color, color;
+  transition-duration: 150ms;
+}
+
+.canvas-dock button:hover {
+  color: var(--color-ink);
+  background: var(--color-list-hover);
+}
+
+.canvas-dock button.on {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.canvas-dock button::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre;
+  color: var(--color-bg);
+  background: var(--color-ink);
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 -50%;
+  transition: opacity 150ms;
+}
+
+.canvas-dock button:hover::after {
+  opacity: 1;
+  transition-delay: 400ms;
+}
+
+.canvas-tool-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: crosshair;
+}
+
+.canvas-section-draft {
+  position: absolute;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--color-primary) 8%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.canvas-map {
+  overflow: hidden;
+  margin: 14px;
+  border-radius: 12px;
+  background: var(--canvas-card);
+  box-shadow: var(--canvas-float);
+}
+
+.canvas-map .react-flow__minimap-svg {
+  display: block;
+}
+
+.canvas-zoom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  border-top: 1px solid var(--canvas-line);
+  font-size: 12px;
+  color: var(--color-ink-2);
+}
+
+.canvas-zoom button {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+}
+
+.canvas-zoom button:hover {
+  color: var(--color-ink);
+  background: var(--color-list-hover);
+}
+
+.canvas-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 6px 0 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  white-space: nowrap;
+  color: var(--color-ink);
+  background: var(--canvas-card);
+  box-shadow: var(--canvas-float);
+  translate: -50% 0;
+}
+
+.canvas-banner.danger {
+  padding-right: 14px;
+  color: var(--color-danger);
+}
+
+.canvas-banner strong {
+  font-weight: 500;
+}
+
+.canvas-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.canvas-banner button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+}
+
+.canvas-pill {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 14px 0 6px;
+  border-radius: 14px;
+  background: var(--canvas-card);
+  box-shadow: var(--canvas-float);
+}
+
+/* Centred on the traffic lights (Electron trafficLightPosition y 13). */
+.canvas-pill.beside-traffic-lights {
+  top: 4px;
+  left: 84px;
+  height: 32px;
+  border-radius: 11px;
+}
+
+.canvas-pill-menu {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 8px;
+  border-radius: 9px;
+  color: var(--color-ink-2);
+}
+
+.canvas-pill-menu:hover {
+  color: var(--color-ink);
+  background: var(--color-list-hover);
+}
+
+.canvas-pill-mark {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-ink);
+}
+
+.canvas-pill-name {
+  max-width: 280px;
+  overflow: hidden;
+  padding-left: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-ink);
+}

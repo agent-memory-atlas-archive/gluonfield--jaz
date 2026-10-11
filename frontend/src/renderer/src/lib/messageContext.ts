@@ -32,11 +32,20 @@ export type ComposerContext =
       browser_annotation: BrowserAnnotation
       screenshotAttachment?: ContextAttachment
     }
+  | {
+      // A selected canvas item; it lives in the board's selection, never in a
+      // stored draft.
+      id: string
+      type: 'canvas'
+      node: string
+      label: string
+    }
 
 export type MessageContextInput =
   | { type: 'voice'; id: string; request_id: string; text: string }
   | { type: 'selection'; text: string; comment?: string }
   | { type: 'browser_annotation'; browser_annotation: BrowserAnnotation }
+  | { type: 'canvas'; id: string; text: string }
 
 export function contextInputs(contexts: ComposerContext[] = []): MessageContextInput[] {
   return contexts.flatMap<MessageContextInput>((context) => {
@@ -45,6 +54,7 @@ export function contextInputs(contexts: ComposerContext[] = []): MessageContextI
       if (!text) return []
       return [{ type: 'selection' as const, text, comment: context.comment?.trim() || undefined }]
     }
+    if (context.type === 'canvas') return [{ type: 'canvas' as const, id: context.node, text: context.label }]
     const annotation = normalizeBrowserAnnotation(context.browser_annotation)
     if (!annotation) return []
     const screenshotAttachmentID = context.screenshotAttachment?.id ?? annotation.screenshot_attachment_id
@@ -71,6 +81,7 @@ export function contextAttachmentIDs(contexts: ComposerContext[] = []): string[]
 }
 
 export function contextLabel(context: ComposerContext): string {
+  if (context.type === 'canvas') return context.label
   if (context.type !== 'selection') return 'Annotation'
   return context.comment?.trim() ? 'Comment' : 'Quote'
 }
@@ -79,6 +90,7 @@ export function contextPreviewText(context: ComposerContext): string {
   if (context.type === 'selection') {
     return [context.text, context.comment?.trim()].filter(Boolean).join('\n\n')
   }
+  if (context.type === 'canvas') return context.label
   const annotation = context.browser_annotation
   return [annotation.target, annotation.comment || annotation.requested_changes].filter(Boolean).join('\n\n')
 }

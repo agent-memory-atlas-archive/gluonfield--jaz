@@ -179,3 +179,25 @@ func TestNewThreadOpensWhileAgentStarts(t *testing.T) {
 		t.Fatalf("thread status = %q, acp state = %q; want running while the agent starts", view.Session.Status, view.ACPState)
 	}
 }
+
+func TestCreateACPSessionFixesTheArtifactSurface(t *testing.T) {
+	store, err := jsonstore.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &fakeACPManager{spawnStore: store}
+	create := func(surface string) *httptest.ResponseRecorder {
+		body := `{"runtime":"acp","agent":"claude","artifact_surface":"` + surface + `"}`
+		req := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(body))
+		res := httptest.NewRecorder()
+		(&Server{Store: store, ACP: manager}).Handler().ServeHTTP(res, req)
+		return res
+	}
+
+	if res := create("canvas"); res.Code != http.StatusOK || manager.created.ArtifactSurface != "canvas" {
+		t.Fatalf("status = %d, surface = %q, body = %s", res.Code, manager.created.ArtifactSurface, res.Body.String())
+	}
+	if res := create("widget"); res.Code != http.StatusBadRequest {
+		t.Fatalf("widget surface status = %d, want 400: loop widgets are not a thread mode", res.Code)
+	}
+}

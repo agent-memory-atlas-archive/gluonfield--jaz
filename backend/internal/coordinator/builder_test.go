@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/wins/jaz/backend/internal/connections"
+	"github.com/wins/jaz/backend/internal/mcpsession"
 	"github.com/wins/jaz/backend/internal/sessioncontext"
 	"github.com/wins/jaz/backend/internal/visualize"
 )
@@ -286,4 +287,23 @@ type failingAgentNames struct{}
 
 func (failingAgentNames) EnabledAgentNames() ([]string, error) {
 	return nil, errors.New("agent settings unavailable")
+}
+
+func TestBuilderCanvasPromptNamesTheThreadsBoard(t *testing.T) {
+	root := t.TempDir()
+	builder := NewBuilder(root, "", t.TempDir(), func() bool { return false })
+	prompt, err := builder.ACPPromptForContext(mcpsession.With(context.Background(), "thread-1"), root, string(visualize.SurfaceCanvas))
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := filepath.Join(root, "canvases", "thread-1", "canvas.json")
+	if !strings.Contains(prompt, "## Canvas") || !strings.Contains(prompt, board) {
+		t.Fatalf("canvas prompt should name %s:\n%s", board, prompt)
+	}
+	if strings.Contains(prompt, "visualise_show_widget") {
+		t.Fatal("a canvas thread has no transcript for inline artifacts")
+	}
+	if _, err := builder.ACPPromptForContext(context.Background(), root, string(visualize.SurfaceCanvas)); err == nil {
+		t.Fatal("a canvas prompt without a session id must fail rather than name a shared board")
+	}
 }

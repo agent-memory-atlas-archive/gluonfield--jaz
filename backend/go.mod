@@ -5,6 +5,7 @@ go 1.26.0
 require (
 	github.com/charmbracelet/log v0.4.2
 	github.com/creack/pty v1.1.24
+	github.com/evanw/esbuild v0.28.2
 	github.com/gluonfield/acp-transport v0.0.0-20260925121224-9e5d8f001fb3
 	github.com/gluonfield/jazmem v0.0.0-20260915200900-30df5981063e
 	github.com/google/jsonschema-go v0.4.3

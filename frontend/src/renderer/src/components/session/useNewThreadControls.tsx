@@ -96,12 +96,13 @@ export function useNewThreadControls() {
     effortOptions,
     // The launched config IS the resolved config shown in the UI — same model,
     // provider, and clamped effort — so display and launch cannot diverge.
-    sessionConfig: (extra: { directory: string; worktree: boolean }, title?: string): CreateSessionInput => ({
+    sessionConfig: (extra: { directory: string; worktree: boolean; canvas?: boolean }, title?: string): CreateSessionInput => ({
       ...(title ? { title } : {}),
       runtime: 'acp',
       agent: runtime,
       directory: extra.directory,
       worktree: extra.worktree,
+      ...(extra.canvas ? { artifact_surface: 'canvas' as const } : {}),
       ...(usesProvider && provider ? { model_provider: provider } : {}),
       ...(selectedModel ? { model: selectedModel } : {}),
       ...(effort ? { reasoning_effort: effort } : {}),

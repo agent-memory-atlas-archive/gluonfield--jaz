@@ -49,6 +49,7 @@ export function ComposerCard({
   onQueuePrompt,
   commands,
   optionsSlot,
+  attachable = true,
   onStop,
   onClearGoal,
   onVoice,
@@ -85,6 +86,8 @@ export function ComposerCard({
   onQueuePrompt?: SendMessageHandler
   commands?: AgentSessionCommand[]
   optionsSlot?: ReactNode
+  // Whether the options menu offers Add files.
+  attachable?: boolean
   onStop?: () => void
   /** stops the goal auto-continuation loop server-side */
   onClearGoal?: () => void
@@ -477,13 +480,15 @@ export function ComposerCard({
                   </IconButton>
                 }
               >
-                <ComposerAttachmentMenuRow
-                  disabled={disabled}
-                  onChoose={() => {
-                    setOptionsOpen(false)
-                    fileInputRef.current?.click()
-                  }}
-                />
+                {attachable ? (
+                  <ComposerAttachmentMenuRow
+                    disabled={disabled}
+                    onChoose={() => {
+                      setOptionsOpen(false)
+                      fileInputRef.current?.click()
+                    }}
+                  />
+                ) : null}
                 {planAvailable ? (
                   <SwitchRow
                     icon={<ListChecks size={13} className="shrink-0" />}
@@ -599,6 +604,7 @@ export function Composer({
   onQueuePrompt,
   commands,
   optionsSlot,
+  attachable,
   chat,
   onStop,
   onClearGoal,
@@ -631,6 +637,7 @@ export function Composer({
   onQueuePrompt?: SendMessageHandler
   commands?: AgentSessionCommand[]
   optionsSlot?: ReactNode
+  attachable?: boolean
   chat?: boolean
   onStop: () => void
   onClearGoal?: () => void
@@ -682,6 +689,7 @@ export function Composer({
         onQueuePrompt={onQueuePrompt}
         commands={commands}
         optionsSlot={optionsSlot}
+        attachable={attachable}
         chat={chat}
         onStop={onStop}
         onClearGoal={onClearGoal}

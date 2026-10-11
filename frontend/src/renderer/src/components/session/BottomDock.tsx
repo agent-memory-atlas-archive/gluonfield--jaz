@@ -4,10 +4,13 @@ import { THREAD_COLUMN_CLASS } from '@/components/session/threadLayout'
 export function BottomDock({
   before,
   children,
+  floating,
   onHeightChange,
 }: {
   before?: ReactNode
   children: ReactNode
+  // Over a canvas there is no transcript to fade out.
+  floating?: boolean
   onHeightChange?: (height: number) => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -29,7 +32,7 @@ export function BottomDock({
       // the dock's height it was still half-transparent at that edge, so the
       // last line of the thread got sliced by the composer instead of fading
       // out under it.
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] pt-6 pb-5 [background:linear-gradient(to_bottom,transparent,var(--color-bg)_24px)]"
+      className={`pointer-events-none absolute inset-x-0 bottom-0 z-[1] pt-6 pb-5 ${floating ? '' : '[background:linear-gradient(to_bottom,transparent,var(--color-bg)_24px)]'}`}
     >
       <div className={`pointer-events-none relative ${THREAD_COLUMN_CLASS}`}>
         <div className="pointer-events-auto absolute inset-x-0 bottom-full">{before}</div>

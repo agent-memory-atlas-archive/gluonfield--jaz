@@ -104,7 +104,7 @@ func (m *Manager) resumeLocked(ctx context.Context, ref string) (*jobState, erro
 	if err != nil {
 		return nil, err
 	}
-	ac, err := m.connect(ctx, agentName, cfg, cwd, session.RuntimeRef.ArtifactSurface, mcpServerPolicy, systemPromptExtensions)
+	ac, err := m.connect(mcpsession.With(ctx, session.ID), agentName, cfg, cwd, session.RuntimeRef.ArtifactSurface, mcpServerPolicy, systemPromptExtensions)
 	if err != nil {
 		return nil, err
 	}

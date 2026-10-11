@@ -58,6 +58,7 @@ type Data struct {
 	Internal        string
 	BrowserEnabled  bool
 	ArtifactSurface string
+	CanvasDir       string
 	Memory          *MemoryData
 	Connections     []connections.AgentConnection
 	Skills          string
@@ -66,7 +67,7 @@ type Data struct {
 func Render(data Data) (string, error) {
 	data.Device = deviceLabel(data.Device)
 	data.ArtifactSurface = strings.TrimSpace(data.ArtifactSurface)
-	if data.ArtifactSurface != "widget" {
+	if data.ArtifactSurface != "widget" && data.ArtifactSurface != "canvas" {
 		data.ArtifactSurface = "chat"
 	}
 	return renderTemplate("jazplatform", data)

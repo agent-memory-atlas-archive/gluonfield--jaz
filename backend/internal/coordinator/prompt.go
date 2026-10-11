@@ -2,13 +2,17 @@ package coordinator
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/wins/jaz/backend/internal/acp"
+	"github.com/wins/jaz/backend/internal/canvas"
 	"github.com/wins/jaz/backend/internal/connections"
+	"github.com/wins/jaz/backend/internal/mcpsession"
+	"github.com/wins/jaz/backend/internal/runtimefiles"
 	"github.com/wins/jaz/backend/internal/sessioncontext"
 	"github.com/wins/jaz/backend/internal/templates/jazagent"
 	"github.com/wins/jaz/backend/internal/templates/jazplatform"
@@ -71,6 +75,15 @@ func platformPrompt(ctx context.Context, root, cwd, workspace, memoryRoot, skill
 	if err != nil {
 		return "", err
 	}
+	surface = visualize.NormalizeSurface(string(surface))
+	canvasDir := ""
+	if surface == visualize.SurfaceCanvas {
+		sessionID := mcpsession.ID(ctx)
+		if sessionID == "" {
+			return "", fmt.Errorf("canvas prompt needs the session id")
+		}
+		canvasDir = canvas.Dir(runtimefiles.New(root).Canvases, sessionID)
+	}
 	return jazplatform.Render(jazplatform.Data{
 		Agents:          orEmpty(agents),
 		AgentNames:      acp.SelectableAgentNames(agentNames),
@@ -85,7 +98,8 @@ func platformPrompt(ctx context.Context, root, cwd, workspace, memoryRoot, skill
 		Soul:            orEmpty(soul),
 		Internal:        orEmpty(internal),
 		BrowserEnabled:  browserEnabled,
-		ArtifactSurface: string(visualize.NormalizeSurface(string(surface))),
+		ArtifactSurface: string(surface),
+		CanvasDir:       canvasDir,
 		Memory:          memory,
 		Connections:     connections,
 		Skills:          strings.TrimSpace(skillsPrompt),

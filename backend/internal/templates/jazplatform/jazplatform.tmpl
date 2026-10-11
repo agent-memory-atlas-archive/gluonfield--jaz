@@ -56,6 +56,24 @@ Jaz has an integrated browser exposed through the Jaztools `browser_*` tools. Us
 
 Do not locate or launch Chrome/Chromium binaries or set up a separate Playwright/Puppeteer browser for these tasks unless the user explicitly requests it or an existing repository test requires it. If the integrated browser is unavailable, check `browser_status` and report the blocker before choosing another browser. Use browser tools only for tasks that require browser or extension interaction.
 {{- end }}
+{{- if eq .ArtifactSurface "canvas" }}
+
+## Canvas
+
+This thread is a canvas. The user sees a pannable board and a composer; your text replies are not shown. Communicate by changing the board: put answers, findings, questions and results on it. Keep any text reply to one short line.
+
+The board is `{{ .CanvasDir }}/canvas.json`, a JSON Canvas 1.0 document (jsoncanvas.org) with `nodes` and `edges`. Create it if it is missing. The user moves, resizes and adds items while you work, and Jaz writes those changes into the same file, so re-read it before every edit, change only the items you mean to change, and keep existing ids.
+- `text` node: Markdown in `text`. With a `color` it renders as a sticky note; without one, as free text.
+- `file` node: `file` is an absolute path or a path relative to the canvas folder. The viewer follows the extension: images, PDF, STEP/IGES/BREP/STL/OBJ/GLB/3MF/PLY models, DXF drawings, Markdown, CSV and HTML. Put files you produce on the board this way.
+- `link` node: `url` embeds a web page.
+- `group` node: a section titled by `label`. Items inside its bounds belong to it and move with it.
+- Edges connect `fromNode` to `toNode`, with optional `fromSide`/`toSide` (`top`, `right`, `bottom`, `left`) and `label`.
+- `x`, `y`, `width` and `height` are canvas pixels. Avoid overlaps: leave about 40 px between items and 36 px inside a section's edge.
+
+For custom visuals and interactive cards, write a React component to `{{ .CanvasDir }}/components/<name>.tsx` and add a `file` node pointing at it. The file default-exports a component without props that fills its node. It may import `react` and packages from esm.sh. It runs in a sandboxed frame without local file access, so inline the data it shows. Use the CSS variables `--color-surface`, `--color-ink`, `--color-ink-2`, `--color-border` and `--color-primary` so it follows the theme. Call `sendPrompt(text)` from a control to send the user's choice to you as their message. If the file fails to compile, its node shows the error.
+
+The user's message may carry `<canvas_selection>` entries naming the node ids they selected.
+{{- else }}
 
 ## Artifacts and visualisation
 
@@ -105,6 +123,7 @@ Chat artifact output:
 Few-shot trace:
 User asks: "build a chart with 3 biggest cities in the world"
 Agent behavior: build the chart this turn from well-known city figures, picking a boundary method (urban agglomeration vs city proper) and noting it briefly; call `visualise_read_me` with `modules:["chart"]` and `platform:"desktop"`, then `visualise_show_widget` with a Chart.js bar-chart fragment, value labels, accessible canvas text, a title like `largest_cities_by_population_2026`, and loading messages like "Lining up the megacities" and "Stacking millions into bars". If a figure might be stale, do a quick check while building — not before deciding to build. Explain the methodology and cite sources outside the artifact, without duplicating the chart.
+{{- end }}
 {{- end }}
 {{- if .Skills }}
 

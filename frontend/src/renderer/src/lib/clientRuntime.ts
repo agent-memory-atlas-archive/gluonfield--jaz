@@ -107,6 +107,9 @@ function createRuntime(): ClientRuntime {
 
 export const clientRuntime = createRuntime()
 
+// macOS draws the traffic lights over the window's top-left corner.
+export const isMacDesktop = clientRuntime.kind === 'electron' && /Mac/.test(navigator.platform)
+
 export function openExternal(url: string): void {
   if (clientRuntime.openExternalURL) {
     clientRuntime.openExternalURL(url)
