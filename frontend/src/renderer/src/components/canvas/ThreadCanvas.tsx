@@ -54,8 +54,6 @@ import type { CanvasPick } from './useCanvasContexts'
 interface Props {
   sessionId: string
   working: boolean
-  // Height of the floating composer, which the overview card sits above.
-  dockHeight: number
   selection: string[]
   onSelect: (picks: CanvasPick[]) => void
   onPrompt: (text: string) => void
@@ -84,7 +82,7 @@ function pointerOf(event: MouseEvent | TouchEvent) {
   return 'changedTouches' in event ? event.changedTouches[0] : event
 }
 
-function Board({ sessionId, working, dockHeight, selection, onSelect, onPrompt }: Props) {
+function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
   const flow = useReactFlow<BoardNode, BoardEdge>()
   const { zoom } = useViewport()
   const queryClient = useQueryClient()
@@ -434,7 +432,7 @@ function Board({ sessionId, working, dockHeight, selection, onSelect, onPrompt }
             proOptions={{ hideAttribution: true }}
           >
             <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} color="var(--canvas-dot)" bgColor="var(--color-bg)" />
-            <Panel position="bottom-right" className="canvas-map canvas-overlay" style={{ marginBottom: Math.max(14, dockHeight - 12) }}>
+            <Panel position="bottom-right" className="canvas-map canvas-overlay">
               <MiniMap
                 pannable
                 zoomable

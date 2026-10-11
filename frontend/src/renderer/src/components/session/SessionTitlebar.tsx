@@ -7,13 +7,15 @@ import { RuntimeBadge } from '@/components/sidebar/RuntimeBadge'
 import type { Session } from '@/lib/api/types'
 import { useTitlebarActions, useTitlebarSlot } from '@/lib/titlebar'
 
-export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable, header, overviewLabel }: {
+export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable, header, overviewLabel, panelControls = true }: {
   session: Session
   isMobile: boolean
   panel: ReturnType<typeof useSidePanelState>
   sideChatAvailable: boolean
   header?: ReactNode
   overviewLabel?: string
+  /** a canvas thread has no side panel to open */
+  panelControls?: boolean
 }) {
   const { open, mode, tabs, activeTab, width, selectTab, reorderTabs, closeTab, addTab, duplicateTab, toggleMode } = panel
   const activeId = activeTab?.id
@@ -22,7 +24,7 @@ export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable, h
     <TokenStats session={session} />
   </>, [header, session])
   useTitlebarSlot(slot)
-  const actions = useMemo(() => (
+  const actions = useMemo(() => panelControls ? (
     <div className="flex min-w-0 items-center gap-1" style={{ width: open && mode === 'tabs' ? isMobile ? '100%' : `calc(${width}px - 1rem)` : undefined }}>
       {open && mode === 'tabs' ? <SidePanelTabs
         tabs={tabs}
@@ -36,7 +38,7 @@ export function SessionTitlebar({ session, isMobile, panel, sideChatAvailable, h
       /> : null}
       <SidePanelControl open={open} mode={mode} overviewLabel={overviewLabel} onToggle={toggleMode} />
     </div>
-  ), [open, mode, isMobile, width, tabs, activeId, sideChatAvailable, overviewLabel, selectTab, reorderTabs, closeTab, addTab, duplicateTab, toggleMode])
+  ) : null, [panelControls, open, mode, isMobile, width, tabs, activeId, sideChatAvailable, overviewLabel, selectTab, reorderTabs, closeTab, addTab, duplicateTab, toggleMode])
   useTitlebarActions(actions)
   return null
 }
