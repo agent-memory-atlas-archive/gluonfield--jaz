@@ -119,8 +119,9 @@ export function attachVoiceOverlay(owner: BrowserWindow): void {
       const [windowX, windowY] = target.getPosition()
       dragOrigin = { ...point, windowX, windowY }
     } else {
-      top = Math.round(dragOrigin.windowY + point.y - dragOrigin.y)
-      target.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x), top)
+      // Electron rejects -0 as an integer coordinate; adding 0 normalizes it.
+      top = Math.round(dragOrigin.windowY + point.y - dragOrigin.y) + 0
+      target.setPosition(Math.round(dragOrigin.windowX + point.x - dragOrigin.x) + 0, top)
     }
   }
   const resize = (event: IpcMainEvent, height: number) => {
