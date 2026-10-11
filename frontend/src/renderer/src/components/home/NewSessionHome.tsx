@@ -69,7 +69,7 @@ export function NewSessionHome({
     <FileDropScope className="relative flex h-full flex-col overflow-hidden">
       <CanvasDots on={canvas} />
       <motion.div
-        className="flex flex-1 items-center justify-center px-10 py-8 max-sm:px-4"
+        className="relative flex flex-1 items-center justify-center px-10 py-8 max-sm:px-4"
         initial={{ opacity: 0, y: 14, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
@@ -108,7 +108,7 @@ export function NewSessionHome({
       </motion.div>
       {/* in flow, so the hero centers in whatever the brandscape leaves; a short
           window shrinks the sky, never the composer */}
-      <DitherTerrain sky className="flex min-h-0 shrink flex-col justify-end" />
+      <DitherTerrain sky className="relative flex min-h-0 shrink flex-col justify-end" />
     </FileDropScope>
   )
 }
