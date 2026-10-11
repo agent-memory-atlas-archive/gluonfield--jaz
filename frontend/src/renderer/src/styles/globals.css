@@ -51,6 +51,8 @@
   --color-ok: oklch(0.5 0.14 150);
   --color-danger: oklch(0.55 0.19 25);
   --color-danger-soft: oklch(0.95 0.025 25);
+  /* A solid destructive fill, like ending a call: one vivid red in both themes. */
+  --color-danger-solid: oklch(0.64 0.24 24);
 
   --color-border: oklch(0.905 0.006 264);
 

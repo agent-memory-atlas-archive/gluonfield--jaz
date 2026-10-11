@@ -107,7 +107,7 @@ function PillButton({ label, pressed, danger = false, ...props }: {
       aria-pressed={pressed}
       whileTap={props.disabled ? undefined : { scale: 0.96 }}
       className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-full transition-colors duration-150 disabled:cursor-default disabled:opacity-50 ${
-        danger ? 'bg-danger text-white hover:bg-danger/90' : 'bg-ink/8 text-ink-2 hover:bg-ink/12 hover:text-ink aria-pressed:bg-ink/15 aria-pressed:text-ink'
+        danger ? 'bg-danger-solid text-white hover:bg-danger-solid/90' : 'bg-ink/8 text-ink-2 hover:bg-ink/12 hover:text-ink aria-pressed:bg-ink/15 aria-pressed:text-ink'
       }`}
       {...props}
     />
