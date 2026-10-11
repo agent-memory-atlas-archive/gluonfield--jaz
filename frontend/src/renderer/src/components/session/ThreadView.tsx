@@ -476,97 +476,94 @@ export function ThreadView({
           ) : null}
           {sidePanel.resizing ? <div className="fixed inset-0 z-modal cursor-col-resize" aria-hidden /> : null}
 
-          <div className="relative h-full min-w-0 flex-1">
-            {canvas ? (
-              <ThreadCanvas sessionId={session.id} working={sessionRunning} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
-            ) : (
+          {/* A canvas thread keeps its chat in a narrow column beside the board. */}
+          <div className={`relative h-full min-w-0 ${canvas ? 'w-[360px] shrink-0 border-r border-border' : 'flex-1'}`}>
+            <div
+              ref={attachScroll}
+              className="scrollbar-quiet relative z-0 h-full overflow-y-auto"
+              onScroll={onThreadScroll}
+              onClickCapture={onThreadClickCapture}
+            >
               <div
-                ref={attachScroll}
-                className="scrollbar-quiet relative z-0 h-full overflow-y-auto"
-                onScroll={onThreadScroll}
-                onClickCapture={onThreadClickCapture}
+                ref={threadFind.rootRef}
+                className={`${canvas ? 'px-4' : THREAD_COLUMN_CLASS} pt-6`}
+                style={{ paddingBottom: transcriptBottomPadding }}
               >
-                <div
-                  ref={threadFind.rootRef}
-                  className={`${THREAD_COLUMN_CLASS} pt-6`}
-                  style={{ paddingBottom: transcriptBottomPadding }}
-                >
-                  {chat ? (
-                    <>
-                      {chat({ messages: transcriptMessages, events: displayEvents, scrollRef, paging, working: sessionRunning, threads: spawnedThreads, send: handleSend, showDetails })}
-                      {errorNotice}
-                    </>
-                  ) : empty ? (
-                    <EmptyState title="Start the conversation">
-                      <p>Messages stream in live as your assistant thinks and works.</p>
-                    </EmptyState>
-                  ) : (
-                    <>
-                      <Transcript
-                        scrollRef={scrollRef}
-                        key={session.id}
-                        messages={transcriptMessages}
-                        events={displayEvents}
-                        sessionId={session.id}
-                        groupTurns={isACP}
-                        working={sessionRunning}
-                        findActive={threadFind.open && Boolean(threadFind.query.trim())}
-                        revealSeq={revealedMessageSeq}
-                        errorAction={visibleSessionError ? undefined : continueErrorAction}
-                        onArtifactPrompt={handleSend}
-                        paging={paging}
-                        tail={
-                          isACP ? (
-                            <>
-                              {pendingSteer ? <PendingSteerBubble prompt={pendingSteer} /> : null}
-                              <SessionLivenessIndicator
-                                agent={session.runtime_ref?.agent}
-                                running={sessionRunning}
-                                activity={activity}
-                                activeOperation={detail.data?.acp_active_operation}
-                                updatedAt={session.updated_at}
-                                lastActivityAt={latestEventTimeISO(lastSessionEventAt, live?.at)}
+                {chat ? (
+                  <>
+                    {chat({ messages: transcriptMessages, events: displayEvents, scrollRef, paging, working: sessionRunning, threads: spawnedThreads, send: handleSend, showDetails })}
+                    {errorNotice}
+                  </>
+                ) : empty ? (
+                  <EmptyState title="Start the conversation">
+                    <p>Messages stream in live as your assistant thinks and works.</p>
+                  </EmptyState>
+                ) : (
+                  <>
+                    <Transcript
+                      scrollRef={scrollRef}
+                      key={session.id}
+                      messages={transcriptMessages}
+                      events={displayEvents}
+                      sessionId={session.id}
+                      groupTurns={isACP}
+                      working={sessionRunning}
+                      findActive={threadFind.open && Boolean(threadFind.query.trim())}
+                      revealSeq={revealedMessageSeq}
+                      errorAction={visibleSessionError ? undefined : continueErrorAction}
+                      onArtifactPrompt={handleSend}
+                      paging={paging}
+                      tail={
+                        isACP ? (
+                          <>
+                            {pendingSteer ? <PendingSteerBubble prompt={pendingSteer} /> : null}
+                            <SessionLivenessIndicator
+                              agent={session.runtime_ref?.agent}
+                              running={sessionRunning}
+                              activity={activity}
+                              activeOperation={detail.data?.acp_active_operation}
+                              updatedAt={session.updated_at}
+                              lastActivityAt={latestEventTimeISO(lastSessionEventAt, live?.at)}
+                            />
+                          </>
+                        ) : live ? (
+                          <div className="flex flex-col gap-2">
+                            <motion.div
+                              className="w-full"
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                            >
+                              <UserBubble
+                                text={live.user}
+                                createdAt={live.at}
+                                contexts={live.contexts}
+                                attachments={live.attachments}
+                                attachmentSessionId={sessionId}
                               />
-                            </>
-                          ) : live ? (
-                            <div className="flex flex-col gap-2">
-                              <motion.div
-                                className="w-full"
-                                initial={{ opacity: 0, y: 8 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                              >
-                                <UserBubble
-                                  text={live.user}
-                                  createdAt={live.at}
-                                  contexts={live.contexts}
-                                  attachments={live.attachments}
-                                  attachmentSessionId={sessionId}
-                                />
-                              </motion.div>
-                              <ThinkingBlock text={live.reasoning} pending={streaming} />
-                              <ToolCalls
-                                calls={live.tools.map((tool) => ({
-                                  ...tool,
-                                  pending: streaming && tool.result === undefined,
-                                }))}
-                                onArtifactPrompt={handleSend}
-                              />
-                              {live.assistant ? (
-                                <MessageMarkdown text={live.assistant} />
-                              ) : streaming ? (
-                                <p className="animate-pulse text-sm text-ink-3">Thinking…</p>
-                              ) : null}
-                            </div>
-                          ) : null
-                        }
-                      />
-                      {errorNotice}
-                    </>
-                  )}
-                </div>
+                            </motion.div>
+                            <ThinkingBlock text={live.reasoning} pending={streaming} />
+                            <ToolCalls
+                              calls={live.tools.map((tool) => ({
+                                ...tool,
+                                pending: streaming && tool.result === undefined,
+                              }))}
+                              onArtifactPrompt={handleSend}
+                            />
+                            {live.assistant ? (
+                              <MessageMarkdown text={live.assistant} />
+                            ) : streaming ? (
+                              <p className="animate-pulse text-sm text-ink-3">Thinking…</p>
+                            ) : null}
+                          </div>
+                        ) : null
+                      }
+                    />
+                    {errorNotice}
+                  </>
+                )}
               </div>
-            )}
+            </div>
             {chat || canvas ? null : (
               <ThreadOutline
                 messages={transcriptMessages}
@@ -575,12 +572,8 @@ export function ThreadView({
                 onSelect={jumpToMessage}
               />
             )}
-            {canvas ? null : (
-              <>
-                <ThreadFindBar find={threadFind} />
-                <SelectionContextToolbar scrollRef={scrollRef} onAdd={composerContexts.addSelection} />
-              </>
-            )}
+            <ThreadFindBar find={threadFind} />
+            <SelectionContextToolbar scrollRef={scrollRef} onAdd={composerContexts.addSelection} />
 
             {showPlanDecision && planDecisionError ? (
               <p className="absolute inset-x-0 bottom-32 mx-auto max-w-[640px] rounded-card bg-danger-soft px-3 py-2 text-sm text-danger select-text">
@@ -588,8 +581,8 @@ export function ThreadView({
               </p>
             ) : null}
             <BottomDock
-              before={canvas ? null : <ScrollToBottomButton visible={showScrollToBottom} onClick={scrollToBottom} />}
-              floating={canvas}
+              before={<ScrollToBottomButton visible={showScrollToBottom} onClick={scrollToBottom} />}
+              compact={canvas}
               onHeightChange={setBottomDockHeight}
             >
               <VoiceMode voice={voice} face={voice.bot?.avatar ?? null} />
@@ -652,6 +645,11 @@ export function ThreadView({
               )}
             </BottomDock>
           </div>
+          {canvas ? (
+            <div className="relative h-full min-w-0 flex-1">
+              <ThreadCanvas sessionId={session.id} working={sessionRunning} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
+            </div>
+          ) : null}
 
           {/* Docked, never overlapping: the chat pane flexes and stays centered
               between the sidebar and this panel. */}

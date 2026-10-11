@@ -476,7 +476,7 @@ func TestCanvasThreadsGetThreadToolsWithoutInlineArtifacts(t *testing.T) {
 	client, closeClient := connectClient(t, service.server(canvasSurface))
 	defer closeClient()
 	if hasTool(t, client, "visualise_show_widget") || hasTool(t, client, "visualise_read_me") {
-		t.Fatal("canvas threads must not render inline artifacts into a transcript nobody sees")
+		t.Fatal("canvas threads put visuals on the board, not inline in the chat")
 	}
 	if !hasTool(t, client, "create_thread") {
 		t.Fatal("canvas threads keep the ordinary thread tools")

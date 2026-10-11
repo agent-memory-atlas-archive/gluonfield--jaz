@@ -279,8 +279,8 @@ func (s *Service) newServer(surface toolSurface) *mcp.Server {
 		s.visualizeTools.AddReadMeTo(server)
 		widgets.AddMCPTools(server, s.widgetPublisher)
 	case canvasSurface:
-		// The board is a canvas thread's output; inline artifacts would land in
-		// a transcript it never shows.
+		// A canvas thread's visuals belong on its board, not in the narrow chat
+		// beside it.
 	default:
 		s.visualizeTools.AddReadMeTo(server)
 		s.visualizeTools.AddShowWidgetTo(server)
