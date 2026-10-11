@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from 'react'
 import { motion } from 'motion/react'
+import { CanvasDots } from '@/components/home/CanvasDots'
 import { DitherTerrain, DitherWordmark } from '@/components/launch/DitherArt'
 import { ComposerCard } from '@/components/session/Composer'
 import { FileDropScope } from '@/components/ui/FileDrop'
@@ -66,11 +67,7 @@ export function NewSessionHome({
 
   return (
     <FileDropScope className="relative flex h-full flex-col overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 [background-image:radial-gradient(circle,color-mix(in_oklab,var(--color-ink)_18%,transparent)_1.1px,transparent_1.6px)] [background-size:22px_22px] transition-opacity duration-300"
-        style={{ opacity: canvas ? 1 : 0 }}
-      />
+      <CanvasDots on={canvas} />
       <motion.div
         className="flex flex-1 items-center justify-center px-10 py-8 max-sm:px-4"
         initial={{ opacity: 0, y: 14, scale: 0.985 }}
