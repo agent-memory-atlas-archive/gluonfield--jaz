@@ -7,6 +7,7 @@ export type Kind = 'text' | 'file' | 'link' | 'group'
 
 export type BoardNode = Node<{ item: CanvasItem }, Kind>
 export type BoardEdge = Edge<{ label?: string }, 'connector'>
+export type Clip = { nodes: CanvasItem[]; edges: CanvasItem[] }
 
 export const SECTION_PAD = 36
 const KINDS: Kind[] = ['text', 'file', 'link', 'group']
@@ -129,23 +130,26 @@ export function newId(kind: string): string {
 }
 
 // The items again under fresh ids, moved by (dx, dy), connectors following.
-export function cloneItems(nodes: CanvasItem[], edges: CanvasItem[], dx: number, dy: number): CanvasPatch {
+export function cloneItems({ nodes, edges }: Clip, dx: number, dy: number): Clip {
   const ids = new Map(nodes.map((item) => [item.id, newId(String(item.type))]))
   return {
-    nodes: nodes.map((item) => ({ ...item, id: ids.get(item.id), x: Math.round(rectOfItem(item).x + dx), y: Math.round(rectOfItem(item).y + dy) })),
+    nodes: nodes.map((item) => ({ ...item, id: ids.get(item.id)!, x: Math.round(rectOfItem(item).x + dx), y: Math.round(rectOfItem(item).y + dy) })),
     edges: edges.map((edge) => ({ ...edge, id: newId('edge'), fromNode: ids.get(edge.fromNode as string), toNode: ids.get(edge.toNode as string) })),
   }
 }
 
-// The server owns the board; selection and measurements stay local, and an
-// item the user is resizing keeps its live geometry.
-export function mergeNodes(current: BoardNode[], next: BoardNode[]): BoardNode[] {
+// The nodes are the server's items, selected as the composer says. An item
+// being resized keeps its live geometry, and an unchanged node keeps its
+// object so React Flow skips it.
+export function mergeNodes(current: BoardNode[], next: BoardNode[], selected: ReadonlySet<string>): BoardNode[] {
   const local = new Map(current.map((node) => [node.id, node]))
   return next.map((node) => {
     const mine = local.get(node.id)
-    if (!mine) return node
-    if (mine.resizing) return mine
-    return { ...node, selected: mine.selected, measured: mine.measured }
+    const chosen = selected.has(node.id)
+    if (mine?.resizing || (mine && mine.data.item === node.data.item && Boolean(mine.selected) === chosen)) {
+      return mine
+    }
+    return { ...node, selected: chosen, measured: mine?.measured }
   })
 }
 
@@ -192,6 +196,12 @@ export function sectionContents(section: BoardNode, nodes: BoardNode[]): BoardNo
     const rect = rectOfNode(node)
     return node.id !== section.id && containsPoint(area, rect.x + rect.width / 2, rect.y + rect.height / 2) && !contains(rect, area)
   })
+}
+
+// The nodes with everything their sections hold.
+export function withContents(nodes: BoardNode[], all: BoardNode[]): BoardNode[] {
+  const sections = nodes.filter((node) => node.type === 'group')
+  return [...new Map([...nodes, ...sections.flatMap((section) => sectionContents(section, all))].map((node) => [node.id, node])).values()]
 }
 
 export function padded(rect: Rect): Rect {

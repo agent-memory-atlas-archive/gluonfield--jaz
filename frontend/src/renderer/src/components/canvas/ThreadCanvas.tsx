@@ -16,8 +16,8 @@ import {
 import '@xyflow/react/dist/base.css'
 import './canvas.css'
 import { Minus, Plus } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import type { CanvasItem } from '@/lib/api/canvas'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import type { CanvasItem, CanvasPatch, CanvasView } from '@/lib/api/canvas'
 import { useArtifactThemeCSS } from '@/lib/hooks/useArtifactThemeCSS'
 import {
   bounds,
@@ -38,6 +38,7 @@ import {
   toFlowEdges,
   toFlowNodes,
   viewerFor,
+  withContents,
   type BoardEdge,
   type BoardNode,
   type Rect,
@@ -47,7 +48,7 @@ import { CanvasDock, type Tool } from './CanvasDock'
 import { ConnectorEdge, FileNode, GroupNode, LinkNode, TextNode } from './CanvasNodes'
 import { FIT, useAgentFollow } from './useAgentFollow'
 import type { CanvasPick } from './useCanvasContexts'
-import { typing, useCanvasEditing } from './useCanvasEditing'
+import { useCanvasInput, type Bindings } from './useCanvasInput'
 import { useCanvasSync } from './useCanvasSync'
 import { useSectionDrag } from './useSectionDrag'
 
@@ -61,34 +62,49 @@ interface Props {
 
 const nodeTypes = { text: TextNode, file: FileNode, link: LinkNode, group: GroupNode }
 const edgeTypes = { connector: ConnectorEdge }
-const SHORTCUTS: Record<string, Tool> = { KeyV: 'select', KeyH: 'hand', KeyS: 'sticky', KeyT: 'text', KeyX: 'connector' }
+const TOOL_KEYS: Record<string, Tool> = { V: 'select', H: 'hand', S: 'sticky', T: 'text', X: 'connector' }
 const HINTS: Record<string, string> = { link: 'Use the page', cad: 'Drag to rotate, scroll to zoom', dxf: 'Drag to pan, scroll to zoom', pdf: 'Scroll and use the page controls' }
 
 export function ThreadCanvas(props: Props) {
+  const sync = useCanvasSync(props.sessionId, props.working)
+  if (!sync.view || !sync.local) {
+    return <div className="canvas">{sync.error ? <div className="canvas-overlay canvas-banner danger">{sync.error.message}</div> : null}</div>
+  }
   return (
     <ReactFlowProvider>
-      <Board {...props} />
+      <Board {...props} {...sync} view={sync.view} local={sync.local} />
     </ReactFlowProvider>
   )
 }
 
-function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
+interface BoardProps extends Props {
+  view: CanvasView
+  local: CanvasView
+  commit: (change: CanvasPatch) => void
+  replay: (from: 'undo' | 'redo') => void
+  error: Error | null
+}
+
+function Board({ sessionId, selection, onSelect, onPrompt, view, local, commit, replay, error }: BoardProps) {
   const flow = useReactFlow<BoardNode, BoardEdge>()
   const { zoom } = useViewport()
   const theme = useArtifactThemeCSS()
   const container = useRef<HTMLDivElement>(null)
-  const { view, local, commit, replay, error } = useCanvasSync(sessionId, working)
-  useCanvasEditing({ local, commit, replay, onSelect, container })
   const { flash, news, show, touch } = useAgentFollow(view, local, container)
   const [nodes, setNodes, onNodesChange] = useNodesState<BoardNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<BoardEdge>([])
   const { dragging, dropTarget, ...drag } = useSectionDrag(setNodes, commit)
   // Nothing from the server lands mid-drag; the drag's own result merges after.
   useEffect(() => {
-    if (!local || dragging) return
-    setNodes((current) => mergeNodes(current, toFlowNodes(local)))
-    setEdges((current) => mergeEdges(current, toFlowEdges(local)))
-  }, [local, dragging, setNodes, setEdges])
+    if (!dragging) {
+      setNodes((current) => mergeNodes(current, toFlowNodes(local), new Set(selection)))
+    }
+  }, [local, selection, dragging, setNodes])
+  useEffect(() => {
+    if (!dragging) {
+      setEdges((current) => mergeEdges(current, toFlowEdges(local)))
+    }
+  }, [local, dragging, setEdges])
 
   const [tool, setTool] = useState<Tool>('select')
   const [editing, setEditing] = useState<string | null>(null)
@@ -100,13 +116,6 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
   const onSelectionChange = useCallback(({ nodes: picked }: OnSelectionChangeParams<BoardNode, BoardEdge>) => {
     onSelect(picked.map((node) => ({ node: node.id, label: itemLabel(node.data.item) })))
   }, [onSelect])
-  useEffect(() => {
-    const wanted = new Set(selection)
-    setNodes((current) =>
-      current.every((node) => Boolean(node.selected) === wanted.has(node.id))
-        ? current
-        : current.map((node) => ({ ...node, selected: wanted.has(node.id) })))
-  }, [selection, setNodes])
 
   // A new item dropped inside a section grows the section around it.
   const sectionFor = (rect: Rect): Partial<CanvasItem>[] => {
@@ -176,46 +185,25 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
     setConnectSource(null)
   }
 
-  const onKey = useEffectEvent((event: KeyboardEvent) => {
-    if (event.defaultPrevented || typing(event.target)) {
-      return
-    }
-    if (event.key === 'Escape') {
+  const keys: Bindings = {
+    ...Object.fromEntries(Object.entries(TOOL_KEYS).map(([key, next]) => [key, () => chooseTool(next)])),
+    Escape: () => {
       setFocused(null)
-      setTool('select')
-      setConnectSource(null)
-      return
-    }
-    // Cmd+Delete removes a section and keeps what it holds; React Flow's own
-    // Delete would take the contents too.
-    if ((event.metaKey || event.ctrlKey) && (event.key === 'Backspace' || event.key === 'Delete')) {
-      const sections = flow.getNodes().filter((node) => node.selected && node.type === 'group')
-      if (!sections.length) return
-      event.preventDefault()
-      event.stopPropagation()
-      commit({ remove: sections.map((node) => node.id) })
-      return
-    }
-    if (event.metaKey || event.ctrlKey || event.altKey) return
-    if (event.code === 'KeyS' && event.shiftKey) {
-      event.preventDefault()
+      chooseTool('select')
+    },
+    // Shift+S wraps the selection in a section, or draws one.
+    'Shift+S': () => {
       const picked = flow.getNodes().filter((node) => node.selected && node.type !== 'group')
       if (!picked.length) {
-        setTool('section')
+        chooseTool('section')
         return
       }
       addSection(padded(bounds(picked.map(rectOfNode))))
-      return
-    }
-    if (!event.shiftKey && SHORTCUTS[event.code]) setTool(SHORTCUTS[event.code])
-  })
-  useEffect(() => {
-    const listener = (event: KeyboardEvent) => onKey(event)
-    window.addEventListener('keydown', listener, true)
-    return () => window.removeEventListener('keydown', listener, true)
-  }, [])
+    },
+  }
+  useCanvasInput({ local, commit, replay, onSelect, container, keys })
 
-  const board = useMemo<CanvasBoard | null>(() => view ? {
+  const board = useMemo<CanvasBoard>(() => ({
     sessionId,
     view,
     theme,
@@ -228,7 +216,7 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
     connectSource,
     commit,
     prompt: onPrompt,
-  } : null, [sessionId, view, theme, focused, flash, editing, dropTarget, connectSource, commit, onPrompt])
+  }), [sessionId, view, theme, focused, flash, editing, dropTarget, connectSource, commit, onPrompt])
 
   const focusedItem = nodes.find((node) => node.id === focused)?.data.item
   const focusedKind = focusedItem?.type === 'link' ? 'link' : viewerFor(String(focusedItem?.file ?? ''))
@@ -242,84 +230,81 @@ function Board({ sessionId, working, selection, onSelect, onPrompt }: Props) {
       onWheelCapture={touch}
       onKeyDownCapture={touch}
     >
-      {board ? (
-        <CanvasContext.Provider value={board}>
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onReconnect={onReconnect}
-            onDelete={({ nodes: gone, edges: cut }) => {
-              const contents = gone.filter((node) => node.type === 'group').flatMap((section) => sectionContents(section, flow.getNodes()))
-              commit({ remove: [...new Set([...gone, ...cut, ...contents].map((item) => item.id))] })
-            }}
-            {...drag}
-            onNodeClick={onNodeClick}
-            onNodeDoubleClick={(event, node) => {
-              if (node.type !== 'group') {
-                if (focusable(node.data.item)) setFocused(node.id)
-                return
-              }
-              // Double-clicking a section's edge fits it to what it holds.
-              const inside = sectionContents(node, flow.getNodes())
-              if (inside.length && (event.target as HTMLElement).closest('.react-flow__resize-control')) {
-                commit({ nodes: [{ id: node.id, ...rounded(padded(bounds(inside.map(rectOfNode)))) }] })
-              }
-            }}
-            onEdgeDoubleClick={(_event, edge) => setEditing(edge.id)}
-            onPaneClick={() => setFocused(null)}
-            onSelectionChange={onSelectionChange}
-            onMoveStart={(event) => event && setBusy(true)}
-            onMoveEnd={() => setBusy(false)}
-            onSelectionStart={() => setBusy(true)}
-            onSelectionEnd={() => setBusy(false)}
-            connectionMode={ConnectionMode.Loose}
-            connectionLineStyle={{ stroke: 'var(--canvas-accent)', strokeWidth: 1.5 }}
-            reconnectRadius={8}
-            panOnScroll
-            selectionOnDrag={tool !== 'hand'}
-            panOnDrag={tool === 'hand' ? true : [1, 2]}
-            nodesDraggable={tool !== 'hand'}
-            elementsSelectable={tool !== 'hand'}
-            zoomOnDoubleClick={false}
-            elevateNodesOnSelect={false}
-            nodeDragThreshold={3}
-            deleteKeyCode={['Backspace', 'Delete']}
-            multiSelectionKeyCode={['Meta', 'Shift']}
-            minZoom={0.1}
-            maxZoom={4}
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} color="var(--canvas-dot)" bgColor="var(--color-bg)" />
-            <Panel position="bottom-right" className="canvas-map canvas-overlay">
-              <MiniMap
-                pannable
-                zoomable
-                ariaLabel="Canvas overview"
-                nodeColor={(node) => (node.type === 'group' ? 'var(--canvas-map-section)' : 'var(--canvas-map-node)')}
-                nodeStrokeWidth={0}
-                maskColor="var(--canvas-map-mask)"
-                style={{ position: 'static', margin: 0, width: 200, height: 130, background: 'transparent' }}
-              />
-              <div className="canvas-zoom">
-                <button type="button" aria-label="Zoom out" onClick={() => void flow.zoomOut({ duration: 200 })}>
-                  <Minus size={14} />
-                </button>
-                <button type="button" title="Fit everything" onClick={() => void flow.fitView({ duration: 300, ...FIT })}>
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button type="button" aria-label="Zoom in" onClick={() => void flow.zoomIn({ duration: 200 })}>
-                  <Plus size={14} />
-                </button>
-              </div>
-            </Panel>
-          </ReactFlow>
-        </CanvasContext.Provider>
-      ) : null}
+      <CanvasContext.Provider value={board}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onReconnect={onReconnect}
+          onDelete={({ nodes: gone, edges: cut }) => {
+            commit({ remove: [...new Set([...withContents(gone, flow.getNodes()), ...cut].map((item) => item.id))] })
+          }}
+          {...drag}
+          onNodeClick={onNodeClick}
+          onNodeDoubleClick={(event, node) => {
+            if (node.type !== 'group') {
+              if (focusable(node.data.item)) setFocused(node.id)
+              return
+            }
+            // Double-clicking a section's edge fits it to what it holds.
+            const inside = sectionContents(node, flow.getNodes())
+            if (inside.length && (event.target as HTMLElement).closest('.react-flow__resize-control')) {
+              commit({ nodes: [{ id: node.id, ...rounded(padded(bounds(inside.map(rectOfNode)))) }] })
+            }
+          }}
+          onEdgeDoubleClick={(_event, edge) => setEditing(edge.id)}
+          onPaneClick={() => setFocused(null)}
+          onSelectionChange={onSelectionChange}
+          onMoveStart={(event) => event && setBusy(true)}
+          onMoveEnd={() => setBusy(false)}
+          onSelectionStart={() => setBusy(true)}
+          onSelectionEnd={() => setBusy(false)}
+          connectionMode={ConnectionMode.Loose}
+          connectionLineStyle={{ stroke: 'var(--canvas-accent)', strokeWidth: 1.5 }}
+          reconnectRadius={8}
+          panOnScroll
+          selectionOnDrag={tool !== 'hand'}
+          panOnDrag={tool === 'hand' ? true : [1, 2]}
+          nodesDraggable={tool !== 'hand'}
+          elementsSelectable={tool !== 'hand'}
+          zoomOnDoubleClick={false}
+          elevateNodesOnSelect={false}
+          nodeDragThreshold={3}
+          deleteKeyCode={['Backspace', 'Delete']}
+          multiSelectionKeyCode={['Meta', 'Shift']}
+          minZoom={0.1}
+          maxZoom={4}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} color="var(--canvas-dot)" bgColor="var(--color-bg)" />
+          <Panel position="bottom-right" className="canvas-map canvas-overlay">
+            <MiniMap
+              pannable
+              zoomable
+              ariaLabel="Canvas overview"
+              nodeColor={(node) => (node.type === 'group' ? 'var(--canvas-map-section)' : 'var(--canvas-map-node)')}
+              nodeStrokeWidth={0}
+              maskColor="var(--canvas-map-mask)"
+              style={{ position: 'static', margin: 0, width: 200, height: 130, background: 'transparent' }}
+            />
+            <div className="canvas-zoom">
+              <button type="button" aria-label="Zoom out" onClick={() => void flow.zoomOut({ duration: 200 })}>
+                <Minus size={14} />
+              </button>
+              <button type="button" title="Fit everything" onClick={() => void flow.fitView({ duration: 300, ...FIT })}>
+                {Math.round(zoom * 100)}%
+              </button>
+              <button type="button" aria-label="Zoom in" onClick={() => void flow.zoomIn({ duration: 200 })}>
+                <Plus size={14} />
+              </button>
+            </div>
+          </Panel>
+        </ReactFlow>
+      </CanvasContext.Provider>
 
       {['sticky', 'text', 'section'].includes(tool) ? (
         <div

@@ -11,10 +11,10 @@ const IDLE_MS = 3000
 // someone else's edits: the user's own are already on screen. Those items
 // flash; the camera follows them while the user is idle, otherwise a pill
 // offers to.
-export function useAgentFollow(view: CanvasView | undefined, local: CanvasView | undefined, container: RefObject<HTMLDivElement | null>) {
+export function useAgentFollow(view: CanvasView, local: CanvasView, container: RefObject<HTMLDivElement | null>) {
   const flow = useReactFlow<BoardNode, BoardEdge>()
   const touched = useRef(0)
-  const shown = useRef<{ view?: CanvasView; local?: CanvasView }>({})
+  const shown = useRef<{ view: CanvasView; local: CanvasView } | null>(null)
   const [flash, setFlash] = useState<Record<string, number>>({})
   const [news, setNews] = useState<string[]>([])
   const show = useCallback((ids: string[]) => {
@@ -23,10 +23,9 @@ export function useAgentFollow(view: CanvasView | undefined, local: CanvasView |
   }, [flow])
 
   useEffect(() => {
-    if (!local) return
     const before = shown.current
     shown.current = { view, local }
-    if (!before.local) {
+    if (!before) {
       requestAnimationFrame(() => void flow.fitView({ maxZoom: 1, ...FIT }))
       return
     }

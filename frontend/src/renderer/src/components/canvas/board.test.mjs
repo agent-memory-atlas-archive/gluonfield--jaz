@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { applyPatch, changedNodeIds, cloneItems, innermostSection, invertPatch, mergeNodes, sectionContents, toFlowEdges, toFlowNodes } from '@/components/canvas/board'
+import { applyPatch, changedNodeIds, cloneItems, innermostSection, invertPatch, mergeNodes, sectionContents, toFlowEdges, toFlowNodes, withContents } from '@/components/canvas/board'
 
 const view = (nodes, edges = [], files = {}) => ({ version: 'v', dir: '/c', nodes, edges, files, components: {} })
 
@@ -26,21 +26,24 @@ test('optimistic patches follow the server: merge by id, null removes, removed n
   expect(before.nodes[0].x).toBe(0)
 })
 
-test('server views replace the board except selection and an item being resized', () => {
+test('server views replace the board, selected as asked, except an item being resized', () => {
   const server = toFlowNodes(view([
     { id: 'free', type: 'text', x: 500, y: 500, width: 100, height: 100 },
     { id: 'resized', type: 'text', x: 500, y: 500, width: 100, height: 100 },
+    { id: 'new', type: 'text', x: 0, y: 0, width: 100, height: 100 },
   ]))
   const local = [
-    { ...server[0], position: { x: 1, y: 1 }, selected: true },
+    { ...server[0], data: { item: { ...server[0].data.item } }, position: { x: 1, y: 1 } },
     { ...server[1], width: 300, resizing: true },
     { id: 'gone', type: 'text', position: { x: 0, y: 0 }, data: { item: { id: 'gone' } } },
   ]
-  const merged = mergeNodes(local, server)
+  const merged = mergeNodes(local, server, new Set(['free', 'new']))
   expect(merged.map((node) => [node.id, node.position.x, node.width, Boolean(node.selected)])).toEqual([
     ['free', 500, 100, true],
     ['resized', 500, 300, false],
+    ['new', 0, 100, true],
   ])
+  expect(mergeNodes(merged, server, new Set(['free', 'new']))[0]).toBe(merged[0])
 })
 
 test('sections render behind items and edges get sides from geometry unless the agent named them', () => {
@@ -85,6 +88,7 @@ test('a section holds what is centred inside it, never the section around it', (
   const outer = nodes.find((node) => node.id === 'outer')
   expect(sectionContents(inner, nodes).map((node) => node.id)).toEqual(['in', 'straddling'])
   expect(sectionContents(outer, nodes).map((node) => node.id)).toEqual(['inner', 'in', 'straddling', 'out'])
+  expect(withContents([inner, nodes.find((node) => node.id === 'in')], nodes).map((node) => node.id)).toEqual(['inner', 'in', 'straddling'])
 })
 
 test('the innermost section under a point wins', () => {
@@ -119,7 +123,7 @@ test('copies get fresh ids and keep the connectors among them', () => {
     { id: 'a', type: 'text', x: 0, y: 0, width: 10, height: 10 },
     { id: 'b', type: 'group', x: 50, y: 0, width: 10, height: 10 },
   ]
-  const copy = cloneItems(nodes, [{ id: 'ab', fromNode: 'a', toNode: 'b', label: 'next' }], 24, 24)
+  const copy = cloneItems({ nodes, edges: [{ id: 'ab', fromNode: 'a', toNode: 'b', label: 'next' }] }, 24, 24)
   const ids = copy.nodes.map((node) => node.id)
   expect(ids).not.toContain('a')
   expect(ids).not.toContain('b')

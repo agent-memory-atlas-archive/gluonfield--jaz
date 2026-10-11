@@ -14,7 +14,6 @@ const EASE = 0.7
 
 type Wave = {
   on: boolean
-  calm: boolean
   start: number
   end: number
   reach: number
@@ -33,13 +32,7 @@ function front(ms: number): number {
 // Where a dot sits in the wave: px behind the shockwave on the way in, ms
 // since the sweep passed on the way out.
 function local(wave: Wave, i: number, elapsed: number): number {
-  if (wave.calm) {
-    return elapsed
-  }
-  if (wave.on) {
-    return front(elapsed) - wave.dist[i]
-  }
-  return elapsed - (SWEEP * wave.dist[i]) / wave.reach
+  return wave.on ? front(elapsed) - wave.dist[i] : elapsed - (SWEEP * wave.dist[i]) / wave.reach
 }
 
 // How present a dot is: 1 is its resting size.
@@ -47,9 +40,6 @@ function presence(wave: Wave, i: number, u: number): number {
   const from = wave.from[i]
   if (u <= 0) {
     return from
-  }
-  if (wave.calm) {
-    return from + (Number(wave.on) - from) * Math.min(1, u / 200)
   }
   if (!wave.on) {
     return from * (1 - Math.min(1, u / 220)) ** 2
@@ -108,7 +98,7 @@ function createField(canvas: HTMLCanvasElement) {
         continue
       }
       // A dot the shockwave brings in flares in the rainbow and ripples.
-      const fresh = wave.on && !wave.calm && u > 0 ? 1 - wave.from[i] : 0
+      const fresh = wave.on && u > 0 ? 1 - wave.from[i] : 0
       const crest = fresh * (u / 26) * Math.exp(1 - u / 26)
       const push = fresh * 7 * Math.exp(-u / 70) * Math.sin(u / 24)
       ctx.globalAlpha = Math.min(1, ALPHA * Math.min(p, 1) + 0.85 * crest)
@@ -174,20 +164,21 @@ function createField(canvas: HTMLCanvasElement) {
     return { x: (pointer.x - rect.left) / zoom(), y: (pointer.y - rect.top) / zoom() }
   }
 
+  // A field's first state, and every change without effects, is drawn at once.
   const set = (next: boolean, animate: boolean) => {
     if (next === on) {
       return
     }
-    const fresh = on === undefined
+    const first = on === undefined
     const now = performance.now()
     const from = new Float32Array(xs.length)
     for (let i = 0; i < xs.length; i++) {
       from[i] = wave ? Math.min(1, presence(wave, i, local(wave, i, now - wave.start))) : Number(Boolean(on))
     }
     on = next
+    wave = null
     cancelAnimationFrame(raf)
-    if (fresh) {
-      wave = null
+    if (first || !animate) {
       draw(now)
       return
     }
@@ -206,8 +197,8 @@ function createField(canvas: HTMLCanvasElement) {
       hue[i] = Math.floor(((Math.atan2(dy, dx) / TAU + 1) % 1) * HUES)
     }
     // The shockwave runs until every dot is well behind it.
-    const end = !animate ? 200 : next ? ((reach + 200) / SPEED) ** (1 / EASE) : SWEEP + 220
-    wave = { on: next, calm: !animate, start: now, end, reach, from, dist, ux, uy, hue }
+    const end = next ? ((reach + 200) / SPEED) ** (1 / EASE) : SWEEP + 220
+    wave = { on: next, start: now, end, reach, from, dist, ux, uy, hue }
     raf = requestAnimationFrame(frame)
   }
 
