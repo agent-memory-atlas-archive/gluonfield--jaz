@@ -35,6 +35,7 @@ func TestABotsLoopToolsSeeOnlyItsOwnRoutines(t *testing.T) {
 	}
 	gimli, legolas := bot("Gimli"), bot("Legolas")
 	subtask := thread(storage.CreateSession{SourceType: storage.SourceBotWorker, SourceID: gimli})
+	seat := thread(storage.CreateSession{SourceType: storage.SourceBotMember, SourceID: gimli})
 	chat := thread(storage.CreateSession{Title: "Chat"})
 
 	routines := loops.NewService(store, nil, log.New(nil))
@@ -56,7 +57,7 @@ func TestABotsLoopToolsSeeOnlyItsOwnRoutines(t *testing.T) {
 	}
 	ctx := context.Background()
 
-	for threadID, want := range map[string][]string{gimli: {own}, subtask: {own}, chat: {own, theirs, unowned}} {
+	for threadID, want := range map[string][]string{gimli: {own}, subtask: {own}, seat: {own}, chat: {own, theirs, unowned}} {
 		_, out, err := tools.List(ctx, from(threadID), loops.MCPListInput{})
 		if err != nil {
 			t.Fatal(err)
@@ -74,15 +75,17 @@ func TestABotsLoopToolsSeeOnlyItsOwnRoutines(t *testing.T) {
 	if _, _, err := tools.Get(ctx, from(gimli), loops.MCPIDInput{ID: own}); err != nil {
 		t.Fatalf("a bot could not read its own routine: %v", err)
 	}
+	paused := loops.StatusPaused
 	for _, id := range []string{theirs, unowned} {
-		if _, _, err := tools.Get(ctx, from(subtask), loops.MCPIDInput{ID: id}); err == nil {
-			t.Fatalf("a bot read routine %s it does not own", id)
+		_, _, getErr := tools.Get(ctx, from(seat), loops.MCPIDInput{ID: id})
+		_, _, updateErr := tools.Update(ctx, from(subtask), loops.MCPUpdateInput{ID: id, Status: &paused})
+		_, _, runErr := tools.Run(ctx, from(gimli), loops.MCPIDInput{ID: id})
+		_, _, deleteErr := tools.Delete(ctx, from(gimli), loops.MCPIDInput{ID: id})
+		if getErr == nil || updateErr == nil || runErr == nil || deleteErr == nil {
+			t.Fatalf("a bot reached routine %s it does not own: get %v, update %v, run %v, delete %v", id, getErr, updateErr, runErr, deleteErr)
 		}
-		if _, _, err := tools.Delete(ctx, from(gimli), loops.MCPIDInput{ID: id}); err == nil {
-			t.Fatalf("a bot deleted routine %s it does not own", id)
-		}
-		if loop, err := routines.Load(id); err != nil || loop.Status == loops.StatusDeleted {
-			t.Fatalf("routine %s after a foreign delete = %+v, %v", id, loop, err)
+		if loop, err := routines.Load(id); err != nil || loop.Status != loops.StatusActive {
+			t.Fatalf("routine %s after foreign calls = %+v, %v", id, loop, err)
 		}
 	}
 }

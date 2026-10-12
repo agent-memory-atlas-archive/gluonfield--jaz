@@ -163,30 +163,6 @@ func (t *MCPTools) List(_ context.Context, req *mcp.CallToolRequest, _ MCPListIn
 	return nil, MCPListOutput{Loops: items}, err
 }
 
-// bot returns the bot whose routines the caller is limited to, or "" for all.
-func (t *MCPTools) bot(req *mcp.CallToolRequest) string {
-	if t.scope == nil {
-		return ""
-	}
-	return t.scope(mcpsession.SessionID(req))
-}
-
-// load returns the loop the caller names, provided the caller may see it.
-func (t *MCPTools) load(req *mcp.CallToolRequest, value string) (Loop, error) {
-	id := strings.TrimSpace(value)
-	if id == "" {
-		return Loop{}, errors.New("id is required")
-	}
-	loop, err := t.service.Load(id)
-	if err != nil {
-		return Loop{}, err
-	}
-	if bot := t.bot(req); bot != "" && loop.BotID != bot {
-		return Loop{}, fmt.Errorf("loop %s is not one of your routines", id)
-	}
-	return loop, nil
-}
-
 type MCPIDInput struct {
 	ID    string `json:"id" jsonschema:"loop id"`
 	Limit int    `json:"limit,omitempty" jsonschema:"recent run limit, 1-100, default 20"`
@@ -326,6 +302,30 @@ func (t *MCPTools) Delete(_ context.Context, req *mcp.CallToolRequest, input MCP
 		return nil, MCPDeleteOutput{}, err
 	}
 	return nil, MCPDeleteOutput{OK: true}, nil
+}
+
+// bot returns the bot whose routines the caller is limited to, or "" for all.
+func (t *MCPTools) bot(req *mcp.CallToolRequest) string {
+	if t.scope == nil {
+		return ""
+	}
+	return t.scope(mcpsession.SessionID(req))
+}
+
+// load returns the loop the caller names, provided the caller may see it.
+func (t *MCPTools) load(req *mcp.CallToolRequest, value string) (Loop, error) {
+	id := strings.TrimSpace(value)
+	if id == "" {
+		return Loop{}, errors.New("id is required")
+	}
+	loop, err := t.service.Load(id)
+	if err != nil {
+		return Loop{}, err
+	}
+	if bot := t.bot(req); bot != "" && loop.BotID != bot {
+		return Loop{}, fmt.Errorf("loop %s is not one of your routines", id)
+	}
+	return loop, nil
 }
 
 func mcpLimit(value int) int {
