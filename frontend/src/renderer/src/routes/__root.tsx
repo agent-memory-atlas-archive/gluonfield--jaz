@@ -309,7 +309,7 @@ function RootLayout() {
           </div>
 
           <div className="flex min-h-0 flex-1">
-            <NavRail tab={tab} onOpenSettings={() => openSettings()} />
+            <NavRail tab={tab} onOpenChat={() => setSidebarOpen(true)} onOpenSettings={() => openSettings()} />
             <div
               className={`relative flex min-w-0 flex-1 overflow-hidden border-border bg-bg transition-[margin,border-radius] duration-300 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none sm:border ${
                 pathname === '/new' && !settingsOpen

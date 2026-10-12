@@ -64,7 +64,7 @@ function TabLabel({ children, shortcut }: { children: string; shortcut?: number 
   )
 }
 
-export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings: () => void }) {
+export function NavRail({ tab, onOpenChat, onOpenSettings }: { tab: RailTab; onOpenChat: () => void; onOpenSettings: () => void }) {
   const rail = useRef<HTMLElement>(null)
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const sections = useRailSections()
@@ -97,6 +97,7 @@ export function NavRail({ tab, onOpenSettings }: { tab: RailTab; onOpenSettings:
         to={lastSession ? '/sessions/$sessionId' : '/new'}
         params={lastSession ? { sessionId: lastSession } : {}}
         aria-label="Chat"
+        onClick={onOpenChat}
         className={tabClass(tab === 'chat')}
       >
         <MessageSquare aria-hidden />
