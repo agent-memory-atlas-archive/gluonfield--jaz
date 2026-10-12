@@ -211,6 +211,15 @@ JAZ_TASKS_API_KEY=...
 JAZ_MCP_SERVERS='[{"name":"Tasks","url":"http://tasks:7400/mcp","bearer_token_env_var":"JAZ_TASKS_API_KEY"}]'
 ```
 
+A server also takes `headers`, sent on every request: each has a `name` and a `value` or an `envvar`. The same JSON works as the string `jaz.mcpservers` in `application.yaml`; a YAML list is rejected. Jaz Tasks reads its [app configuration headers](https://github.com/gluonfield/jaz-tasks#configure-the-app) this way:
+
+```yaml
+jaz:
+  mcpservers: |
+    [{"name": "Tasks", "url": "http://tasks:7400/mcp", "bearer_token_env_var": "JAZ_TASKS_API_KEY",
+      "headers": [{"name": "Tasks-View", "value": "board"}, {"name": "Tasks-Mode", "value": "minimal"}]}]
+```
+
 ## Clients
 
 The Electron desktop app can connect to a remote backend with a client URL or a pinned development backend:
