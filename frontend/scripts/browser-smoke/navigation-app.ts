@@ -1,5 +1,6 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 import { createMemoryHistory } from '@tanstack/react-router'
+import { z } from 'zod'
 
 const app = new App({ name: 'Navigation peer', version: '1' }, {
   availableDisplayModes: ['fullscreen'],
@@ -12,12 +13,16 @@ const report = (replace: boolean, delta?: number) => app.notification({
   params: { path: history.location.href, replace, ...(delta && { delta }) },
 })
 const paint = () => {
-  document.body.innerHTML = '<button id="person">Jim</button><button id="other">Jane</button><button id="filter">Filter</button><button id="replace">Replace</button><button id="back">Back</button>'
+  document.body.innerHTML = '<button id="person">Jim</button><button id="other">Jane</button><button id="filter">Filter</button><button id="replace">Replace</button><button id="back">Back</button><button id="thread">Chat</button>'
   document.getElementById('person')!.onclick = () => history.push('/r/jim')
   document.getElementById('other')!.onclick = () => history.push('/r/jane')
   document.getElementById('filter')!.onclick = () => history.push('/people?tags=Advisor')
   document.getElementById('replace')!.onclick = () => history.replace('/people?tags=Customer')
   document.getElementById('back')!.onclick = () => history.back()
+  document.getElementById('thread')!.onclick = () => app.request({ method: 'jaz/threads/create', params: { prompt: 'Find the biggest city' } }, z.object({})).then(
+    () => window.parent.postMessage({ type: 'navigation-peer-thread', result: 'started' }, '*'),
+    (error: Error) => window.parent.postMessage({ type: 'navigation-peer-thread', result: error.message }, '*'),
+  )
   window.parent.postMessage({ type: 'navigation-peer', path: history.location.href, instance }, '*')
 }
 history.subscribe(({ location, action }) => {

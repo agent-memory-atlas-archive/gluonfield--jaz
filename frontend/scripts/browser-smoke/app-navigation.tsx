@@ -3,6 +3,9 @@ import { createHashHistory, createRoute, createRouter, RouterProvider } from '@t
 import { createRoot } from 'react-dom/client'
 import { Route as rootRoute } from '@/routes/__root'
 import { Route as appRoute } from '@/routes/apps.$serverId.$tool'
+import { Route as newRoute } from '@/routes/new'
+import type { AgentSettings } from '@/lib/api/types'
+import { NEW_SESSION_AGENT_KEY, NEW_SESSION_DIRECTORY_KEY, NEW_SESSION_DRAFT_KEY } from '@/lib/newSessionConfig'
 
 export async function exerciseAppNavigation() {
   const sourceURL = location.href
@@ -13,15 +16,41 @@ export async function exerciseAppNavigation() {
   const root = createRoot(element)
   const originalFetch = window.fetch
   const locations = new Map<MessageEventSource, { path: string; instance: number }>()
+  let thread = ''
   const observe = (event: MessageEvent) => {
     if (event.data?.type === 'navigation-peer' && event.source) locations.set(event.source, event.data)
+    if (event.data?.type === 'navigation-peer-thread') {
+      thread = event.data.result
+    }
   }
+  const settings: AgentSettings = {
+    providers: [], agents: ['codex'],
+    acp: { codex: { enabled: true, model: 'gpt', reasoning_effort: 'medium' } },
+    acp_options: { codex: { local: true, supports_auth: false, reasoning_efforts: [], models: [{ value: 'gpt', label: 'GPT', reasoning: { status: 'ready', efforts: ['medium'], default_effort: 'medium' } }] } },
+  }
+  const sessions: unknown[] = []
+  const prompts: { message: { text: string } }[] = []
+  const originalAgent = localStorage.getItem(NEW_SESSION_AGENT_KEY)
+  const originalDirectory = localStorage.getItem(NEW_SESSION_DIRECTORY_KEY)
+  localStorage.setItem(NEW_SESSION_AGENT_KEY, 'codex')
+  localStorage.setItem(NEW_SESSION_DIRECTORY_KEY, '')
   window.addEventListener('message', observe)
   window.fetch = async (input, init) => {
     const url = String(input)
     if (url.endsWith('/v1/mcp/apps')) return Response.json({ entrypoints: ['crm', 'tasks'].map((id) => ({ server_id: id, tool: 'show', title: id, type: 'global' })) })
     if (url.includes('/resource?tool=')) return Response.json({ html })
     if (url.endsWith('/tools/call')) return Response.json({ content: [] })
+    if (url.endsWith('/v1/settings/agents')) {
+      return Response.json(settings)
+    }
+    if (url.endsWith('/v1/sessions') && init?.method === 'POST') {
+      sessions.push(JSON.parse(String(init.body)))
+      return Response.json({ id: 'thread-smoke' })
+    }
+    if (url.endsWith('/v1/sessions/thread-smoke/queue')) {
+      prompts.push(JSON.parse(String(init?.body)))
+      return Response.json({ id: 'thread-smoke' })
+    }
     if (url.includes('/v1/')) return new Response('Unavailable in this fixture', { status: 503 })
     return originalFetch(input, init)
   }
@@ -31,7 +60,8 @@ export async function exerciseAppNavigation() {
   const router = createRouter({
     routeTree: rootRoute.addChildren([
       createRoute({ getParentRoute: () => rootRoute, path: '/apps/$serverId/$tool', validateSearch: appRoute.options.validateSearch }),
-      createRoute({ getParentRoute: () => rootRoute, path: '/new', component: () => <p>Chat</p> }),
+      createRoute({ getParentRoute: () => rootRoute, path: '/new', component: newRoute.options.component, validateSearch: newRoute.options.validateSearch }),
+      createRoute({ getParentRoute: () => rootRoute, path: '/sessions/$sessionId', component: () => <p>Thread</p> }),
     ]),
     history,
   })
@@ -121,6 +151,34 @@ export async function exerciseAppNavigation() {
     await until(() => locations.get(frame('crm').contentWindow!)?.path === '/people?tags=Advisor')
     if (!at('tasks', '/issue/CAS-2')) throw new Error('An inactive app changed Jaz navigation')
     await window.smoke.capture('app-navigation')
+    frame('crm').focus()
+    frame('tasks').contentWindow!.postMessage({ type: 'navigation-peer-action', button: 'thread' }, '*')
+    await until(() => thread.includes('Only the app in use can start a chat'))
+    if (sessions.length) {
+      throw new Error('An app the user was not using started a thread')
+    }
+    const draft = JSON.stringify({ text: 'My own draft', tokens: [] })
+    sessionStorage.setItem(NEW_SESSION_DRAFT_KEY, draft)
+    thread = ''
+    frame('tasks').focus()
+    frame('tasks').contentWindow!.postMessage({ type: 'navigation-peer-action', button: 'thread' }, '*')
+    await until(() => thread !== '')
+    if (thread !== 'started') {
+      throw new Error(`The app in use could not start a thread: ${thread}`)
+    }
+    await until(() => router.state.location.pathname === '/sessions/thread-smoke')
+    if (JSON.stringify(sessions) !== JSON.stringify([{ title: 'Find the biggest city', runtime: 'acp', agent: 'codex', directory: '', worktree: false, model: 'gpt', reasoning_effort: 'medium' }]) || prompts[0]?.message.text !== 'Find the biggest city') {
+      throw new Error(`The app's thread started wrong: ${JSON.stringify({ sessions, prompts })}`)
+    }
+    if (sessionStorage.getItem(NEW_SESSION_DRAFT_KEY) !== draft) {
+      throw new Error('Starting an app thread discarded the composer draft')
+    }
+    await step('back')
+    await until(() => at('tasks', '/issue/CAS-2'))
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    if (sessions.length !== 1) {
+      throw new Error('Going back from the app thread started it again')
+    }
   } catch (error) {
     await window.smoke.capture('app-navigation-failure')
     throw error
@@ -132,5 +190,13 @@ export async function exerciseAppNavigation() {
     element.remove()
     window.fetch = originalFetch
     window.removeEventListener('message', observe)
+    sessionStorage.removeItem(NEW_SESSION_DRAFT_KEY)
+    for (const [key, value] of [[NEW_SESSION_AGENT_KEY, originalAgent], [NEW_SESSION_DIRECTORY_KEY, originalDirectory]] as const) {
+      if (value === null) {
+        localStorage.removeItem(key)
+      } else {
+        localStorage.setItem(key, value)
+      }
+    }
   }
 }
