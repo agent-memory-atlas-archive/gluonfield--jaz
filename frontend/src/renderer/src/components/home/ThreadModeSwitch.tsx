@@ -14,6 +14,7 @@ export function ThreadModeSwitch({ canvas, disabled, onChange }: { canvas: boole
   return (
     <Segmented
       layoutId="thread-mode"
+      compact
       value={canvas ? 'canvas' : 'chat'}
       disabled={disabled}
       onChange={(value) => onChange(value === 'canvas')}
