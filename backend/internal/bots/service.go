@@ -272,11 +272,8 @@ func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, er
 		}
 		return in.BotID, nil
 	}
-	if session, err := s.store.LoadSession(threadID); err == nil && (session.SourceType == storage.SourceBotWorker || session.SourceType == storage.SourceBotMember) {
-		threadID = session.SourceID
-	}
-	if s.isBot(threadID) {
-		return threadID, nil
+	if bot := s.BotOf(threadID); bot != "" {
+		return bot, nil
 	}
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
@@ -284,6 +281,18 @@ func (s *Service) RoutineOwner(threadID string, in loops.CreateLoop) (string, er
 	}
 	bot, err := s.Create(context.Background(), CreateBot{Name: name, Agent: in.ACPAgent, Model: in.Model})
 	return bot.ID, err
+}
+
+// BotOf returns the bot a thread belongs to: the bot's own thread, one of its
+// subtasks or its seat in a group. Empty for any other thread.
+func (s *Service) BotOf(threadID string) string {
+	if session, err := s.store.LoadSession(threadID); err == nil && (session.SourceType == storage.SourceBotWorker || session.SourceType == storage.SourceBotMember) {
+		threadID = session.SourceID
+	}
+	if s.isBot(threadID) {
+		return threadID
+	}
+	return ""
 }
 
 // AdoptLoops gives every loop that has no owner and is not on a board a bot

@@ -3,6 +3,8 @@ package loops
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -31,6 +33,7 @@ type MCPTools struct {
 	// thread after a successful create.
 	card  CardSink
 	owner OwnerFunc
+	scope func(threadID string) string
 }
 
 // MCPOption configures optional MCPTools dependencies.
@@ -58,6 +61,12 @@ func WithOwner(owner OwnerFunc) MCPOption {
 	return func(t *MCPTools) { t.owner = owner }
 }
 
+// WithScope limits a bot's threads to the bot's own routines. scope returns the
+// bot a thread belongs to, or "" for a thread that sees every routine.
+func WithScope(scope func(threadID string) string) MCPOption {
+	return func(t *MCPTools) { t.scope = scope }
+}
+
 func NewMCPTools(service MCPService, opts ...MCPOption) *MCPTools {
 	t := &MCPTools{service: service}
 	for _, opt := range opts {
@@ -74,7 +83,7 @@ func (t *MCPTools) AddTo(server *mcp.Server) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_list",
 		Title:       "List Jaz loops",
-		Description: "List routines. A routine is a scheduled or event-triggered prompt owned by a Jaz bot; bot_id names the owner.",
+		Description: "List routines. A routine is a scheduled or event-triggered prompt owned by a Jaz bot; bot_id names the owner. Called from a bot's thread, it lists only that bot's routines.",
 	}, t.List)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "loop_get",
@@ -146,9 +155,36 @@ type MCPListOutput struct {
 	Loops []Loop `json:"loops"`
 }
 
-func (t *MCPTools) List(context.Context, *mcp.CallToolRequest, MCPListInput) (*mcp.CallToolResult, MCPListOutput, error) {
+func (t *MCPTools) List(_ context.Context, req *mcp.CallToolRequest, _ MCPListInput) (*mcp.CallToolResult, MCPListOutput, error) {
 	items, err := t.service.List()
+	if bot := t.bot(req); bot != "" {
+		items = slices.DeleteFunc(items, func(loop Loop) bool { return loop.BotID != bot })
+	}
 	return nil, MCPListOutput{Loops: items}, err
+}
+
+// bot returns the bot whose routines the caller is limited to, or "" for all.
+func (t *MCPTools) bot(req *mcp.CallToolRequest) string {
+	if t.scope == nil {
+		return ""
+	}
+	return t.scope(mcpsession.SessionID(req))
+}
+
+// load returns the loop the caller names, provided the caller may see it.
+func (t *MCPTools) load(req *mcp.CallToolRequest, value string) (Loop, error) {
+	id := strings.TrimSpace(value)
+	if id == "" {
+		return Loop{}, errors.New("id is required")
+	}
+	loop, err := t.service.Load(id)
+	if err != nil {
+		return Loop{}, err
+	}
+	if bot := t.bot(req); bot != "" && loop.BotID != bot {
+		return Loop{}, fmt.Errorf("loop %s is not one of your routines", id)
+	}
+	return loop, nil
 }
 
 type MCPIDInput struct {
@@ -162,20 +198,16 @@ type MCPDetailOutput struct {
 	BoardIDs []string `json:"board_ids"`
 }
 
-func (t *MCPTools) Get(_ context.Context, _ *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, MCPDetailOutput, error) {
-	id, err := mcpRequiredID(input.ID)
+func (t *MCPTools) Get(_ context.Context, req *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, MCPDetailOutput, error) {
+	loop, err := t.load(req, input.ID)
 	if err != nil {
 		return nil, MCPDetailOutput{}, err
 	}
-	loop, err := t.service.Load(id)
+	runs, err := t.service.Runs(loop.ID, mcpLimit(input.Limit))
 	if err != nil {
 		return nil, MCPDetailOutput{}, err
 	}
-	runs, err := t.service.Runs(id, mcpLimit(input.Limit))
-	if err != nil {
-		return nil, MCPDetailOutput{}, err
-	}
-	return nil, MCPDetailOutput{Loop: loop, Runs: runs, BoardIDs: t.boardsForLoop(id)}, nil
+	return nil, MCPDetailOutput{Loop: loop, Runs: runs, BoardIDs: t.boardsForLoop(loop.ID)}, nil
 }
 
 type MCPBoardsOutput struct {
@@ -248,12 +280,12 @@ type MCPUpdateInput struct {
 	BoardIDs *[]string `json:"board_ids,omitempty" jsonschema:"boards to place this loop's widget on; omit to leave unchanged, empty array to remove from all boards. Use loop_boards to list ids."`
 }
 
-func (t *MCPTools) Update(_ context.Context, _ *mcp.CallToolRequest, input MCPUpdateInput) (*mcp.CallToolResult, Loop, error) {
-	id, err := mcpRequiredID(input.ID)
+func (t *MCPTools) Update(_ context.Context, req *mcp.CallToolRequest, input MCPUpdateInput) (*mcp.CallToolResult, Loop, error) {
+	current, err := t.load(req, input.ID)
 	if err != nil {
 		return nil, Loop{}, err
 	}
-	loop, err := t.coordinator().Update(id, UpdateLoop{
+	loop, err := t.coordinator().Update(current.ID, UpdateLoop{
 		Name:            input.Name,
 		Prompt:          input.Prompt,
 		Schedule:        input.Schedule,
@@ -269,12 +301,12 @@ func (t *MCPTools) Update(_ context.Context, _ *mcp.CallToolRequest, input MCPUp
 	return nil, loop, err
 }
 
-func (t *MCPTools) Run(ctx context.Context, _ *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, Run, error) {
-	id, err := mcpRequiredID(input.ID)
+func (t *MCPTools) Run(ctx context.Context, req *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, Run, error) {
+	loop, err := t.load(req, input.ID)
 	if err != nil {
 		return nil, Run{}, err
 	}
-	run, err := t.service.RunNow(ctx, id)
+	run, err := t.service.RunNow(ctx, loop.ID)
 	if err != nil {
 		return nil, run, err
 	}
@@ -285,23 +317,15 @@ type MCPDeleteOutput struct {
 	OK bool `json:"ok"`
 }
 
-func (t *MCPTools) Delete(_ context.Context, _ *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, MCPDeleteOutput, error) {
-	id, err := mcpRequiredID(input.ID)
+func (t *MCPTools) Delete(_ context.Context, req *mcp.CallToolRequest, input MCPIDInput) (*mcp.CallToolResult, MCPDeleteOutput, error) {
+	loop, err := t.load(req, input.ID)
 	if err != nil {
 		return nil, MCPDeleteOutput{}, err
 	}
-	if err := t.service.Delete(id); err != nil {
+	if err := t.service.Delete(loop.ID); err != nil {
 		return nil, MCPDeleteOutput{}, err
 	}
 	return nil, MCPDeleteOutput{OK: true}, nil
-}
-
-func mcpRequiredID(value string) (string, error) {
-	id := strings.TrimSpace(value)
-	if id == "" {
-		return "", errors.New("id is required")
-	}
-	return id, nil
 }
 
 func mcpLimit(value int) int {

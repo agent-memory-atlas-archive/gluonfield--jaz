@@ -315,6 +315,7 @@ func startServer(
 		loops.WithAgentNames(manager.Agents),
 		loops.WithEvents(store, events),
 		loops.WithOwner(botService.RoutineOwner),
+		loops.WithScope(botService.BotOf),
 	)
 	jazTools.SetBots(bots.NewMCPTools(botService))
 	handler.Routes = append(handler.Routes, app.BotRoutes(botsapi.NewHandler(botService))...)
