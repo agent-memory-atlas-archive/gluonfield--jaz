@@ -1,5 +1,7 @@
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import type { ReactNode } from 'react'
+
+const spring = { type: 'spring', duration: 0.32, bounce: 0 } as const
 
 // Inline segmented control (the SidePanelControl pattern): a quiet pill track
 // where the active option carries a spring-animated lozenge. Sizes to its
@@ -22,7 +24,7 @@ export function Segmented<T extends string>({
   compact?: boolean
 }) {
   return (
-    <div className="inline-flex h-8 items-center self-start rounded-full bg-bg p-0.5">
+    <motion.div layout={compact} transition={spring} className="inline-flex h-8 items-center self-start rounded-full bg-bg p-0.5">
       {options.map((option) => {
         const active = option.value === value
         const labelled = active || !compact || !option.icon
@@ -43,17 +45,23 @@ export function Segmented<T extends string>({
             {active ? (
               <motion.span
                 layoutId={layoutId}
-                transition={{ type: 'spring', duration: 0.32, bounce: 0 }}
+                transition={spring}
                 className="absolute inset-0 rounded-full bg-surface-2 shadow-sm ring-1 ring-border/50"
               />
             ) : null}
-            <span className="relative flex items-center gap-1.5">
+            <motion.span layout={compact && 'position'} transition={spring} className="relative flex items-center gap-1.5">
               {option.icon}
-              {labelled ? option.label : null}
-            </span>
+              <AnimatePresence initial={false} mode="popLayout">
+                {labelled ? (
+                  <motion.span key="label" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                    {option.label}
+                  </motion.span>
+                ) : null}
+              </AnimatePresence>
+            </motion.span>
           </motion.button>
         )
       })}
-    </div>
+    </motion.div>
   )
 }
