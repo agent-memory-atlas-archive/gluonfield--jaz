@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, useLocation, useNavigate } from '@tanstack/react-router'
 import { GitBranch } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { NewSessionHome } from '@/components/home/NewSessionHome'
 import { NewThreadOptions } from '@/components/home/NewThreadOptions'
 import { ThreadModeSwitch } from '@/components/home/ThreadModeSwitch'
@@ -32,6 +32,7 @@ type NewSearch = {
 declare module '@tanstack/history' {
   interface HistoryState {
     startVoice?: boolean
+    appPrompt?: string
   }
 }
 
@@ -99,7 +100,7 @@ function NewSessionPage() {
     }
   }, [directory, project, directoryInfo.error])
 
-  const handleStart = async (text?: string, options: SendMessageOptions = {}) => {
+  const handleStart = async (text?: string, options: SendMessageOptions = {}, fromApp = false) => {
     if (text === undefined && voice.sessionId && voice.phase !== 'off') {
       await navigate({ to: '/sessions/$sessionId', params: { sessionId: voice.sessionId } })
       return
@@ -133,12 +134,15 @@ function NewSessionPage() {
         options,
         (initialSessionPrompt) => {
           const sessionId = initialSessionPrompt.sessionId
-          sessionStorage.removeItem(NEW_SESSION_DRAFT_KEY)
-          void deleteAttachmentDraft(NEW_SESSION_DRAFT_KEY, 'session')
+          if (!fromApp) {
+            sessionStorage.removeItem(NEW_SESSION_DRAFT_KEY)
+            void deleteAttachmentDraft(NEW_SESSION_DRAFT_KEY, 'session')
+          }
           invalidateSessionLists(queryClient, { session: sessionId })
           void navigate({
             to: '/sessions/$sessionId',
             params: { sessionId },
+            replace: fromApp,
             state: { initialSessionPrompt },
           })
         },
@@ -148,6 +152,25 @@ function NewSessionPage() {
       setCreating(false)
     }
   }
+
+  // An app's jaz/threads/create opens this page with a prompt. It starts once
+  // the agent and model are ready, leaves the composer's draft alone and
+  // replaces this page in history, so Back returns to the app.
+  const appPrompt = useLocation({ select: (location) => location.state.appPrompt })
+  const startedPrompt = useRef<string>(undefined)
+  const startAppPrompt = useEffectEvent((prompt: string) => {
+    if (startedPrompt.current === prompt) {
+      return
+    }
+    startedPrompt.current = prompt
+    void navigate({ replace: true, state: (previous) => ({ ...previous, appPrompt: undefined }) })
+    void handleStart(prompt, {}, true)
+  })
+  useEffect(() => {
+    if (appPrompt && controls.ready) {
+      startAppPrompt(appPrompt)
+    }
+  }, [appPrompt, controls.ready])
 
   // Phone: the controls live in a header dropdown, which sits above the
   // composer, so their own popovers open downward.

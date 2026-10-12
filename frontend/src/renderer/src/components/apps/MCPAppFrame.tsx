@@ -13,6 +13,7 @@ import { mcpAppKeyboard } from '@/lib/mcpAppKeyboard'
 import { useWindowEvent } from '@/lib/hooks/useWindowEvent'
 
 const navigationParams = z.object({ path: z.string().regex(/^\/(?!\/)/), replace: z.boolean(), delta: z.number().int().optional() })
+const threadParams = z.object({ prompt: z.string().trim().min(1) })
 
 // Every sidebar app stays mounted over the content card, so opening its
 // section is instant and finds the app as the user left it; only the active
@@ -103,6 +104,15 @@ export function MCPAppFrame({ app, active, file, call, deepLink, toolInput, onNa
     ...mcpAppHostContext(displayMode),
     ...(onNavigate && deepLink && { 'jaz/navigation': { path: deepLink } }),
   }))
+  // Only the app the user is working in may start a thread; the new-thread
+  // page starts it with the agent, model and project selected there.
+  const createThread = useEffectEvent(({ prompt }: z.infer<typeof threadParams>) => {
+    if (document.activeElement !== frame.current) {
+      throw new Error('Only the app in use can start a chat')
+    }
+    void navigate({ to: '/new', state: { appPrompt: prompt } })
+    return {}
+  })
   const callTool = useEffectEvent((input: Record<string, unknown>) =>
     callMCPAppTool(serverId, { name: tool, arguments: input }).catch(
       (error: Error): CallToolResult => ({ content: [{ type: 'text', text: error.message }], isError: true }),
@@ -152,10 +162,11 @@ export function MCPAppFrame({ app, active, file, call, deepLink, toolInput, onNa
       const created = new AppBridge(
         null,
         { name: 'Jaz', version: '1' },
-        { openLinks: {}, serverTools: {}, logging: {}, experimental: { ...(file && { 'openai/resource': {} }), ...(navigationEnabled && { 'jaz/navigation': {} }) } },
+        { openLinks: {}, serverTools: {}, logging: {}, experimental: { 'jaz/threads': {}, ...(file && { 'openai/resource': {} }), ...(navigationEnabled && { 'jaz/navigation': {} }) } },
         { hostContext: hostContext() },
       )
       if (navigationEnabled) created.setNotificationHandler('jaz/notifications/navigation', { params: navigationParams }, navigated)
+      created.setRequestHandler('jaz/threads/create', { params: threadParams }, createThread)
       // The host alone attests the opened file's path, which only the app's
       // server may see; an app's own openai/resource claim never passes.
       created.oncalltool = (params) =>

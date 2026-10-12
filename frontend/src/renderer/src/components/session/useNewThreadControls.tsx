@@ -90,6 +90,8 @@ export function useNewThreadControls() {
     modelsLoading,
     reasoningStatus,
     reasoningBlocked,
+    // ready means a start now uses the settled agent and model, or reports why it cannot.
+    ready: runtimeReady && (!runtimeAvailable || agents.includes(runtime)) && !(reasoningBlocked && reasoningStatus === 'pending'),
     setSelection,
     fastMode,
     effort,
