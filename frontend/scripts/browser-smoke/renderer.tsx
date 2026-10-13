@@ -73,6 +73,12 @@ function Fixture() {
         window.smoke.result({ ok: true, checks: ['blocked LinkedIn homepages reach sign-in; successful pages, other paths/sites and background requests retain their responses'] })
         return
       }
+      if (new URLSearchParams(location.search).get('suite') === 'session-config') {
+        stage = 'session settings and canvas side panel'
+        await exerciseSessionConfig()
+        window.smoke.result({ ok: true, checks: ['existing composer setting changes across menu closure; Canvas panel controls, real browser navigation, retained board and close/reopen'] })
+        return
+      }
       if (new URLSearchParams(location.search).get('suite') === 'side-panel') {
         stage = 'side panel tabs and retained resources'
         await exerciseSidePanelTabs()

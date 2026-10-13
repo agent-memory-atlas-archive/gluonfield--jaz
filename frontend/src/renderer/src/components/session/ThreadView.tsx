@@ -458,7 +458,7 @@ export function ThreadView({
       <PreviewLinkProvider onOpen={sidePanel.openPreview}>
         {/* Phone: the closed side panel slides off to the right (translateX 100%);
             clip horizontal overflow so it can't be revealed by scrolling. */}
-        <FileDropScope ref={sidePanel.containerRef} className="relative flex h-full max-sm:overflow-x-clip">
+        <FileDropScope ref={canvas ? undefined : sidePanel.containerRef} className="relative flex h-full max-sm:overflow-x-clip">
           <SessionTitlebar
             session={session}
             isMobile={isMobile}
@@ -466,7 +466,6 @@ export function ThreadView({
             sideChatAvailable={sideChatAvailable}
             header={header}
             overviewLabel={details ? 'Details' : undefined}
-            panelControls={!canvas}
           />
           {/* Phone: the open panel covers the chat full-width, so the only
               non-panel area left is the title bar. This catches taps on its empty
@@ -645,15 +644,15 @@ export function ThreadView({
               )}
             </BottomDock>
           </div>
-          {canvas ? (
-            <div className="relative h-full min-w-0 flex-1">
-              <ThreadCanvas sessionId={session.id} working={sessionRunning} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
-            </div>
-          ) : null}
+          <div ref={canvas ? sidePanel.containerRef : undefined} className={canvas ? 'flex h-full min-w-0 flex-1' : 'contents'}>
+            {canvas ? (
+              <div className="relative h-full min-w-0 flex-1">
+                <ThreadCanvas sessionId={session.id} working={sessionRunning} selection={canvasContexts.selection} onSelect={canvasContexts.onSelect} onPrompt={handleSend} />
+              </div>
+            ) : null}
 
-          {/* Docked, never overlapping: the chat pane flexes and stays centered
-              between the sidebar and this panel. */}
-          {canvas ? null : (
+            {/* Docked, never overlapping: the chat pane flexes and stays centered
+                between the sidebar and this panel. */}
             <SidePanelDrawer panel={sidePanel} isMobile={isMobile}>
               <SidePanel
                 session={session}
@@ -673,7 +672,7 @@ export function ThreadView({
                 onSendSideChat={handleSideChatSend}
               />
             </SidePanelDrawer>
-          )}
+          </div>
         </FileDropScope>
       </PreviewLinkProvider>
     </FileReaderLinkProvider>
