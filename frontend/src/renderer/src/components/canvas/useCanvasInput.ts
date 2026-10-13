@@ -110,6 +110,9 @@ export function useCanvasInput({ local, commit, replay, onSelect, container, key
   })
 
   const onCopy = useEffectEvent((event: ClipboardEvent) => {
+    if (document.getSelection()?.isCollapsed === false) {
+      return
+    }
     const clip = attending(event) ? picked() : undefined
     if (!clip?.nodes.length) {
       return

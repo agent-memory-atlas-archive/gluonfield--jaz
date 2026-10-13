@@ -17,8 +17,9 @@ export async function exerciseCanvas(): Promise<void> {
       { id: 'page', type: 'link', url: 'about:blank', x: 0, y: 440, width: 180, height: 160 },
       { id: 'sticky', type: 'text', text: paragraphs, color: '3', x: 360, y: 440, width: 200, height: 160 },
       { id: 'text', type: 'text', text: paragraphs, x: 600, y: 440, width: 200, height: 160 },
+      { id: 'cad', type: 'file', file: 'broken.stl', x: 480, y: 300, width: 320, height: 100 },
     ],
-    files: { report: { path: 'report.md', version: '1' }, table: { path: 'costs.csv', version: '1' } },
+    files: { report: { path: 'report.md', version: '1' }, table: { path: 'costs.csv', version: '1' }, cad: { path: 'broken.stl', version: '1' } },
   }
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(keys.sessionCanvas(sessionId), view)
@@ -28,7 +29,11 @@ export async function exerciseCanvas(): Promise<void> {
   client.setQueryData([...keys.sessionFile(sessionId, 'costs.csv'), '1'], { content: header + '\n' + csv })
   const originalFetch = window.fetch
   window.fetch = async (input, init) => {
-    if (new URL(String(input)).pathname !== `/v1/sessions/${sessionId}/canvas`) {
+    const url = new URL(String(input))
+    if (url.pathname === `/v1/sessions/${sessionId}/file` && url.searchParams.get('path') === 'broken.stl') {
+      return new Response('Invalid STL')
+    }
+    if (url.pathname !== `/v1/sessions/${sessionId}/canvas`) {
       return originalFetch(input, init)
     }
     if (init?.method === 'PATCH') {
@@ -72,6 +77,31 @@ export async function exerciseCanvas(): Promise<void> {
     root.render(<QueryClientProvider client={client}><Fixture /></QueryClientProvider>)
     await until(() => Boolean(node('report')?.querySelector('p')))
     await new Promise((resolve) => setTimeout(resolve, 100))
+    await until(() => Boolean(node('cad')?.textContent?.includes('Could not open STL')))
+    const status = node('cad').querySelector<HTMLElement>('.canvas-viewer-toolbar')!
+    if (getComputedStyle(status).opacity === '0') {
+      throw new Error('The CAD load error is hidden until the item is hovered or selected')
+    }
+    await select('report')
+    const selection = window.getSelection()!
+    const range = document.createRange()
+    range.selectNodeContents(node('report').querySelector('p')!)
+    selection.removeAllRanges()
+    selection.addRange(range)
+    for (const type of ['cut', 'copy']) {
+      const event = new ClipboardEvent(type, { bubbles: true, cancelable: true, clipboardData: new DataTransfer() })
+      node('report').dispatchEvent(event)
+      if (event.defaultPrevented) {
+        throw new Error(`${type} of selected document text was replaced with a canvas item`)
+      }
+    }
+    selection.removeAllRanges()
+    const copied = new DataTransfer()
+    const copyItem = new ClipboardEvent('copy', { bubbles: true, cancelable: true, clipboardData: copied })
+    node('report').dispatchEvent(copyItem)
+    if (!copyItem.defaultPrevented || JSON.parse(copied.getData('application/x-jaz-canvas')).nodes[0]?.id !== 'report') {
+      throw new Error('The canvas item could not be copied after clearing the text selection')
+    }
     for (const id of ['report', 'table', 'sticky', 'text']) {
       await select(id)
       const scroll = node(id).querySelector<HTMLElement>('.canvas-scroll')!
@@ -88,6 +118,15 @@ export async function exerciseCanvas(): Promise<void> {
         await until(() => scroll.scrollLeft > 0)
       }
     }
+    element.querySelector<HTMLButtonElement>('[aria-label="Hand"]')!.click()
+    await until(() => Boolean(element.querySelector('.tool-hand')))
+    const report = node('report').getBoundingClientRect()
+    const beforePan = viewport()
+    await drag(report.x + report.width / 2, report.y + report.height / 2, 24, 0)
+    await until(() => viewport() !== beforePan, 'The Hand tool could not pan over a document')
+    await drag(report.x + report.width / 2 + 24, report.y + report.height / 2, -24, 0)
+    element.querySelector<HTMLButtonElement>('[aria-label="Select"]')!.click()
+    await until(() => Boolean(element.querySelector('.tool-select')))
     if (node('report').querySelector('.canvas-viewer-toolbar') || node('report').textContent?.includes('MD · report.md')) {
       throw new Error('The Markdown item still has a duplicate filename footer')
     }
@@ -140,6 +179,16 @@ export async function exerciseCanvas(): Promise<void> {
     }
     await drag(label.x + label.width / 2, label.y + label.height / 2, 25, 0)
     await until(() => Number(view.nodes.find((item) => item.id === 'report')!.x) > before, 'The document could not be moved by its title')
+    for (const id of ['sticky', 'text']) {
+      view = { ...applyPatch(view, { nodes: [{ id, text: paragraphs + '\n\nAgent update' }] }), version: String(Number(view.version) + 1) }
+      await client.invalidateQueries({ queryKey: keys.sessionCanvas(sessionId) })
+      await until(() => Boolean(node(id).querySelector('.canvas-flash')))
+      const frame = node(id).getBoundingClientRect()
+      const flash = node(id).querySelector('.canvas-flash')!.getBoundingClientRect()
+      if (Math.abs(flash.top - frame.top) > 1 || Math.abs(flash.height - frame.height) > 1) {
+        throw new Error('An agent update highlight scrolled out of the note')
+      }
+    }
     await window.smoke.capture('canvas')
   } finally {
     root.unmount()

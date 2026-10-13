@@ -123,8 +123,8 @@ export function TextNode({ id, data, selected }: NodeProps<BoardNode>) {
         onDoubleClick={() => setEditing(id)}
       >
         {editing === id ? <TextEditor initial={text} onDone={finish} /> : <MessageMarkdown text={text} />}
-        <Flash id={id} />
       </div>
+      <Flash id={id} />
     </>
   )
 }
