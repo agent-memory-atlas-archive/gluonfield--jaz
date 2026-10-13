@@ -25,13 +25,17 @@ func Prompt(store PromptStore, session storage.Session) (promptmodule.Modules, e
 		if err != nil {
 			return nil, err
 		}
-		return promptmodule.New(memberPrompt(bot.Title, group.Title)), nil
+		record, err := store.LoadBot(membership.BotID)
+		if err != nil {
+			return nil, err
+		}
+		return promptmodule.New(memberPrompt(bot.Title, group.Title), record.Prompt), nil
 	}
 	record, err := store.LoadBot(session.ID)
 	if err != nil || record.Kind != KindBot {
 		return nil, err
 	}
-	return promptmodule.New(identityPrompt(session.Title)), nil
+	return promptmodule.New(identityPrompt(session.Title), record.Prompt), nil
 }
 
 func identityPrompt(name string) string {

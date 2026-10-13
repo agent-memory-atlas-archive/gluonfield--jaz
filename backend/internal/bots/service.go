@@ -105,7 +105,7 @@ func (s *Service) Create(ctx context.Context, input CreateBot) (Bot, error) {
 	if err := s.store.UpdateSessionTitle(session.ID, name); err != nil {
 		return Bot{}, err
 	}
-	if err := s.store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Shape: avatar.Shape, Color: avatar.Color}); err != nil {
+	if err := s.store.SaveBot(storage.BotRecord{ThreadID: session.ID, Kind: KindBot, Prompt: strings.TrimSpace(input.Prompt), Shape: avatar.Shape, Color: avatar.Color}); err != nil {
 		return Bot{}, err
 	}
 	return s.Load(session.ID)
@@ -143,6 +143,12 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 	}
 	if (input.Agent != nil || input.Model != nil) && record.Kind != KindBot {
 		return Bot{}, errors.New("only a bot has an agent")
+	}
+	if input.Prompt != nil {
+		if record.Kind != KindBot {
+			return Bot{}, errors.New("only a bot has a prompt")
+		}
+		record.Prompt = strings.TrimSpace(*input.Prompt)
 	}
 	if input.Members != nil && record.Kind != KindGroup {
 		return Bot{}, errors.New("only a group has members")
@@ -342,6 +348,7 @@ func (s *Service) view(record storage.BotRecord, session storage.Session) Bot {
 		ID:        session.ID,
 		Kind:      record.Kind,
 		Name:      session.Title,
+		Prompt:    record.Prompt,
 		Avatar:    Avatar{Shape: record.Shape, Color: record.Color},
 		Pinned:    record.Pinned,
 		Unread:    session.Unread,

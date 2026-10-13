@@ -72,6 +72,18 @@ func TestLoadConfigUnmarshalsACPAgentModelAndProviderKeys(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "application.yaml")
 	if err := os.WriteFile(path, []byte(`
 jaz:
+  bots:
+    - name: Research
+      prompt: Track engineering news.
+      agent: codex
+      model: gpt-6-astra
+      schedules:
+        - name: Morning
+          prompt: Send a morning brief.
+          status: paused
+          schedule:
+            expr: "0 9 * * 1-5"
+            timezone: Europe/London
   connections:
     chat:
       grouphistorylimit: 123
@@ -120,5 +132,16 @@ openai:
 	}
 	if cfg.Jaz.Connections.Drive.OAuthClientID != "drive-client" || cfg.Jaz.Connections.Drive.OAuthClientSecret != "drive-secret" {
 		t.Fatal("Google Drive OAuth client overrides were not loaded")
+	}
+	if len(cfg.Jaz.Bots) != 1 {
+		t.Fatalf("configured bots = %+v", cfg.Jaz.Bots)
+	}
+	bot := cfg.Jaz.Bots[0]
+	if bot.Name != "Research" || bot.Prompt != "Track engineering news." || bot.Agent != "codex" || bot.Model != "gpt-6-astra" || len(bot.Schedules) != 1 {
+		t.Fatalf("configured bot = %+v", bot)
+	}
+	routine := bot.Schedules[0]
+	if routine.Name != "Morning" || routine.Prompt != "Send a morning brief." || routine.Status != "paused" || routine.Schedule.Expr != "0 9 * * 1-5" || routine.Schedule.Timezone != "Europe/London" {
+		t.Fatalf("configured schedule = %+v", routine)
 	}
 }

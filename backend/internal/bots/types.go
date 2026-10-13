@@ -29,6 +29,7 @@ type Bot struct {
 	ID              string    `json:"id"`
 	Kind            string    `json:"kind"`
 	Name            string    `json:"name"`
+	Prompt          string    `json:"prompt,omitempty"`
 	Avatar          Avatar    `json:"avatar"`
 	Pinned          int       `json:"pinned,omitempty"`
 	Unread          bool      `json:"unread"`
@@ -45,6 +46,7 @@ type Bot struct {
 
 type CreateBot struct {
 	Name   string  `json:"name"`
+	Prompt string  `json:"prompt,omitempty"`
 	Avatar *Avatar `json:"avatar,omitempty"`
 	Agent  string  `json:"agent,omitempty"`
 	Model  string  `json:"model,omitempty"`
@@ -52,6 +54,7 @@ type CreateBot struct {
 
 type UpdateBot struct {
 	Name    *string   `json:"name,omitempty"`
+	Prompt  *string   `json:"prompt,omitempty"`
 	Avatar  *Avatar   `json:"avatar,omitempty"`
 	Members *[]string `json:"members,omitempty"`
 	// Agent moves the bot to another agent, which starts a fresh native session.
@@ -110,6 +113,7 @@ type PromptStore interface {
 // Routines is the loop service seen as a bot's routines.
 type Routines interface {
 	List() ([]loops.Loop, error)
+	Create(loops.CreateLoop) (loops.Loop, error)
 	Update(string, loops.UpdateLoop) (loops.Loop, error)
 	Delete(string) error
 	OnBoard(loops.Loop) bool

@@ -63,6 +63,9 @@ and pass the setting through that agent's own args or env.
 
 Runtime files are stored under `~/.jaz` by default. Override with `jaz.root`.
 
+For bots with prompts, models and schedules declared at startup, see
+[Configured Bots](../docs/configured-bots.md).
+
 ## Google Calendar
 
 The `google_calendar_create_event` MCP action accepts optional

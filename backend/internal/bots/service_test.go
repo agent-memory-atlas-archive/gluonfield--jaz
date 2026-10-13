@@ -218,6 +218,10 @@ func (w *fakeWorld) List() ([]loops.Loop, error) {
 	return w.loops, nil
 }
 
+func (*fakeWorld) Create(loops.CreateLoop) (loops.Loop, error) {
+	panic("unexpected routine creation")
+}
+
 func (w *fakeWorld) Update(id string, input loops.UpdateLoop) (loops.Loop, error) {
 	for i := range w.loops {
 		if w.loops[i].ID == id && input.BotID != nil {

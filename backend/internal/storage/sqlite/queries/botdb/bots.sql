@@ -1,20 +1,21 @@
 -- name: UpsertBot :exec
-INSERT INTO bots (thread_id, kind, shape, color, members)
-VALUES (sqlc.arg(thread_id), sqlc.arg(kind), sqlc.arg(shape), sqlc.arg(color), sqlc.arg(members))
+INSERT INTO bots (thread_id, kind, prompt, shape, color, members)
+VALUES (sqlc.arg(thread_id), sqlc.arg(kind), sqlc.arg(prompt), sqlc.arg(shape), sqlc.arg(color), sqlc.arg(members))
 ON CONFLICT(thread_id) DO UPDATE SET
   kind = excluded.kind,
+  prompt = excluded.prompt,
   shape = excluded.shape,
   color = excluded.color,
   members = excluded.members;
 
 -- name: GetBot :one
-SELECT thread_id, kind, shape, color, members, pinned
+SELECT thread_id, kind, shape, color, members, pinned, prompt
 FROM bots
 WHERE thread_id = sqlc.arg(thread_id)
 LIMIT 1;
 
 -- name: ListBots :many
-SELECT thread_id, kind, shape, color, members, pinned
+SELECT thread_id, kind, shape, color, members, pinned, prompt
 FROM bots;
 
 -- name: UnpinBots :exec

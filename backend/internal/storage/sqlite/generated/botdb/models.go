@@ -11,6 +11,7 @@ type Bot struct {
 	Color    string `json:"color"`
 	Members  string `json:"members"`
 	Pinned   int64  `json:"pinned"`
+	Prompt   string `json:"prompt"`
 }
 
 type BotMembership struct {

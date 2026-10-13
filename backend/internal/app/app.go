@@ -62,6 +62,7 @@ type Config struct {
 	Memory         MemoryConfig
 	Connections    ConnectionsConfig
 	Devices        DevicesConfig
+	Bots           []bots.Config
 	// MCPServers declares MCP servers as a JSON array of server inputs
 	// (JAZ_MCP_SERVERS), which each start applies.
 	MCPServers string
