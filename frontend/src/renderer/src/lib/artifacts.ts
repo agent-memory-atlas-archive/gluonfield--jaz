@@ -63,6 +63,49 @@ const bridgeScript = `
 })();
 `
 
+const canvasBridgeScript = `
+(() => {
+  const fit = () => {
+    const body = document.body
+    if (!body || !innerWidth || !innerHeight) {
+      return
+    }
+    body.style.transform = ''
+    const scale = Math.min(1, innerWidth / body.scrollWidth, innerHeight / body.scrollHeight)
+    body.style.transform = 'scale(' + scale + ')'
+  }
+  let pending = false
+  const schedule = () => {
+    if (pending) {
+      return
+    }
+    pending = true
+    requestAnimationFrame(() => {
+      pending = false
+      fit()
+    })
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    new ResizeObserver(schedule).observe(document.body)
+    new MutationObserver((changes) => {
+      if (changes.some((change) => change.target !== document.body)) {
+        schedule()
+      }
+    }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true })
+    fit()
+  }, { once: true })
+  window.addEventListener('resize', schedule)
+  document.addEventListener('load', schedule, true)
+  document.addEventListener('wheel', (event) => {
+    event.preventDefault()
+    const { clientX, clientY, deltaX, deltaY, deltaMode, ctrlKey, shiftKey } = event
+    parent.postMessage({ type: 'jaz:canvas-wheel', wheel: { clientX, clientY, deltaX, deltaY, deltaMode, ctrlKey, shiftKey } }, '*')
+  }, { passive: false })
+})();
+`
+
+const canvasCSS = 'html,body{overflow:hidden!important}body{transform-origin:top left}*{scrollbar-width:none}'
+
 // Tile-only extension: the widget author designs blind, so the host measures
 // what actually rendered — dead space below the content, overflow past the
 // tile, clipped elements, broken images — and reports it as jaz:artifact-layout.
@@ -156,16 +199,17 @@ export function buildArtifactThemeCSS(darkOverride?: boolean): string {
   return themeCSS(values, darkOverride ?? root.classList.contains('dark'))
 }
 
-// Inline artifacts and board widgets render through this one builder, so both
-// get the same design system, theme, color-scheme, CSP, and CDN allowlist. The
-// only difference is the bridge: board tiles also report layout telemetry back
-// to their loop, opted in via measureLayout.
+// Inline artifacts, board widgets and canvas HTML share the theme and CSP.
+// Each surface adds its own layout and interaction bridge.
 export function buildArtifactDocument(
   input: ArtifactInput,
   theme: string,
-  opts: { measureLayout?: boolean } = {},
+  opts: { measureLayout?: boolean; canvas?: boolean } = {},
 ): string {
-  const bridge = opts.measureLayout ? `${bridgeScript}${widgetBridgeScript}` : bridgeScript
+  const bridge = bridgeScript + (opts.measureLayout ? widgetBridgeScript : '') + (opts.canvas ? canvasBridgeScript : '')
+  if (opts.canvas) {
+    theme += canvasCSS
+  }
   // A board tile fills a fixed cell, so the document height must resolve to the
   // viewport — then a fragment using height:100% fills the tile. Inline
   // artifacts grow to their content instead, so they must NOT get this.
@@ -197,7 +241,7 @@ const React = await import('react');
 const { createRoot } = await import('react-dom/client');
 createRoot(document.getElementById('root')).render(React.createElement(module.exports.default ?? module.exports));
 `
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}"><style>${artifactCSS(theme)} html,body,#root{height:100%}</style><script>${bridgeScript}</script><script type="importmap">${JSON.stringify({ imports })}</script></head><body><div id="root"></div><script type="module">${main}</script></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${ARTIFACT_CSP}"><style>${artifactCSS(theme)} html,body,#root{height:100%}${canvasCSS}</style><script>${bridgeScript}${canvasBridgeScript}</script><script type="importmap">${JSON.stringify({ imports })}</script></head><body><div id="root"></div><script type="module">${main}</script></body></html>`
 }
 
 function isFullHTMLDocument(code: string): boolean {

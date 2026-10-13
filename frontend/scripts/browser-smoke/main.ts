@@ -231,7 +231,11 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
     if (type === 'mouseUp') {
       pointerPressed = false
     }
-    window.webContents.sendInputEvent({ type, x, y, button, clickCount: 1, modifiers: pointerPressed ? [`${button}ButtonDown`] : [] })
+    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: { mouseDown: 'mousePressed', mouseMove: 'mouseMoved', mouseUp: 'mouseReleased' }[type],
+      x, y, button, buttons: pointerPressed ? button === 'left' ? 1 : 2 : 0,
+      clickCount: type === 'mouseMove' ? 0 : 1,
+    })
     await new Promise((resolve) => setTimeout(resolve, 20))
   })
   window.webContents.on('console-message', ({ level, message }) => {
@@ -245,6 +249,10 @@ body{font:16px system-ui;padding:60px;background:#faf9f6;color:#242424}form{disp
       window.webContents.sendInputEvent({ type: 'char', keyCode })
     }
     window.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  })
+  ipcMain.handle('smoke:wheel', async (_event, x: number, y: number, deltaY: number, control = false) => {
+    await window.webContents.debugger.sendCommand('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY, modifiers: control ? 2 : 0 })
     await new Promise((resolve) => setTimeout(resolve, 20))
   })
   await assertUntrustedProfileCaller(process.env.JAZ_BROWSER_SMOKE_DIR!)

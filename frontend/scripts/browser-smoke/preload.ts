@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('smoke', {
   passwordStore: () => ipcRenderer.invoke('smoke:password-store'),
   pointer: (type: string, x: number, y: number, button?: 'left' | 'right') => ipcRenderer.invoke('smoke:pointer', type, x, y, button),
   key: (key: string, modifiers?: string[]) => ipcRenderer.invoke('smoke:key', key, modifiers),
+  wheel: (x: number, y: number, deltaY: number, control?: boolean) => ipcRenderer.invoke('smoke:wheel', x, y, deltaY, control),
   capture: (name?: string) => ipcRenderer.invoke('smoke:capture', name),
   resize: (width: number, height: number) => ipcRenderer.invoke('smoke:resize', width, height),
   dropFolder: (x: number, y: number) => ipcRenderer.invoke('smoke:drop-folder', x, y),

@@ -13,6 +13,7 @@ import { MessageMarkdown } from '@/components/session/MessageMarkdown'
 import { extension, itemLabel, rounded, viewerFor, type BoardEdge, type BoardNode } from './board'
 import { useCanvas } from './canvasContext'
 import { FileViewer } from './CanvasViewers'
+import { FitContent } from '@/components/canvas/FitContent'
 import { ViewerFrame } from './ViewerFrame'
 
 const SIDES = [
@@ -79,7 +80,7 @@ export function FileNode({ id, data, selected }: NodeProps<BoardNode>) {
 }
 
 export function LinkNode({ id, data, selected }: NodeProps<BoardNode>) {
-  const { focused, connectSource } = useCanvas()
+  const { connectSource } = useCanvas()
   const url = typeof data.item.url === 'string' ? data.item.url : ''
   const host = URL.canParse(url) ? new URL(url).host : url
   return (
@@ -88,10 +89,9 @@ export function LinkNode({ id, data, selected }: NodeProps<BoardNode>) {
       <Handles />
       <ItemLabel badge="WEB" name={host} />
       <div className={`canvas-card${connectSource === id ? ' canvas-connect-source' : ''}`}>
-        <ViewerFrame id={id} status={url} focusable>
+        <ViewerFrame id={id} focusable>
           <iframe className="canvas-frame" title={host} src={url} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" />
         </ViewerFrame>
-        {focused === id ? null : <div className="canvas-shield" />}
         <Flash id={id} />
       </div>
     </>
@@ -123,9 +123,9 @@ export function TextNode({ id, data, selected }: NodeProps<BoardNode>) {
         style={style}
         onDoubleClick={() => setEditing(id)}
       >
-        {editing === id ? <TextEditor initial={text} onDone={finish} /> : <MessageMarkdown text={text} />}
-        <Flash id={id} />
+        {editing === id ? <TextEditor initial={text} onDone={finish} /> : <FitContent><MessageMarkdown text={text} /></FitContent>}
       </div>
+      <Flash id={id} />
     </>
   )
 }
@@ -148,7 +148,7 @@ function TextEditor({ initial, onDone }: { initial: string; onDone: (value: stri
   return (
     <textarea
       ref={field}
-      className="canvas-text-editor nodrag nowheel"
+      className="canvas-text-editor nodrag nopan"
       value={value}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => onDone(value)}

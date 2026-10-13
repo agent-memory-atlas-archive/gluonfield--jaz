@@ -1,6 +1,13 @@
 name: Validate ACP adapters
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/acp-adapter-assets.json
+      - .github/scripts/create-acp-adapters-manifest.mjs
+      - .github/workflows/acp-adapters-validate.yml
+      - dist/acp-adapters.json
   pull_request:
     paths:
       - .github/acp-adapter-assets.json

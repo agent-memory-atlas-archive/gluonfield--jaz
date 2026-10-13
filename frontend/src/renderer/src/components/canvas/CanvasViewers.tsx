@@ -7,6 +7,7 @@ import { keys } from '@/lib/query/keys'
 import { MessageMarkdown } from '@/components/session/MessageMarkdown'
 import { extension, fileName, viewerFor } from './board'
 import { useCanvas } from './canvasContext'
+import { FitContent } from '@/components/canvas/FitContent'
 import { rawUrl, ViewerFrame } from './ViewerFrame'
 
 const CadViewer = lazy(() => import('./CadViewer'))
@@ -16,32 +17,32 @@ export function FileViewer({ id, file }: { id: string; file: CanvasFile }) {
   const { sessionId, view, focused: focusedId } = useCanvas()
   const focused = focusedId === id
   if (!file.version) {
-    return <ViewerFrame id={id} status={`Missing · ${file.path}`}><div className="canvas-viewer-empty">{fileName(file.path)}</div></ViewerFrame>
+    return <ViewerFrame id={id}><div className="canvas-viewer-empty">File missing</div></ViewerFrame>
   }
   switch (viewerFor(file.path)) {
     case 'component':
       return <ComponentFrame id={id} code={view.components[id]?.code} error={view.components[id]?.error} />
     case 'image':
       return (
-        <ViewerFrame id={id} status={`${extension(file.path).toUpperCase()} · ${fileName(file.path)}`}>
+        <ViewerFrame id={id}>
           <img className="canvas-image" src={rawUrl(sessionId, file)} alt={fileName(file.path)} draggable={false} />
         </ViewerFrame>
       )
     case 'pdf':
       return (
-        <ViewerFrame id={id} status={`PDF · ${fileName(file.path)}`} focusable paper>
+        <ViewerFrame id={id} focusable paper>
           <iframe className="canvas-frame" title={fileName(file.path)} src={`${rawUrl(sessionId, file)}#${focused ? 'view=FitH' : 'toolbar=0&view=FitH'}`} />
         </ViewerFrame>
       )
     case 'cad':
       return (
-        <Suspense fallback={<ViewerFrame id={id} status="Opening…" focusable><div /></ViewerFrame>}>
+        <Suspense fallback={<ViewerFrame id={id} focusable><div className="canvas-viewer-empty">Opening…</div></ViewerFrame>}>
           <CadViewer id={id} src={rawUrl(sessionId, file)} kind={extension(file.path)} focused={focused} />
         </Suspense>
       )
     case 'dxf':
       return (
-        <Suspense fallback={<ViewerFrame id={id} status="Opening…" focusable paper><div /></ViewerFrame>}>
+        <Suspense fallback={<ViewerFrame id={id} focusable paper><div className="canvas-viewer-empty">Opening…</div></ViewerFrame>}>
           <DxfViewer id={id} src={rawUrl(sessionId, file)} />
         </Suspense>
       )
@@ -50,7 +51,7 @@ export function FileViewer({ id, file }: { id: string; file: CanvasFile }) {
     case 'html':
       return <TextFileViewer id={id} file={file} />
     case 'file':
-      return <ViewerFrame id={id} status={fileName(file.path)}><div className="canvas-viewer-empty">{extension(file.path).toUpperCase() || 'File'}</div></ViewerFrame>
+      return <ViewerFrame id={id}><div className="canvas-viewer-empty">{extension(file.path).toUpperCase() || 'File'}</div></ViewerFrame>
   }
 }
 
@@ -63,18 +64,17 @@ function TextFileViewer({ id, file }: { id: string; file: CanvasFile }) {
   })
   const viewer = viewerFor(file.path)
   const text = read.data?.content ?? ''
-  const status = `${extension(file.path).toUpperCase()} · ${fileName(file.path)}`
-  if (read.isError) return <ViewerFrame id={id} status={status}><div className="canvas-viewer-empty">{read.error.message}</div></ViewerFrame>
+  if (read.isError) return <ViewerFrame id={id}><div className="canvas-viewer-empty">{read.error.message}</div></ViewerFrame>
   if (viewer === 'html') {
     return (
-      <ViewerFrame id={id} status={status}>
-        <SandboxFrame title={fileName(file.path)} document={buildArtifactDocument({ title: fileName(file.path), code: text, loadingMessages: [] }, theme)} onPrompt={prompt} />
+      <ViewerFrame id={id}>
+        <SandboxFrame title={fileName(file.path)} document={buildArtifactDocument({ title: fileName(file.path), code: text, loadingMessages: [] }, theme, { canvas: true })} onPrompt={prompt} />
       </ViewerFrame>
     )
   }
   return (
-    <ViewerFrame id={id} status={status}>
-      <div className="canvas-text-file nowheel">{viewer === 'csv' ? <CsvTable text={text} /> : <MessageMarkdown text={text} />}</div>
+    <ViewerFrame id={id}>
+      <div className="canvas-text-file nodrag nopan"><FitContent>{viewer === 'csv' ? <CsvTable text={text} /> : <MessageMarkdown text={text} />}</FitContent></div>
     </ViewerFrame>
   )
 }
@@ -134,6 +134,7 @@ interface FrameMessage {
   message?: string
   text?: string
   href?: string
+  wheel?: Pick<WheelEvent, 'clientX' | 'clientY' | 'deltaX' | 'deltaY' | 'deltaMode' | 'ctrlKey' | 'shiftKey'>
 }
 
 // An opaque-origin frame: agent code runs here without access to the app,
@@ -149,6 +150,15 @@ function SandboxFrame({ title, document, onPrompt }: { title: string; document: 
       if (message?.type === 'jaz:artifact-error') setError(message.message ?? 'Component error')
       if (message?.type === 'jaz:artifact-link' && message.href) window.open(message.href, '_blank', 'noopener,noreferrer')
       if (message?.type === 'jaz:artifact-send-prompt' && message.text?.trim()) onPrompt(message.text.trim())
+      if (message?.type === 'jaz:canvas-wheel' && message.wheel) {
+        const element = frame.current!
+        const box = element.getBoundingClientRect()
+        element.dispatchEvent(new WheelEvent('wheel', {
+          ...message.wheel, bubbles: true, cancelable: true,
+          clientX: box.x + message.wheel.clientX * box.width / element.clientWidth,
+          clientY: box.y + message.wheel.clientY * box.height / element.clientHeight,
+        }))
+      }
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)

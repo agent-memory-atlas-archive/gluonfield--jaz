@@ -1,11 +1,11 @@
 {
   "adapters": {
     "codex": {
-      "version": "2.1.1-jaz.2",
+      "version": "2.2.2-jaz.2",
       "assets": {
         "darwin-arm64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-darwin-arm64.tar.gz",
-          "sha256": "6ef084241ba652167b16d3f92c9ae3bab518fef0e79a49d5078ced05ad5ec7a9",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-darwin-arm64.tar.gz",
+          "sha256": "428af9c3eb2e0b0a9b695bbded61101921125eace3483814d7e980cf1b6dc783",
           "binary": "codex-acp",
           "env": {
             "CODEX_PATH": "codex-runtime/aarch64-apple-darwin/bin/codex",
@@ -13,8 +13,8 @@
           }
         },
         "darwin-x64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-darwin-x64.tar.gz",
-          "sha256": "377191ce4442049c45919894b7de2857a8ced177ef72672f7f4782dcc32619b8",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-darwin-x64.tar.gz",
+          "sha256": "3282bd5353d648910394f8ec262ee7d07e3d7e73e2c56389b6a3dfd58325bc78",
           "binary": "codex-acp",
           "env": {
             "CODEX_PATH": "codex-runtime/x86_64-apple-darwin/bin/codex",
@@ -22,8 +22,8 @@
           }
         },
         "linux-arm64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-linux-arm64.tar.gz",
-          "sha256": "887e2470f723951778b31fca6cd56ec9df1684b87ff7f2b2b0cd288719592661",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-linux-arm64.tar.gz",
+          "sha256": "dece6d820d5cd206198f715c448398550d150c00cccf1439a9286e604119a75b",
           "binary": "codex-acp",
           "env": {
             "CODEX_PATH": "codex-runtime/aarch64-unknown-linux-musl/bin/codex",
@@ -31,8 +31,8 @@
           }
         },
         "linux-x64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-linux-x64.tar.gz",
-          "sha256": "50142177c5792273b27834abbabe1c0fc30028f6ddead4691b5c36499d187d16",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-linux-x64.tar.gz",
+          "sha256": "6d0c9d69e307aab06f0f87624a53a17d24e91af8b084cbb7e8a087cfc8903865",
           "binary": "codex-acp",
           "env": {
             "CODEX_PATH": "codex-runtime/x86_64-unknown-linux-musl/bin/codex",
@@ -40,8 +40,8 @@
           }
         },
         "win32-arm64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-win32-arm64.tar.gz",
-          "sha256": "9b235352274e50639e2d32b6fe6ab100a02cd3491532ff753bd9f375cbdd1c4a",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-win32-arm64.tar.gz",
+          "sha256": "368f18c63972574cdac2d08b6fa1a07bf124383098f6fe0993c5c69f8680f4a3",
           "binary": "codex-acp.exe",
           "env": {
             "CODEX_PATH": "codex-runtime/aarch64-pc-windows-msvc/bin/codex.exe",
@@ -49,8 +49,8 @@
           }
         },
         "win32-x64": {
-          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.1.1-jaz.2/codex-acp-app-server-2.1.1-jaz.2-win32-x64.tar.gz",
-          "sha256": "053db0418ebe107cbba983671dc92a23ad5057abec116354716c51101a94f3b4",
+          "url": "https://github.com/gluonfield/codex-acp-app-server/releases/download/v2.2.2-jaz.2/codex-acp-app-server-2.2.2-jaz.2-win32-x64.tar.gz",
+          "sha256": "cb5f66db624b829a8fc8c81fe9f66b1d20dd1cd32e89b470d8b0d51597388c33",
           "binary": "codex-acp.exe",
           "env": {
             "CODEX_PATH": "codex-runtime/x86_64-pc-windows-msvc/bin/codex.exe",
@@ -95,43 +95,43 @@
       }
     },
     "claude": {
-      "version": "0.85.1-jaz.1",
+      "version": "0.89.1-jaz.1",
       "assets": {
         "darwin-arm64": {
-          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.85.1-jaz.1/claude-agent-acp-0.85.1-jaz.1-darwin-arm64.tar.gz",
-          "sha256": "0ca51a1ccbaacea689eab8d33bc4787159a9d76607c351fcd5679d7416f0c8f0",
+          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.89.1-jaz.1/claude-agent-acp-0.89.1-jaz.1-darwin-arm64.tar.gz",
+          "sha256": "7569433f8ceba753b303a900c359d6e5b1f96f9d3169cc6ee72538c866c51c5d",
           "binary": "claude-agent-acp",
           "env": {
             "CLAUDE_CODE_EXECUTABLE": "claude"
           }
         },
         "darwin-x64": {
-          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.85.1-jaz.1/claude-agent-acp-0.85.1-jaz.1-darwin-x64.tar.gz",
-          "sha256": "6b650d86f5e8b448295b6532a3b1d06786d7c9d6d7a2a602d4e818da2709a79e",
+          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.89.1-jaz.1/claude-agent-acp-0.89.1-jaz.1-darwin-x64.tar.gz",
+          "sha256": "5aa02883f2e137caa3dfa8e7708771856edaed8b8e63bc16869cce536944074f",
           "binary": "claude-agent-acp",
           "env": {
             "CLAUDE_CODE_EXECUTABLE": "claude"
           }
         },
         "linux-arm64": {
-          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.85.1-jaz.1/claude-agent-acp-0.85.1-jaz.1-linux-arm64.tar.gz",
-          "sha256": "ea2edca4470a47d5b9bd534173a70b99388d99438abdf54e7dc28091dd84648f",
+          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.89.1-jaz.1/claude-agent-acp-0.89.1-jaz.1-linux-arm64.tar.gz",
+          "sha256": "82b52e32a0eba8bf6181dae65fc40c0605985a30fbe012650008295ffe631de4",
           "binary": "claude-agent-acp",
           "env": {
             "CLAUDE_CODE_EXECUTABLE": "claude"
           }
         },
         "linux-x64": {
-          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.85.1-jaz.1/claude-agent-acp-0.85.1-jaz.1-linux-x64.tar.gz",
-          "sha256": "797e8c90026404933f28e244755f6ce79a45bb9786695d0883fa3ed1fc5f9b23",
+          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.89.1-jaz.1/claude-agent-acp-0.89.1-jaz.1-linux-x64.tar.gz",
+          "sha256": "49b975de1c0bd793e32d37e36df9724283d4fdf8622f7b596b6d50483eda823b",
           "binary": "claude-agent-acp",
           "env": {
             "CLAUDE_CODE_EXECUTABLE": "claude"
           }
         },
         "win32-x64": {
-          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.85.1-jaz.1/claude-agent-acp-0.85.1-jaz.1-win32-x64.tar.gz",
-          "sha256": "3268d2ce23a313383e114cbf4e27798a368010a6b1d86d9c95848453cd163219",
+          "url": "https://github.com/gluonfield/claude-agent-acp/releases/download/v0.89.1-jaz.1/claude-agent-acp-0.89.1-jaz.1-win32-x64.tar.gz",
+          "sha256": "bccb7323761424d19368d4f5a249e7dc27f08f3d8d43ce59ac55b41694adbe4c",
           "binary": "claude-agent-acp.exe",
           "env": {
             "CLAUDE_CODE_EXECUTABLE": "claude.exe"

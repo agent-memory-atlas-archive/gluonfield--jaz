@@ -23,6 +23,7 @@ import { exerciseChatHistory } from './chat-history'
 import { exerciseConnectCard } from './connect-card'
 import { exerciseAccentText } from './accent-text'
 import { exerciseAppNavigation } from './app-navigation'
+import { exerciseCanvas } from './canvas'
 
 declare global {
   interface Window {
@@ -35,6 +36,7 @@ declare global {
       passwordStore(): Promise<{ count: number; plaintext: boolean }>
       pointer(type: string, x: number, y: number, button?: 'left' | 'right'): Promise<void>
       key(key: string, modifiers?: string[]): Promise<void>
+      wheel(x: number, y: number, deltaY: number, control?: boolean): Promise<void>
       capture(name?: string): Promise<void>
       resize(width: number, height: number): Promise<void>
       dropFolder(x: number, y: number): Promise<string>
@@ -83,6 +85,12 @@ function Fixture() {
         stage = 'side panel tabs and retained resources'
         await exerciseSidePanelTabs()
         window.smoke.result({ ok: true, checks: ['side panel and Overview shortcut visibility; compact tabs, browser retention, terminal, side chat, mobile layout, per-chat restoration and browsers surviving a backend reconnect'] })
+        return
+      }
+      stage = 'canvas resizing, scrolling and viewer controls'
+      await exerciseCanvas()
+      if (new URLSearchParams(location.search).get('suite') === 'canvas') {
+        window.smoke.result({ ok: true, checks: ['canvas pinch and pan over content; notes, documents and sandboxed cards fit without scrollbars; corners and edges resize at multiple zoom levels; filenames, Focus and Escape remain accessible'] })
         return
       }
       stage = 'app page navigation across Jaz history'
