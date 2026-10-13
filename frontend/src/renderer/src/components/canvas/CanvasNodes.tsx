@@ -79,7 +79,7 @@ export function FileNode({ id, data, selected }: NodeProps<BoardNode>) {
 }
 
 export function LinkNode({ id, data, selected }: NodeProps<BoardNode>) {
-  const { focused, connectSource } = useCanvas()
+  const { connectSource } = useCanvas()
   const url = typeof data.item.url === 'string' ? data.item.url : ''
   const host = URL.canParse(url) ? new URL(url).host : url
   return (
@@ -88,10 +88,9 @@ export function LinkNode({ id, data, selected }: NodeProps<BoardNode>) {
       <Handles />
       <ItemLabel badge="WEB" name={host} />
       <div className={`canvas-card${connectSource === id ? ' canvas-connect-source' : ''}`}>
-        <ViewerFrame id={id} status={url} focusable>
+        <ViewerFrame id={id} focusable>
           <iframe className="canvas-frame" title={host} src={url} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" referrerPolicy="strict-origin-when-cross-origin" />
         </ViewerFrame>
-        {focused === id ? null : <div className="canvas-shield" />}
         <Flash id={id} />
       </div>
     </>
@@ -119,13 +118,13 @@ export function TextNode({ id, data, selected }: NodeProps<BoardNode>) {
       <Resizer id={id} selected={selected && editing !== id} minWidth={sticky ? 120 : 40} minHeight={sticky ? 100 : 24} />
       <Handles />
       <div
-        className={`${sticky ? `canvas-sticky canvas-sticky-${STICKY_COLORS.has(color) ? color : 'custom'}` : 'canvas-text'}${connectSource === id ? ' canvas-connect-source' : ''}`}
+        className={`canvas-scroll nowheel ${sticky ? `canvas-sticky canvas-sticky-${STICKY_COLORS.has(color) ? color : 'custom'}` : 'canvas-text'}${connectSource === id ? ' canvas-connect-source' : ''}`}
         style={style}
         onDoubleClick={() => setEditing(id)}
       >
         {editing === id ? <TextEditor initial={text} onDone={finish} /> : <MessageMarkdown text={text} />}
-        <Flash id={id} />
       </div>
+      <Flash id={id} />
     </>
   )
 }
@@ -148,7 +147,7 @@ function TextEditor({ initial, onDone }: { initial: string; onDone: (value: stri
   return (
     <textarea
       ref={field}
-      className="canvas-text-editor nodrag nowheel"
+      className="canvas-text-editor canvas-scroll nodrag nowheel nopan"
       value={value}
       onChange={(event) => setValue(event.target.value)}
       onBlur={() => onDone(value)}

@@ -7,11 +7,9 @@ export function rawUrl(sessionId: string, file: CanvasFile): string {
   return `${sessionFileRawUrl(sessionId, file.path)}&v=${encodeURIComponent(file.version ?? '')}`
 }
 
-// Every file viewer shares this frame: the content, then a footer with what
-// the file is and, for viewers that take the pointer, Focus/Done.
 export function ViewerFrame({ id, status, focusable, controls, paper, children }: {
   id: string
-  status: ReactNode
+  status?: ReactNode
   focusable?: boolean
   controls?: ReactNode
   paper?: boolean
@@ -21,17 +19,16 @@ export function ViewerFrame({ id, status, focusable, controls, paper, children }
   const live = focused === id
   return (
     <div className="canvas-viewer">
-      <div className={`canvas-viewer-body${live ? ' live nodrag nowheel nopan' : ''}${paper ? ' paper' : ''}`}>{children}</div>
-      <div className="canvas-viewer-bar">
-        <span className="canvas-viewer-status">{status}</span>
-        {live && controls ? <span className="canvas-viewer-controls nodrag">{controls}</span> : null}
-        {focusable ? (
+      <div className={`canvas-viewer-body${focusable && !live ? ' inert' : ''}${live ? ' nodrag nowheel nopan' : ''}${paper ? ' paper' : ''}`}>{children}</div>
+      {focusable ? (
+        <div className="canvas-viewer-toolbar nodrag nowheel nopan">
+          {status ? <span className="canvas-viewer-status">{status}</span> : null}
+          {live && controls ? <span className="canvas-viewer-controls">{controls}</span> : null}
           <button type="button" className={`canvas-focus nodrag${live ? ' on' : ''}`} onClick={() => setFocused(live ? null : id)}>
             {live ? 'Done' : 'Focus'}
           </button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   )
 }
-

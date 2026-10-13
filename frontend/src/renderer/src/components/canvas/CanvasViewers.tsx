@@ -16,32 +16,32 @@ export function FileViewer({ id, file }: { id: string; file: CanvasFile }) {
   const { sessionId, view, focused: focusedId } = useCanvas()
   const focused = focusedId === id
   if (!file.version) {
-    return <ViewerFrame id={id} status={`Missing · ${file.path}`}><div className="canvas-viewer-empty">{fileName(file.path)}</div></ViewerFrame>
+    return <ViewerFrame id={id}><div className="canvas-viewer-empty">File missing</div></ViewerFrame>
   }
   switch (viewerFor(file.path)) {
     case 'component':
       return <ComponentFrame id={id} code={view.components[id]?.code} error={view.components[id]?.error} />
     case 'image':
       return (
-        <ViewerFrame id={id} status={`${extension(file.path).toUpperCase()} · ${fileName(file.path)}`}>
+        <ViewerFrame id={id}>
           <img className="canvas-image" src={rawUrl(sessionId, file)} alt={fileName(file.path)} draggable={false} />
         </ViewerFrame>
       )
     case 'pdf':
       return (
-        <ViewerFrame id={id} status={`PDF · ${fileName(file.path)}`} focusable paper>
+        <ViewerFrame id={id} focusable paper>
           <iframe className="canvas-frame" title={fileName(file.path)} src={`${rawUrl(sessionId, file)}#${focused ? 'view=FitH' : 'toolbar=0&view=FitH'}`} />
         </ViewerFrame>
       )
     case 'cad':
       return (
-        <Suspense fallback={<ViewerFrame id={id} status="Opening…" focusable><div /></ViewerFrame>}>
+        <Suspense fallback={<ViewerFrame id={id} focusable><div className="canvas-viewer-empty">Opening…</div></ViewerFrame>}>
           <CadViewer id={id} src={rawUrl(sessionId, file)} kind={extension(file.path)} focused={focused} />
         </Suspense>
       )
     case 'dxf':
       return (
-        <Suspense fallback={<ViewerFrame id={id} status="Opening…" focusable paper><div /></ViewerFrame>}>
+        <Suspense fallback={<ViewerFrame id={id} focusable paper><div className="canvas-viewer-empty">Opening…</div></ViewerFrame>}>
           <DxfViewer id={id} src={rawUrl(sessionId, file)} />
         </Suspense>
       )
@@ -50,7 +50,7 @@ export function FileViewer({ id, file }: { id: string; file: CanvasFile }) {
     case 'html':
       return <TextFileViewer id={id} file={file} />
     case 'file':
-      return <ViewerFrame id={id} status={fileName(file.path)}><div className="canvas-viewer-empty">{extension(file.path).toUpperCase() || 'File'}</div></ViewerFrame>
+      return <ViewerFrame id={id}><div className="canvas-viewer-empty">{extension(file.path).toUpperCase() || 'File'}</div></ViewerFrame>
   }
 }
 
@@ -63,18 +63,17 @@ function TextFileViewer({ id, file }: { id: string; file: CanvasFile }) {
   })
   const viewer = viewerFor(file.path)
   const text = read.data?.content ?? ''
-  const status = `${extension(file.path).toUpperCase()} · ${fileName(file.path)}`
-  if (read.isError) return <ViewerFrame id={id} status={status}><div className="canvas-viewer-empty">{read.error.message}</div></ViewerFrame>
+  if (read.isError) return <ViewerFrame id={id}><div className="canvas-viewer-empty">{read.error.message}</div></ViewerFrame>
   if (viewer === 'html') {
     return (
-      <ViewerFrame id={id} status={status}>
+      <ViewerFrame id={id}>
         <SandboxFrame title={fileName(file.path)} document={buildArtifactDocument({ title: fileName(file.path), code: text, loadingMessages: [] }, theme)} onPrompt={prompt} />
       </ViewerFrame>
     )
   }
   return (
-    <ViewerFrame id={id} status={status}>
-      <div className="canvas-text-file nowheel">{viewer === 'csv' ? <CsvTable text={text} /> : <MessageMarkdown text={text} />}</div>
+    <ViewerFrame id={id}>
+      <div className="canvas-text-file canvas-scroll nodrag nowheel nopan">{viewer === 'csv' ? <CsvTable text={text} /> : <MessageMarkdown text={text} />}</div>
     </ViewerFrame>
   )
 }

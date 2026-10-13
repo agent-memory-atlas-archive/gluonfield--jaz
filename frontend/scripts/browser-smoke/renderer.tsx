@@ -23,6 +23,7 @@ import { exerciseChatHistory } from './chat-history'
 import { exerciseConnectCard } from './connect-card'
 import { exerciseAccentText } from './accent-text'
 import { exerciseAppNavigation } from './app-navigation'
+import { exerciseCanvas } from './canvas'
 
 declare global {
   interface Window {
@@ -77,6 +78,12 @@ function Fixture() {
         stage = 'side panel tabs and retained resources'
         await exerciseSidePanelTabs()
         window.smoke.result({ ok: true, checks: ['side panel and Overview shortcut visibility; compact tabs, browser retention, terminal, side chat, mobile layout, per-chat restoration and browsers surviving a backend reconnect'] })
+        return
+      }
+      stage = 'canvas resizing, scrolling and viewer controls'
+      await exerciseCanvas()
+      if (new URLSearchParams(location.search).get('suite') === 'canvas') {
+        window.smoke.result({ ok: true, checks: ['canvas corners and edges resize at multiple zoom levels; document and note scrollbars work without panning; filenames appear once; Focus and Escape remain accessible'] })
         return
       }
       stage = 'app page navigation across Jaz history'
