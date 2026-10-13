@@ -7,3 +7,7 @@
 - [x] Document the format, validate configuration, run the full backend suite, review and commit.
 
 Verification: Go 1.26 full backend suite (101 passing packages), build, two isolated server starts with stable bot/routine IDs and next-run times, and controls proving the tests reject recreated routines and omitted prompts. Strict review passed; staticcheck matches HEAD exactly with 50 existing findings.
+
+- [x] Complete the explicitly requested thermo-nuclear review, repair findings, verify and commit.
+
+Follow-up review repaired four findings: validate all saved-name targets before writes, use one Unicode identity rule, start HTTP before declaration updates, and persist prompts before model resume. Regression controls reproduce all four defects on the original code. See [review](review-configured-bots.md).

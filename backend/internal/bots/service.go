@@ -173,6 +173,9 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 			return Bot{}, err
 		}
 	}
+	if err := s.store.SaveBot(record); err != nil {
+		return Bot{}, err
+	}
 	if input.Agent != nil || input.Model != nil {
 		threads, err := s.threadsOf(id)
 		if err != nil {
@@ -195,9 +198,6 @@ func (s *Service) Update(ctx context.Context, id string, input UpdateBot) (Bot, 
 		if err := s.store.UpdateSessionTitle(id, name); err != nil {
 			return Bot{}, err
 		}
-	}
-	if err := s.store.SaveBot(record); err != nil {
-		return Bot{}, err
 	}
 	return s.Load(id)
 }

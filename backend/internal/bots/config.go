@@ -3,6 +3,7 @@ package bots
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,13 +26,20 @@ type ScheduleConfig struct {
 	Status   string
 }
 
+type declaration struct {
+	input     CreateBot
+	bot       Bot
+	schedules []scheduleDeclaration
+}
+
+type scheduleDeclaration struct {
+	input   loops.CreateLoop
+	routine loops.Loop
+}
+
 func (s *Service) Declare(ctx context.Context, declared []Config) error {
 	if len(declared) == 0 {
 		return nil
-	}
-	declared, err := normalizeConfig(declared)
-	if err != nil {
-		return err
 	}
 	bots, err := s.List()
 	if err != nil {
@@ -41,42 +49,50 @@ func (s *Service) Declare(ctx context.Context, declared []Config) error {
 	if err != nil {
 		return err
 	}
-	for _, input := range declared {
-		bot, err := s.declareBot(ctx, bots, input)
+	plan, err := planDeclarations(declared, bots, routines)
+	if err != nil {
+		return err
+	}
+	for _, item := range plan {
+		bot, err := s.declareBot(ctx, item.bot, item.input)
 		if err != nil {
-			return fmt.Errorf("configured bot %q: %w", input.Name, err)
+			return fmt.Errorf("configured bot %q: %w", item.input.Name, err)
 		}
-		for _, schedule := range input.Schedules {
-			if err := s.declareSchedule(routines, bot.ID, schedule); err != nil {
-				return fmt.Errorf("configured bot %q, schedule %q: %w", input.Name, schedule.Name, err)
+		for _, schedule := range item.schedules {
+			schedule.input.BotID = bot.ID
+			if err := s.declareSchedule(schedule.routine, schedule.input); err != nil {
+				return fmt.Errorf("configured bot %q, schedule %q: %w", item.input.Name, schedule.input.Name, err)
 			}
 		}
 	}
 	return nil
 }
 
-func normalizeConfig(declared []Config) ([]Config, error) {
-	result := make([]Config, 0, len(declared))
-	names := map[string]bool{}
+func planDeclarations(declared []Config, bots []Bot, routines []loops.Loop) ([]declaration, error) {
+	result := make([]declaration, 0, len(declared))
 	for _, input := range declared {
 		input.Name = strings.TrimSpace(input.Name)
 		input.Prompt = strings.TrimSpace(input.Prompt)
 		input.Agent = acp.CanonicalAgentName(input.Agent)
 		input.Model = strings.TrimSpace(input.Model)
-		key := strings.ToLower(input.Name)
-		if key == "" || names[key] {
+		if input.Name == "" || slices.ContainsFunc(result, func(other declaration) bool { return strings.EqualFold(other.input.Name, input.Name) }) {
 			return nil, fmt.Errorf("configured bot name %q is empty or repeated", input.Name)
 		}
-		names[key] = true
-		schedules := make([]ScheduleConfig, 0, len(input.Schedules))
-		scheduleNames := map[string]bool{}
+		item := declaration{input: CreateBot{Name: input.Name, Prompt: input.Prompt, Agent: input.Agent, Model: input.Model}}
+		for _, bot := range bots {
+			if !strings.EqualFold(bot.Name, input.Name) {
+				continue
+			}
+			if item.bot.ID != "" || bot.Kind != KindBot {
+				return nil, fmt.Errorf("configured bot %q: name matches a group or multiple bots", input.Name)
+			}
+			item.bot = bot
+		}
 		for _, schedule := range input.Schedules {
 			schedule.Name = strings.TrimSpace(schedule.Name)
-			key := strings.ToLower(schedule.Name)
-			if key == "" || scheduleNames[key] {
+			if schedule.Name == "" || slices.ContainsFunc(item.schedules, func(other scheduleDeclaration) bool { return strings.EqualFold(other.input.Name, schedule.Name) }) {
 				return nil, fmt.Errorf("configured bot %q: schedule name %q is empty or repeated", input.Name, schedule.Name)
 			}
-			scheduleNames[key] = true
 			prompt := strings.TrimSpace(schedule.Prompt)
 			if prompt == "" {
 				prompt = input.Prompt
@@ -87,29 +103,26 @@ func normalizeConfig(declared []Config) ([]Config, error) {
 			if err != nil {
 				return nil, fmt.Errorf("configured bot %q, schedule %q: %w", input.Name, schedule.Name, err)
 			}
-			schedules = append(schedules, ScheduleConfig{
-				Name: routine.Name, Prompt: routine.Prompt, Schedule: routine.Schedule, Status: routine.Status,
-			})
+			next := scheduleDeclaration{input: routine}
+			for _, saved := range routines {
+				if item.bot.ID == "" || saved.BotID != item.bot.ID || !strings.EqualFold(saved.Name, routine.Name) {
+					continue
+				}
+				if next.routine.ID != "" {
+					return nil, fmt.Errorf("configured bot %q, schedule %q: name matches multiple routines", input.Name, schedule.Name)
+				}
+				next.routine = saved
+			}
+			item.schedules = append(item.schedules, next)
 		}
-		input.Schedules = schedules
-		result = append(result, input)
+		result = append(result, item)
 	}
 	return result, nil
 }
 
-func (s *Service) declareBot(ctx context.Context, bots []Bot, input Config) (Bot, error) {
-	var current Bot
-	for _, bot := range bots {
-		if !strings.EqualFold(bot.Name, input.Name) {
-			continue
-		}
-		if current.ID != "" || bot.Kind != KindBot {
-			return Bot{}, fmt.Errorf("name matches a group or multiple bots")
-		}
-		current = bot
-	}
+func (s *Service) declareBot(ctx context.Context, current Bot, input CreateBot) (Bot, error) {
 	if current.ID == "" {
-		return s.Create(ctx, CreateBot{Name: input.Name, Prompt: input.Prompt, Agent: input.Agent, Model: input.Model})
+		return s.Create(ctx, input)
 	}
 	update := UpdateBot{}
 	if current.Prompt != input.Prompt {
@@ -130,21 +143,9 @@ func (s *Service) declareBot(ctx context.Context, bots []Bot, input Config) (Bot
 	return current, nil
 }
 
-func (s *Service) declareSchedule(routines []loops.Loop, botID string, input ScheduleConfig) error {
-	var current loops.Loop
-	for _, routine := range routines {
-		if routine.BotID != botID || !strings.EqualFold(routine.Name, input.Name) {
-			continue
-		}
-		if current.ID != "" {
-			return fmt.Errorf("name matches multiple routines")
-		}
-		current = routine
-	}
+func (s *Service) declareSchedule(current loops.Loop, input loops.CreateLoop) error {
 	if current.ID == "" {
-		_, err := s.routines.Create(loops.CreateLoop{
-			Name: input.Name, Prompt: input.Prompt, Schedule: input.Schedule, Status: input.Status, BotID: botID,
-		})
+		_, err := s.routines.Create(input)
 		return err
 	}
 	update := loops.UpdateLoop{}

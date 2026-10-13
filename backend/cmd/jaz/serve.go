@@ -354,9 +354,6 @@ func startServer(
 	var stopLoops context.CancelFunc
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			if err := botService.Declare(ctx, cfg.Bots); err != nil {
-				return err
-			}
 			fmt.Printf("jaz server listening on %s\n", serverconfig.DisplayAddr(serverConfig.Addr))
 			if strings.TrimSpace(serverConfig.PublicURL) == "" {
 				fmt.Printf("client: %s\n", serverconfig.ClientURL(serverConfig, authKey))
@@ -374,6 +371,16 @@ func startServer(
 			}
 			listener, err := net.Listen("tcp", srv.Addr)
 			if err != nil {
+				return err
+			}
+			go func() {
+				if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+					fmt.Fprintln(os.Stderr, "serve:", err)
+				}
+			}()
+			if err := botService.Declare(ctx, cfg.Bots); err != nil {
+				_ = srv.Close()
+				manager.Close()
 				return err
 			}
 			loopCtx, cancelLoops := context.WithCancel(context.Background())
@@ -400,11 +407,6 @@ func startServer(
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 				defer cancel()
 				handler.PruneManagedWorktrees(ctx)
-			}()
-			go func() {
-				if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
-					fmt.Fprintln(os.Stderr, "serve:", err)
-				}
 			}()
 			return nil
 		},

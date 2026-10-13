@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/wins/jaz/backend/internal/acp"
 	"github.com/wins/jaz/backend/internal/loops"
+	"github.com/wins/jaz/backend/internal/promptmodule"
 	"github.com/wins/jaz/backend/internal/sessionevents"
 	"github.com/wins/jaz/backend/internal/storage"
 	sqlitestore "github.com/wins/jaz/backend/internal/storage/sqlite"
@@ -151,10 +152,15 @@ func TestConfiguredBotsRejectInvalidInputBeforeCreatingAnything(t *testing.T) {
 	}{
 		{"missing bot name", []Config{{Prompt: "Research."}}},
 		{"duplicate bot", []Config{{Name: "Research"}, {Name: " research "}}},
+		{"Unicode duplicate bot", []Config{{Name: "S"}, {Name: "ſ"}}},
 		{"missing schedule name", []Config{{Name: "Research", Prompt: "Research.", Schedules: []ScheduleConfig{{Schedule: loops.Schedule{Expr: "0 9 * * *"}}}}}},
 		{"duplicate schedule", []Config{{Name: "Research", Prompt: "Research.", Schedules: []ScheduleConfig{
 			{Name: "Morning", Schedule: loops.Schedule{Expr: "0 9 * * *"}},
 			{Name: " morning ", Schedule: loops.Schedule{Expr: "0 10 * * *"}},
+		}}}},
+		{"Unicode duplicate schedule", []Config{{Name: "Research", Prompt: "Research.", Schedules: []ScheduleConfig{
+			{Name: "Σ", Schedule: loops.Schedule{Expr: "0 9 * * *"}},
+			{Name: "ς", Schedule: loops.Schedule{Expr: "0 10 * * *"}},
 		}}}},
 		{"invalid cron", []Config{{Name: "Research", Prompt: "Research.", Schedules: []ScheduleConfig{{Name: "Morning", Schedule: loops.Schedule{Expr: "bad"}}}}}},
 		{"invalid timezone", []Config{{Name: "Research", Prompt: "Research.", Schedules: []ScheduleConfig{{Name: "Morning", Schedule: loops.Schedule{Expr: "0 9 * * *", Timezone: "bad"}}}}}},
@@ -209,6 +215,40 @@ func TestConfiguredPromptReachesOwnAndGroupChats(t *testing.T) {
 	}
 }
 
+func TestBotPromptIsPersistedBeforeModelResume(t *testing.T) {
+	root := t.TempDir()
+	service, store, _ := newConfiguredBotService(t, root)
+	bot, err := service.Create(t.Context(), CreateBot{Name: "Research", Agent: "fixture", Prompt: "Old instructions."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread, err := store.LoadSession(bot.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	thread.RuntimeRef.SessionID = "stored-provider-session"
+	if err := store.SaveSession(thread); err != nil {
+		t.Fatal(err)
+	}
+	var supplied promptmodule.Modules
+	manager := acp.NewManager(store, acp.Config{
+		Root: root, Agents: map[string]acp.AgentConfig{"fixture": {Command: filepath.Join(root, "missing-agent")}},
+		ResumePrompt: func(session storage.Session) (promptmodule.Modules, error) {
+			modules, err := Prompt(store, session)
+			supplied = modules
+			return modules, err
+		},
+	}, log.New(io.Discard))
+	t.Cleanup(manager.Close)
+	service.threads = manager
+	if _, err := service.Update(t.Context(), bot.ID, UpdateBot{Prompt: new("New instructions."), Model: new("new-model")}); err == nil {
+		t.Fatal("unavailable fixture executable accepted a live model change")
+	}
+	if len(supplied) != 2 || supplied[1] != "New instructions." {
+		t.Fatalf("resuming the model saw stale bot instructions: %v", supplied)
+	}
+}
+
 func TestConfiguredBotNamesRejectAmbiguousSavedRecords(t *testing.T) {
 	for _, kind := range []string{"bots", "group", "routines"} {
 		t.Run(kind, func(t *testing.T) {
@@ -242,8 +282,17 @@ func TestConfiguredBotNamesRejectAmbiguousSavedRecords(t *testing.T) {
 				}
 				config[0].Schedules = []ScheduleConfig{{Name: "Morning", Prompt: "Research.", Schedule: loops.Schedule{Expr: "0 9 * * *"}}}
 			}
+			before, err := service.List()
+			if err != nil {
+				t.Fatal(err)
+			}
+			config = append([]Config{{Name: "New bot"}}, config...)
 			if err := service.Declare(t.Context(), config); err == nil {
 				t.Fatal("ambiguous name accepted")
+			}
+			after, err := service.List()
+			if err != nil || len(after) != len(before) {
+				t.Fatalf("ambiguous config created a bot: before %d, after %d, error %v", len(before), len(after), err)
 			}
 		})
 	}

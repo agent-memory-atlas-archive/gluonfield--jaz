@@ -27,6 +27,7 @@ An unchanged schedule keeps its next run; a changed schedule computes a new one.
 Removing a definition from the file leaves the saved bot or routine in place.
 
 `prompt` supplies the bot's instructions in its own chat and group chats.
+`model` is the agent's model identifier.
 Each schedule runs as a turn in that bot's thread and uses its agent and model.
 An omitted schedule prompt uses the bot's prompt. Schedules accept five-field
 cron expressions, an optional IANA timezone (the server's timezone by default),
