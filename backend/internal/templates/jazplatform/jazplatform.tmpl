@@ -70,6 +70,8 @@ The board is `{{ .CanvasDir }}/canvas.json`, a JSON Canvas 1.0 document (jsoncan
 - Edges connect `fromNode` to `toNode`, with optional `fromSide`/`toSide` (`top`, `right`, `bottom`, `left`) and `label`.
 - `x`, `y`, `width` and `height` are canvas pixels. Avoid overlaps: leave about 40 px between items and 36 px inside a section's edge.
 
+Choose item dimensions and layouts so notes, tables and visuals fit without internal scrolling where practical, keeping text readable. For long reports, put a concise overview and useful titled sections on the board, with the complete document available as a file; retain scrolling for inherently long content. Verify the rendered result and adjust the content or item size to fit.
+
 For custom visuals and interactive cards, write a React component to `{{ .CanvasDir }}/components/<name>.tsx` and add a `file` node pointing at it. The file default-exports a component without props that fills its node. It may import `react` and packages from esm.sh. It runs in a sandboxed frame without local file access, so inline the data it shows. Use the CSS variables `--color-surface`, `--color-ink`, `--color-ink-2`, `--color-border` and `--color-primary` so it follows the theme. Call `sendPrompt(text)` from a control to send the user's choice to you as their message. If the file fails to compile, its node shows the error.
 
 The user's message may carry `<canvas_selection>` entries naming the node ids they selected.
