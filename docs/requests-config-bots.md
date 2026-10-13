@@ -11,3 +11,7 @@ Verification: Go 1.26 full backend suite (101 passing packages), build, two isol
 - [x] Complete the explicitly requested thermo-nuclear review, repair findings, verify and commit.
 
 Follow-up review repaired four findings: validate all saved-name targets before writes, use one Unicode identity rule, start HTTP before declaration updates, and persist prompts before model resume. Regression controls reproduce all four defects on the original code. See [review](review-configured-bots.md).
+
+- [x] Repeat the thermo-nuclear review of the completed branch, repair findings and verify.
+
+The second pass found a startup shutdown race: HTTP shutdown could precede listener registration. Closing the listener directly fixes it; the existing lifecycle test fails once in 50 repetitions before the fix and passes all 100 afterwards. No further structural blockers were found in configured bots or the Canvas panel.

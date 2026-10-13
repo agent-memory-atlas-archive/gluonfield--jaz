@@ -379,6 +379,7 @@ func startServer(
 				}
 			}()
 			if err := botService.Declare(ctx, cfg.Bots); err != nil {
+				_ = listener.Close()
 				_ = srv.Close()
 				manager.Close()
 				return err
