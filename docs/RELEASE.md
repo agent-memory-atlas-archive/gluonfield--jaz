@@ -1,28 +1,33 @@
 # Releasing Jaz
 
-Bump the version, then publish a GitHub Release with a matching `v` tag. That
-triggers [`Release`](../.github/workflows/release-desktop.yml), which builds,
-signs and notarizes the macOS app, builds the Windows app, and uploads
-standalone Linux backend binaries.
+Bump the version, commit it and push the matching `v` tag. That triggers
+[`Release`](../.github/workflows/release-desktop.yml), which creates a draft,
+builds and uploads all artifacts, then publishes it as the latest release
+only after every build succeeds. The previous complete release stays available
+to updaters while the new build runs.
 
 The tag must equal `frontend/package.json` version with a `v` prefix
 (`0.0.11` → `v0.0.11`), or the build fails.
 
 ```sh
-# 1. bump version in frontend/package.json (e.g. -> "0.0.11"), then:
-git commit -am "feat: version update" && git push origin main
+# Bump frontend/package.json first, then commit that file and push main.
+git add frontend/package.json
+git commit -m "Release v0.0.11" -- frontend/package.json
+git push origin main
 
-# 2. create + publish the release (this starts the build; don't attach assets)
-gh release create v0.0.11 --target main --title v0.0.11 --generate-notes
+# Start the release build from that exact commit.
+git tag v0.0.11
+git push origin v0.0.11
 
-# 3. watch it
+# Watch the build.
 gh run watch "$(gh run list --workflow=release-desktop.yml -L1 --json databaseId -q '.[0].databaseId')"
 ```
 
 The workflow uploads macOS `*.dmg`, macOS/Windows `*.zip`, Windows `*.exe`,
 `latest-mac.yml`, `latest.yml`, Linux/macOS `jaz-backend-<os>-<arch>.tar.gz`
-backend assets, and matching `.sha256` files to the release. Re-runs overwrite
-assets (`--clobber`), so to redo a release just publish the tag again.
+backend assets, and matching `.sha256` files to the draft release. Retry failed
+jobs with `gh run rerun <run-id> --failed`; uploads replace their earlier assets.
+Never publish the draft manually before its builds finish.
 
 Standalone backend release assets are built with version metadata. After
 installing one, `/opt/jaz/bin/jaz --version` should print the release tag.

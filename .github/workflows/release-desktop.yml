@@ -1,20 +1,49 @@
 name: Release
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tag version
+        run: |
+          tag_version="${RELEASE_TAG#v}"
+          package_version="$(node -p "require('./frontend/package.json').version")"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "Tag $RELEASE_TAG does not match frontend/package.json version $package_version"
+            exit 1
+          fi
+      - name: Prepare draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if release_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "$release_draft" != true ]; then
+              echo "Release $RELEASE_TAG is already published"
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" --draft --verify-tag --title "$RELEASE_TAG" --generate-notes
+          fi
+
   backend:
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.ref_name }}
 
       - uses: actions/checkout@v4
         with:
@@ -30,16 +59,6 @@ jobs:
         working-directory: backend
         run: go mod edit "-replace=github.com/gluonfield/jazmem=../_deps/jazmem"
 
-      - name: Check tag version
-        run: |
-          tag_version="${{ github.event.release.tag_name }}"
-          tag_version="${tag_version#v}"
-          package_version="$(node -p "require('./frontend/package.json').version")"
-          if [ "$tag_version" != "$package_version" ]; then
-            echo "Tag v$tag_version does not match frontend/package.json version $package_version"
-            exit 1
-          fi
-
       - name: Test backend
         working-directory: backend
         run: go test ./...
@@ -51,7 +70,7 @@ jobs:
           JAZ_BUNDLED_TELEGRAM_APP_HASH: ${{ vars.JAZ_BUNDLED_TELEGRAM_APP_HASH || secrets.JAZ_BUNDLED_TELEGRAM_APP_HASH }}
         run: |
           mkdir -p ../dist/backend
-          ldflags="$(bash ../.github/scripts/backend-ldflags.sh "${{ github.event.release.tag_name }}")"
+          ldflags="$(bash ../.github/scripts/backend-ldflags.sh "$RELEASE_TAG")"
           for arch in amd64 arm64; do
             name="jaz-backend-linux-${arch}"
             out="../dist/backend/${name}"
@@ -64,7 +83,6 @@ jobs:
       - name: Attach backend release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$RELEASE_TAG" \
             dist/backend/*.tar.gz \
@@ -72,11 +90,12 @@ jobs:
             --clobber
 
   acp-adapters:
+    needs: prepare
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Generate ACP adapter manifest
         env:
@@ -86,15 +105,15 @@ jobs:
       - name: Attach ACP adapter manifest
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$RELEASE_TAG" dist/acp-adapters.json --clobber
 
   macos:
+    needs: prepare
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.ref_name }}
 
       - uses: actions/checkout@v4
         with:
@@ -113,16 +132,6 @@ jobs:
       - name: Point backend at jazmem checkout
         working-directory: backend
         run: go mod edit "-replace=github.com/gluonfield/jazmem=../_deps/jazmem"
-
-      - name: Check tag version
-        run: |
-          tag_version="${{ github.event.release.tag_name }}"
-          tag_version="${tag_version#v}"
-          package_version="$(bun -e "console.log(require('./frontend/package.json').version)")"
-          if [ "$tag_version" != "$package_version" ]; then
-            echo "Tag v$tag_version does not match frontend/package.json version $package_version"
-            exit 1
-          fi
 
       - name: Install dependencies
         working-directory: frontend
@@ -168,7 +177,7 @@ jobs:
           JAZ_BUNDLED_TELEGRAM_APP_HASH: ${{ vars.JAZ_BUNDLED_TELEGRAM_APP_HASH || secrets.JAZ_BUNDLED_TELEGRAM_APP_HASH }}
         run: |
           mkdir -p ../dist/backend
-          ldflags="$(bash ../.github/scripts/backend-ldflags.sh "${{ github.event.release.tag_name }}")"
+          ldflags="$(bash ../.github/scripts/backend-ldflags.sh "$RELEASE_TAG")"
           for arch in amd64 arm64; do
             name="jaz-backend-darwin-${arch}"
             out="../dist/backend/${name}"
@@ -196,7 +205,6 @@ jobs:
       - name: Attach backend release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$RELEASE_TAG" \
             dist/backend/*.tar.gz \
@@ -207,7 +215,6 @@ jobs:
         working-directory: frontend
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$RELEASE_TAG" \
             dist/*.dmg \
@@ -216,11 +223,12 @@ jobs:
             --clobber
 
   windows:
+    needs: prepare
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.ref_name }}
 
       - uses: actions/checkout@v4
         with:
@@ -239,15 +247,6 @@ jobs:
       - name: Point backend at jazmem checkout
         working-directory: backend
         run: go mod edit "-replace=github.com/gluonfield/jazmem=../_deps/jazmem"
-
-      - name: Check tag version
-        shell: pwsh
-        run: |
-          $tagVersion = "${{ github.event.release.tag_name }}".TrimStart("v")
-          $packageVersion = bun -e "console.log(require('./frontend/package.json').version)"
-          if ($tagVersion -ne $packageVersion) {
-            throw "Tag v$tagVersion does not match frontend/package.json version $packageVersion"
-          }
 
       - name: Install dependencies
         working-directory: frontend
@@ -320,10 +319,19 @@ jobs:
         working-directory: frontend
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           gh release upload "$env:RELEASE_TAG" `
             dist/*.exe `
             dist/*.zip `
             dist/latest.yml `
             --clobber
+
+  publish:
+    needs: [backend, acp-adapters, macos, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish completed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$RELEASE_TAG" --draft=false --latest=true
