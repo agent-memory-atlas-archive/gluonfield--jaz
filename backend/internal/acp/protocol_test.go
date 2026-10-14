@@ -3,7 +3,6 @@ package acp
 import (
 	"context"
 	"encoding/json"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -162,100 +161,6 @@ func TestCodexModelMetadataWarningStaysVisible(t *testing.T) {
 	}
 	if codexHiddenWarning(AgentCodex, update) {
 		t.Fatal("fallback metadata warning was suppressed")
-	}
-}
-
-func TestRequestPermissionPublishesAndWaitsForAnswer(t *testing.T) {
-	root := t.TempDir()
-	store, err := jsonstore.New(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	session, err := store.CreateSession(storage.CreateSession{Slug: "permission", Runtime: storage.RuntimeACP})
-	if err != nil {
-		t.Fatal(err)
-	}
-	oldAttention := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
-	storage.MarkSessionAttention(&session, oldAttention)
-	if err := store.SaveSession(session); err != nil {
-		t.Fatal(err)
-	}
-	events := sessionevents.New()
-	manager := NewManager(store, Config{}, nil)
-	manager.Events = events
-	manager.jobsByID[session.ID] = &jobState{Job: Job{ID: session.ID, ACPSession: "acp-session", Cwd: root}}
-	manager.jobsByACP["acp-session"] = manager.jobsByID[session.ID]
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	sub := events.Subscribe(ctx, session.ID)
-	result := make(chan json.RawMessage, 1)
-	errs := make(chan *jsonrpc.Error, 1)
-
-	go func() {
-		raw, rpcErr := manager.handleJSONRPC(ctx, jsonrpc.Request{
-			Method: acpschema.ClientMethodSessionRequestPermission,
-			Params: mustJSON(t, acpschema.RequestPermissionRequest{
-				SessionID: "acp-session",
-				Options: []acpschema.PermissionOption{{
-					OptionID: "approve",
-					Name:     "Approve tool",
-					Kind:     acpschema.PermissionOptionKindAllowOnce,
-				}},
-				ToolCall: acpschema.ToolCallUpdate{
-					ToolCallID: "tool-approval",
-					Title:      "Approve tool",
-					Locations:  []acpschema.ToolCallLocation{{Path: filepath.Join(root, "index.html")}},
-				},
-			}),
-		})
-		if rpcErr != nil {
-			errs <- rpcErr
-			return
-		}
-		result <- raw
-	}()
-
-	var requestID string
-	select {
-	case event := <-sub:
-		if event.Type != "permission_request" || event.Permission == nil {
-			t.Fatalf("unexpected event %#v", event)
-		}
-		requestID = event.Permission.ID
-		if event.Permission.ToolCallID != "tool-approval" || len(event.Permission.Locations) != 1 {
-			t.Fatalf("permission = %#v", event.Permission)
-		}
-		loaded, err := store.LoadSession(session.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !loaded.LastAttentionAt.After(oldAttention) {
-			t.Fatalf("permission request did not advance attention: %s -> %s", oldAttention, loaded.LastAttentionAt)
-		}
-	case err := <-errs:
-		t.Fatal(err)
-	case <-ctx.Done():
-		t.Fatal(ctx.Err())
-	}
-
-	if err := manager.AnswerInteractive(ctx, InteractiveAnswer{Session: session.ID, RequestID: requestID, OptionID: "approve"}); err != nil {
-		t.Fatal(err)
-	}
-
-	select {
-	case raw := <-result:
-		var got map[string]map[string]string
-		if err := json.Unmarshal(raw, &got); err != nil {
-			t.Fatal(err)
-		}
-		if got["outcome"]["outcome"] != "selected" || got["outcome"]["optionId"] != "approve" {
-			t.Fatalf("unexpected permission response: %s", raw)
-		}
-	case err := <-errs:
-		t.Fatal(err)
-	case <-ctx.Done():
-		t.Fatal(ctx.Err())
 	}
 }
 
@@ -1078,6 +983,11 @@ func TestClaudeStylePlanExitPermissionPublishesRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	oldAttention := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
+	storage.MarkSessionAttention(&session, oldAttention)
+	if err := store.SaveSession(session); err != nil {
+		t.Fatal(err)
+	}
 	events := sessionevents.New()
 	manager := NewManager(store, Config{}, nil)
 	manager.Events = events
@@ -1146,6 +1056,13 @@ func TestClaudeStylePlanExitPermissionPublishesRequest(t *testing.T) {
 			t.Fatalf("unexpected event %#v", event)
 		}
 		requestID = event.Permission.ID
+		loaded, err := store.LoadSession(session.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !loaded.LastAttentionAt.After(oldAttention) {
+			t.Fatalf("plan permission did not advance attention: %s -> %s", oldAttention, loaded.LastAttentionAt)
+		}
 		if event.Permission.ToolCallID != "toolu-plan-exit" || len(event.Permission.Options) != 4 {
 			t.Fatalf("permission = %#v", event.Permission)
 		}

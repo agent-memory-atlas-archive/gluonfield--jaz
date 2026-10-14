@@ -19,6 +19,19 @@ type InteractiveAnswerValue struct {
 }
 
 func (m *Manager) awaitPermission(ctx context.Context, job *jobState, req acpschema.RequestPermissionRequest) (json.RawMessage, *jsonrpc.Error) {
+	if ctx.Err() != nil || job.hasQueuedPromptSuccessor() {
+		return permissionCancelled()
+	}
+	if job.permissionToolCall(req.ToolCall).Kind != string(acpschema.ToolKindSwitchMode) {
+		for _, kind := range []acpschema.PermissionOptionKind{acpschema.PermissionOptionKindAllowOnce, acpschema.PermissionOptionKindAllowAlways} {
+			for _, option := range req.Options {
+				if option.Kind == kind {
+					return jsonrpc.EncodeResult(acpschema.RequestPermissionResponseSelected(option.OptionID))
+				}
+			}
+		}
+		return permissionCancelled()
+	}
 	permission := job.permissionEvent(req)
 	permission.ID = newPermissionID()
 	permission.SessionID = string(req.SessionID)
@@ -200,14 +213,19 @@ func (m *Manager) sendTextAfterTurn(sessionID, text string, parentVisible, planR
 	})
 }
 
-// permissionEvent overlays the request's tool call on the call it updates: an
+// permissionToolCall overlays the request's tool call on the call it updates: an
 // agent can leave out the fields that did not change, such as the kind, title
 // and locations.
-func (j *jobState) permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPermission {
+func (j *jobState) permissionToolCall(update acpschema.ToolCallUpdate) sessionevents.ACPToolCall {
 	j.mu.RLock()
-	call := j.toolByID[string(req.ToolCall.ToolCallID)]
+	call := j.toolByID[string(update.ToolCallID)]
 	j.mu.RUnlock()
-	mergeToolCall(&call, toolUpdateSnapshot(req.ToolCall))
+	mergeToolCall(&call, toolUpdateSnapshot(update))
+	return call
+}
+
+func (j *jobState) permissionEvent(req acpschema.RequestPermissionRequest) sessionevents.ACPPermission {
+	call := j.permissionToolCall(req.ToolCall)
 	out := sessionevents.ACPPermission{
 		Title:      firstNonEmpty(call.Title, "Permission requested"),
 		ToolCallID: string(req.ToolCall.ToolCallID),
