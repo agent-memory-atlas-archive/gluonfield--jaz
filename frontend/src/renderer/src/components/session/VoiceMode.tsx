@@ -46,7 +46,7 @@ export function VoicePill({ voice, face, level = 0, outputLevel = 0, onReturn, t
     ? <BotAvatar avatar={face} size={34} working={voice.phase === 'connecting' || Boolean(voice.activity)} />
     : <VoiceVisualizer voice={voice} size={44} level={level} outputLevel={outputLevel} />
   return (
-    <div className="flex items-center gap-2 rounded-full border border-border bg-surface p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+    <div className="flex items-center gap-2 rounded-full border border-border bg-bg p-1.5 shadow-(--shadow-raised) dark:bg-surface">
       {onReturn ? (
         <button
           type="button"

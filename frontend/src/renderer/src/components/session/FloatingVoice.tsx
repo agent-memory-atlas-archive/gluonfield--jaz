@@ -30,7 +30,7 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
     <div
       style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
       aria-label="Floating voice conversation"
-      className="flex touch-none cursor-grab flex-col gap-2 drop-shadow-[0_6px_14px_rgba(0,0,0,0.28)] active:cursor-grabbing [-webkit-app-region:no-drag]"
+      className="flex touch-none cursor-grab flex-col gap-2 active:cursor-grabbing [-webkit-app-region:no-drag]"
       onPointerDown={(event) => {
         if (event.button !== 0 || (event.target as Element).closest('[data-voice-control]')) {
           return
@@ -90,7 +90,7 @@ export function FloatingVoice({ voice, face, onReturn, level, outputLevel }: {
 // stream in, unless scrolled back.
 function VoiceTranscript({ lines }: { lines: VoiceLine[] }) {
   return (
-    <div data-voice-control className="flex max-h-72 w-0 min-w-full cursor-auto flex-col-reverse overflow-y-auto rounded-3xl border border-border bg-surface p-2 text-sm select-text">
+    <div data-voice-control className="flex max-h-72 w-0 min-w-full cursor-auto flex-col-reverse overflow-y-auto rounded-3xl border border-border bg-bg p-2 text-sm shadow-(--shadow-raised) select-text dark:bg-surface">
       <div className="flex flex-col gap-1.5">
         {lines.map((line) => (
           <p
